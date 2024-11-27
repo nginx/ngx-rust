@@ -6,6 +6,8 @@ use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod bindgen_callbacks;
+
 const ENV_VARS_TRIGGERING_RECOMPILE: &[&str] = &["OUT_DIR", "NGINX_BUILD_DIR", "NGINX_SOURCE_DIR"];
 
 /// The feature flags set by the nginx configuration script.
@@ -228,7 +230,7 @@ fn generate_binding(nginx: &NginxSource) {
     #[cfg(not(windows))]
     let macro_dependencies = ["random", "sched_yield", "usleep"];
 
-    let bindings = bindgen::Builder::default()
+    let mut bindings = bindgen::Builder::default()
         // Allow all the NGINX symbols,
         .allowlist_function("ngx_.*")
         .allowlist_type("ngx_.*")
@@ -246,9 +248,25 @@ fn generate_binding(nginx: &NginxSource) {
         .clang_args(clang_args)
         .layout_tests(false)
         .rust_target(rust_target)
-        .use_core()
-        .generate()
-        .expect("Unable to generate bindings");
+        .use_core();
+
+    if cfg!(feature = "openssl-sys") {
+        use bindgen_callbacks::TypeFlags as TF;
+
+        let mut callbacks = bindgen_callbacks::NgxBindgenCallbacks::new();
+        callbacks.add_external_types(
+            "openssl_sys",
+            [
+                ("SSL", TF::empty()),
+                ("SSL_CTX", TF::empty()),
+                ("SSL_SESSION", TF::empty()),
+            ],
+        );
+
+        bindings = callbacks.add_to_builder(bindings);
+    }
+
+    let bindings = bindings.generate().expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
     let out_dir_env =
