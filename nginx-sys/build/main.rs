@@ -216,6 +216,8 @@ fn generate_binding(nginx: &NginxSource) {
         // Bindings will not compile on Linux without block listing this item
         // It is worth investigating why this is
         .blocklist_item("IPPORT_RESERVED")
+        // will be restored later in build.rs
+        .blocklist_item("NGX_ALIGNMENT")
         .generate_cstr(true)
         // The input header we would like to generate bindings for.
         .header("build/wrapper.h")

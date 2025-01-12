@@ -36,6 +36,14 @@ pub use queue::*;
 #[cfg(ngx_feature = "stream")]
 pub use stream::*;
 
+/// Default alignment for pool allocations.
+pub const NGX_ALIGNMENT: usize = NGX_RS_ALIGNMENT;
+
+// Check if the allocations made with ngx_palloc are properly aligned.
+// If the check fails, objects allocated from `ngx_pool` can violate Rust pointer alignment
+// requirements.
+const _: () = assert!(core::mem::align_of::<ngx_str_t>() <= NGX_ALIGNMENT);
+
 impl ngx_command_t {
     /// Creates a new empty [`ngx_command_t`] instance.
     ///
