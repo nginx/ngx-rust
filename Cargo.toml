@@ -39,9 +39,13 @@ std = ["alloc"]
 # This could be disabled with `--no-default-features` to minimize the dependency tree
 # when building against an existing copy of the NGINX with the NGX_OBJS variable.
 vendored = ["nginx-sys/vendored"]
+# test utility
+test_util = []
+
 
 [badges]
 maintenance = { status = "experimental" }
 
 [dev-dependencies]
 target-triple = "0.1.2"
+ngx = { path ="./", features = ["test_util"] }
