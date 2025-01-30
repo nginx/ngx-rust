@@ -1,5 +1,9 @@
 mod buffer;
 mod pool;
+/// The prelude module.
+///
+/// This module provides common constants and types that are used in NGINX modules.
+pub mod prelude;
 mod status;
 mod string;
 

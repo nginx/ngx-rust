@@ -11,14 +11,14 @@ use std::mem;
 use std::ptr::addr_of;
 use std::slice;
 
+use ngx::core::prelude::*;
 use ngx::core::{Pool, Status};
 use ngx::ffi::{
-    ngx_atoi, ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_free_peer_pt, ngx_event_get_peer_pt,
-    ngx_http_module_t, ngx_http_upstream_init_peer_pt, ngx_http_upstream_init_pt, ngx_http_upstream_init_round_robin,
-    ngx_http_upstream_module, ngx_http_upstream_srv_conf_t, ngx_http_upstream_t, ngx_int_t, ngx_module_t,
-    ngx_peer_connection_t, ngx_str_t, ngx_uint_t, NGX_CONF_NOARGS, NGX_CONF_TAKE1, NGX_CONF_UNSET, NGX_ERROR,
-    NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF_OFFSET, NGX_HTTP_UPS_CONF, NGX_LOG_EMERG,
+    ngx_atoi, ngx_event_free_peer_pt, ngx_event_get_peer_pt, ngx_http_upstream_init_peer_pt, ngx_http_upstream_init_pt,
+    ngx_http_upstream_init_round_robin, ngx_http_upstream_module, ngx_http_upstream_srv_conf_t, ngx_http_upstream_t,
+    ngx_peer_connection_t, NGX_ERROR,
 };
+use ngx::http::prelude::*;
 use ngx::http::{
     ngx_http_conf_get_module_srv_conf, ngx_http_conf_upstream_srv_conf_immutable,
     ngx_http_conf_upstream_srv_conf_mutable, HTTPModule, Merge, MergeConfigError, Request,

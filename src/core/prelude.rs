@@ -1,0 +1,40 @@
+pub use crate::ffi::ngx_command_t;
+pub use crate::ffi::ngx_conf_t;
+pub use crate::ffi::ngx_connection_t;
+pub use crate::ffi::ngx_event_t;
+pub use crate::ffi::ngx_int_t;
+pub use crate::ffi::ngx_module_t;
+pub use crate::ffi::ngx_str_t;
+pub use crate::ffi::ngx_uint_t;
+pub use crate::ffi::ngx_variable_value_t;
+
+pub use crate::ffi::NGX_LOG_ALERT;
+pub use crate::ffi::NGX_LOG_CRIT;
+pub use crate::ffi::NGX_LOG_DEBUG;
+pub use crate::ffi::NGX_LOG_EMERG;
+pub use crate::ffi::NGX_LOG_ERR;
+pub use crate::ffi::NGX_LOG_INFO;
+pub use crate::ffi::NGX_LOG_NOTICE;
+pub use crate::ffi::NGX_LOG_WARN;
+
+pub use crate::ffi::NGX_ANY_CONF;
+pub use crate::ffi::NGX_CONF_1MORE;
+pub use crate::ffi::NGX_CONF_2MORE;
+pub use crate::ffi::NGX_CONF_ANY;
+pub use crate::ffi::NGX_CONF_ARGS_NUMBER;
+pub use crate::ffi::NGX_CONF_BLOCK;
+pub use crate::ffi::NGX_CONF_FLAG;
+pub use crate::ffi::NGX_CONF_NOARGS;
+pub use crate::ffi::NGX_CONF_TAKE1;
+pub use crate::ffi::NGX_CONF_TAKE2;
+pub use crate::ffi::NGX_CONF_TAKE3;
+pub use crate::ffi::NGX_CONF_TAKE4;
+pub use crate::ffi::NGX_CONF_TAKE5;
+pub use crate::ffi::NGX_CONF_TAKE6;
+pub use crate::ffi::NGX_CONF_TAKE7;
+pub use crate::ffi::NGX_CONF_UNSET;
+pub use crate::ffi::NGX_DIRECT_CONF;
+pub use crate::ffi::NGX_MAIN_CONF;
+
+pub use crate::ffi::ngx_cycle;
+pub use crate::ffi::ngx_posted_events;

@@ -2,11 +2,9 @@ use std::ffi::{c_char, c_void};
 use std::ptr::addr_of;
 
 use ngx::core;
-use ngx::ffi::{
-    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_http_core_module, ngx_http_handler_pt, ngx_http_module_t,
-    ngx_http_phases_NGX_HTTP_ACCESS_PHASE, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t, NGX_CONF_TAKE1,
-    NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE,
-};
+use ngx::core::prelude::*;
+use ngx::ffi::{ngx_array_push, ngx_http_phases_NGX_HTTP_ACCESS_PHASE};
+use ngx::http::prelude::*;
 use ngx::http::{self, HTTPModule, MergeConfigError};
 use ngx::{http_request_handler, ngx_log_debug_http, ngx_null_command, ngx_string};
 

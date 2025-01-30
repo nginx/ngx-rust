@@ -2,11 +2,12 @@ use std::ffi::{c_int, c_void};
 use std::ptr::addr_of;
 
 use ngx::core;
+use ngx::core::prelude::*;
 use ngx::ffi::{
-    in_port_t, ngx_conf_t, ngx_connection_local_sockaddr, ngx_http_add_variable, ngx_http_module_t,
-    ngx_http_variable_t, ngx_inet_get_port, ngx_int_t, ngx_module_t, ngx_sock_ntop, ngx_str_t, ngx_variable_value_t,
-    sockaddr, sockaddr_storage, INET_ADDRSTRLEN, NGX_HTTP_MODULE,
+    in_port_t, ngx_conf_t, ngx_connection_local_sockaddr, ngx_inet_get_port, ngx_sock_ntop, sockaddr, sockaddr_storage,
+    INET_ADDRSTRLEN,
 };
+use ngx::http::prelude::*;
 use ngx::http::{self, HTTPModule};
 use ngx::{http_variable_get, ngx_http_null_variable, ngx_log_debug_http, ngx_null_string, ngx_string};
 
