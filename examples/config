@@ -1,94 +1,58 @@
+# shellcheck source=auto/rust
+. $ngx_addon_dir/auto/rust
+
+# ngx_addon_name determines the build directory and should be set before
+# any modules are defined
+
 ngx_addon_name=ngx_rust_examples
-ngx_cargo_profile=ngx-module
 
 if [ $HTTP = YES ]; then
     ngx_module_type=HTTP
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_order=
+
+    ngx_rust_target_type=EXAMPLE
+    ngx_rust_target_features=
 
     if [ "$ngx_module_link" = DYNAMIC ]; then
         ngx_module_name=ngx_http_async_module
-        ngx_module_lib=async
+        ngx_module_libs="-lm"
+        ngx_rust_target_name=async
 
-        ngx_module_lib=$NGX_OBJS/$ngx_addon_name/$ngx_cargo_profile/examples/lib$ngx_module_lib.a
-        ngx_module_deps=$ngx_module_lib
-        ngx_module_libs="$ngx_module_lib -lm"
-
-        # Module deps are usually added to the object file targets, but we don't have any
-        LINK_DEPS="$LINK_DEPS $ngx_module_lib"
-
-        . auto/module
+        ngx_rust_module
     fi
 
     if :; then
         ngx_module_name=ngx_http_awssigv4_module
-        ngx_module_lib=awssig
+        ngx_module_libs="-lm"
+        ngx_rust_target_name=awssig
 
-        ngx_module_lib=$NGX_OBJS/$ngx_addon_name/$ngx_cargo_profile/examples/lib$ngx_module_lib.a
-        ngx_module_deps=$ngx_module_lib
-        ngx_module_libs="$ngx_module_lib -lm"
-
-        # Module deps are usually added to the object file targets, but we don't have any
-        LINK_DEPS="$LINK_DEPS $ngx_module_lib"
-
-        . auto/module
+        ngx_rust_module
     fi
 
     if :; then
         ngx_module_name=ngx_http_curl_module
-        ngx_module_lib=curl
+        ngx_module_libs=
+        ngx_rust_target_name=curl
 
-        ngx_module_lib=$NGX_OBJS/$ngx_addon_name/$ngx_cargo_profile/examples/lib$ngx_module_lib.a
-        ngx_module_deps=$ngx_module_lib
-        ngx_module_libs=$ngx_module_lib
-
-        # Module deps are usually added to the object file targets, but we don't have any
-        LINK_DEPS="$LINK_DEPS $ngx_module_lib"
-
-        . auto/module
+        ngx_rust_module
     fi
-
-    case "$NGX_PLATFORM" in
-        Linux:*)
-            ngx_module_name=ngx_http_orig_dst_module
-            ngx_module_lib=httporigdst
-        
-            ngx_module_lib=$NGX_OBJS/$ngx_addon_name/$ngx_cargo_profile/examples/lib$ngx_module_lib.a
-            ngx_module_deps=$ngx_module_lib
-            ngx_module_libs=$ngx_module_lib
-        
-            # Module deps are usually added to the object file targets, but we don't have any
-            LINK_DEPS="$LINK_DEPS $ngx_module_lib"
-        
-            . auto/module
-            ;;
-    esac
 
     if :; then
         ngx_module_name=ngx_http_upstream_custom_module
-        ngx_module_lib=upstream
+        ngx_module_libs=
+        ngx_rust_target_name=upstream
 
-        ngx_module_lib=$NGX_OBJS/$ngx_addon_name/$ngx_cargo_profile/examples/lib$ngx_module_lib.a
-        ngx_module_deps=$ngx_module_lib
-        ngx_module_libs=$ngx_module_lib
+        ngx_rust_module
+    fi
 
-        # Module deps are usually added to the object file targets, but we don't have any
-        LINK_DEPS="$LINK_DEPS $ngx_module_lib"
+    if [ "$NGX_SYSTEM" = Linux ]; then
+        ngx_module_name=ngx_http_orig_dst_module
+        ngx_module_libs=
+        ngx_rust_target_name=httporigdst
+        ngx_rust_target_features=linux
 
-        . auto/module
+        ngx_rust_module
     fi
 fi
-
-# Write a cargo config with the $ngx_cargo_profile definition (optional)
-
-if [ "$NGX_DEBUG" = YES ]; then
-    NGX_CARGO_PROFILE_BASE=dev
-else
-    NGX_CARGO_PROFILE_BASE=release
-fi
-
-mkdir -p "$NGX_OBJS/.cargo"
-cat > "$NGX_OBJS/.cargo/config.toml" << END
-
-[profile.$ngx_cargo_profile]
-inherits = "$NGX_CARGO_PROFILE_BASE"
-
-END

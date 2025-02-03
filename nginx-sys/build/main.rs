@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "vendored")]
 mod vendored;
 
-const ENV_VARS_TRIGGERING_RECOMPILE: [&str; 2] = ["OUT_DIR", "NGX_OBJS"];
+const ENV_VARS_TRIGGERING_RECOMPILE: &[&str] = &["OUT_DIR", "NGINX_BUILD_DIR", "NGINX_SOURCE_DIR"];
 
 /// The feature flags set by the nginx configuration script.
 ///
@@ -54,18 +54,13 @@ const NGX_CONF_OS: &[&str] = &[
     "darwin", "freebsd", "gnu_hurd", "hpux", "linux", "solaris", "tru64", "win32",
 ];
 
+type BoxError = Box<dyn StdError>;
+
 /// Function invoked when `cargo build` is executed.
 /// This function will download NGINX and all supporting dependencies, verify their integrity,
 /// extract them, execute autoconf `configure` for NGINX, compile NGINX and finally install
 /// NGINX in a subdirectory with the project.
-fn main() -> Result<(), Box<dyn StdError>> {
-    let nginx_build_dir = match std::env::var("NGX_OBJS") {
-        Ok(v) => PathBuf::from(v).canonicalize()?,
-        #[cfg(feature = "vendored")]
-        Err(_) => vendored::build()?,
-        #[cfg(not(feature = "vendored"))]
-        Err(_) => panic!("\"nginx-sys/vendored\" feature is disabled and NGX_OBJS is not specified"),
-    };
+fn main() -> Result<(), BoxError> {
     // Hint cargo to rebuild if any of the these environment variables values change
     // because they will trigger a recompilation of NGINX with different parameters
     for var in ENV_VARS_TRIGGERING_RECOMPILE {
@@ -73,15 +68,99 @@ fn main() -> Result<(), Box<dyn StdError>> {
     }
     println!("cargo:rerun-if-changed=build/main.rs");
     println!("cargo:rerun-if-changed=build/wrapper.h");
+
+    let nginx = NginxSource::from_env();
     // Read autoconf generated makefile for NGINX and generate Rust bindings based on its includes
-    generate_binding(nginx_build_dir);
+    generate_binding(&nginx);
     Ok(())
 }
 
+pub struct NginxSource {
+    source_dir: PathBuf,
+    build_dir: PathBuf,
+}
+
+impl NginxSource {
+    pub fn new(source_dir: impl AsRef<Path>, build_dir: impl AsRef<Path>) -> Self {
+        let source_dir = NginxSource::check_source_dir(source_dir).expect("source directory");
+        let build_dir = NginxSource::check_build_dir(build_dir).expect("build directory");
+
+        Self { source_dir, build_dir }
+    }
+
+    pub fn from_env() -> Self {
+        match (env::var_os("NGINX_SOURCE_DIR"), env::var_os("NGINX_BUILD_DIR")) {
+            (Some(source_dir), Some(build_dir)) => NginxSource::new(source_dir, build_dir),
+            (Some(source_dir), None) => Self::from_source_dir(source_dir),
+            (None, Some(build_dir)) => Self::from_build_dir(build_dir),
+            _ => Self::from_vendored(),
+        }
+    }
+
+    pub fn from_source_dir(source_dir: impl AsRef<Path>) -> Self {
+        let build_dir = source_dir.as_ref().join("objs");
+
+        // todo!("Build from source");
+
+        Self::new(source_dir, build_dir)
+    }
+
+    pub fn from_build_dir(build_dir: impl AsRef<Path>) -> Self {
+        let source_dir = build_dir.as_ref().parent().expect("source directory").to_owned();
+        Self::new(source_dir, build_dir)
+    }
+
+    #[cfg(feature = "vendored")]
+    pub fn from_vendored() -> Self {
+        let build_dir = vendored::build().expect("vendored build");
+        let source_dir = build_dir.parent().expect("source directory").to_path_buf();
+
+        Self { source_dir, build_dir }
+    }
+
+    #[cfg(not(feature = "vendored"))]
+    pub fn from_vendored() -> Self {
+        panic!("\"nginx-sys/vendored\" feature is disabled and neither NGINX_SOURCE_DIR nor NGINX_BUILD_DIR is set");
+    }
+
+    fn check_source_dir(source_dir: impl AsRef<Path>) -> Result<PathBuf, BoxError> {
+        match dunce::canonicalize(&source_dir) {
+            Ok(path) if path.join("src/core/nginx.h").is_file() => Ok(path),
+            Err(err) => Err(format!("Invalid nginx source directory: {:?}. {}", source_dir.as_ref(), err).into()),
+            _ => Err(format!(
+                "Invalid nginx source directory: {:?}. NGINX_SOURCE_DIR is not specified or contains invalid value.",
+                source_dir.as_ref()
+            )
+            .into()),
+        }
+    }
+
+    fn check_build_dir(build_dir: impl AsRef<Path>) -> Result<PathBuf, BoxError> {
+        match dunce::canonicalize(&build_dir) {
+            Ok(path) if path.join("ngx_auto_config.h").is_file() => Ok(path),
+            Err(err) => Err(format!("Invalid nginx build directory: {:?}. {}", build_dir.as_ref(), err).into()),
+            _ => Err(format!(
+                "Invalid NGINX build directory: {:?}. NGINX_BUILD_DIR is not specified or contains invalid value.",
+                build_dir.as_ref()
+            )
+            .into()),
+        }
+    }
+}
+
 /// Generates Rust bindings for NGINX
-fn generate_binding(nginx_build_dir: PathBuf) {
-    let autoconf_makefile_path = nginx_build_dir.join("Makefile");
-    let includes = parse_includes_from_makefile(&autoconf_makefile_path);
+fn generate_binding(nginx: &NginxSource) {
+    let autoconf_makefile_path = nginx.build_dir.join("Makefile");
+    let includes: Vec<_> = parse_includes_from_makefile(&autoconf_makefile_path)
+        .into_iter()
+        .map(|path| {
+            if path.is_absolute() {
+                path
+            } else {
+                nginx.source_dir.join(path)
+            }
+        })
+        .collect();
     let clang_args: Vec<String> = includes
         .iter()
         .map(|path| format!("-I{}", path.to_string_lossy()))
@@ -166,26 +245,7 @@ fn parse_includes_from_makefile(nginx_autoconf_makefile_path: &PathBuf) -> Vec<P
         }
     }
 
-    let makefile_dir = nginx_autoconf_makefile_path
-        .parent()
-        .expect("makefile path has no parent")
-        .parent()
-        .expect("objs dir has no parent")
-        .to_path_buf()
-        .canonicalize()
-        .expect("Unable to canonicalize makefile path");
-
-    includes
-        .into_iter()
-        .map(PathBuf::from)
-        .map(|path| {
-            if path.is_absolute() {
-                path
-            } else {
-                makefile_dir.join(path)
-            }
-        })
-        .collect()
+    includes.into_iter().map(PathBuf::from).collect()
 }
 
 /// Collect info about the nginx configuration and expose it to the dependents via

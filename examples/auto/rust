@@ -1,0 +1,313 @@
+#!/bin/sh
+#
+# Copyright 2025 Nginx, Inc.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+# http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+# Utility library for integration of ngx-rust modules into the NGINX build
+# configuration.
+#
+# Usage:
+#
+# In "config",
+#
+# ```sh
+# . $ngx_addon_dir/auto/rust
+#
+# # ngx_addon_name determines the build directory and should be set before
+# # any modules are defined
+#
+# ngx_addon_name="example"
+#
+# if [ $HTTP = YES ]; then
+#     # Regular NGINX module options,
+#     # http://nginx.org/en/docs/dev/development_guide.html#adding_new_modules
+#
+#     ngx_module_type=HTTP
+#     # Should match the "ngx_module_t" static name(s) exported from the Rust code
+#     ngx_module_name=ngx_http_example_module
+#     ngx_module_incs=
+#     ngx_module_deps=
+#     ngx_module_libs=
+#
+#     # Options for ngx-rust modules
+#
+#     # Target type: LIB or EXAMPLE
+#     ngx_rust_target_type=LIB
+#
+#     # Target name: crate name, lib.name or example.name
+#     ngx_rust_target_name=example
+#
+#     # Whitespace-separated list of cargo features.
+#     # "default" should be specified explicitly if required.
+#     ngx_rust_target_features=
+#
+#     ngx_rust_module
+# fi
+# ```
+#
+# In "config.make",
+#
+# ```sh
+# ngx_addon_name="example"
+# ngx_cargo_manifest=$ngx_addon_dir/Cargo.toml
+#
+# # generate Makefile section for all the modules configured earlier
+#
+# ngx_rust_make_modules
+# ```
+
+# Prevent duplicate invocation unless it is a newer library version
+if [ "${NGX_RUST_AUTO_VER:-0}" -ge 1 ]; then
+    return
+fi
+
+NGX_RUST_AUTO_VER=1
+
+echo $ngx_n "checking for Rust toolchain ...$ngx_c"
+
+NGX_CARGO=${NGX_CARGO:-cargo}
+
+NGX_RUST_VER=$($NGX_CARGO version 2>&1 \
+               | grep 'cargo 1\.[0-9][0-9]*\.[0-9]*' 2>&1 \
+               | sed -e 's/^.* \(1\.[0-9][0-9]*\.[0-9][0.9]*.*\)/\1/')
+
+NGX_RUST_VERSION=${NGX_RUST_VER%% *}
+
+if [ -z "$NGX_RUST_VERSION" ]; then
+    echo " not found"
+    echo
+    echo $0: error: cargo binary $NGX_CARGO is not found
+    echo
+    exit 1
+fi
+
+echo " found"
+echo " + Rust version: $NGX_RUST_VER"
+
+case "$NGX_MACHINE" in
+
+    amd64)
+        RUST_TARGET_ARCH=x86_64
+    ;;
+
+    arm64)
+        RUST_TARGET_ARCH=aarch64
+    ;;
+
+    i?86)
+        RUST_TARGET_ARCH=i686
+    ;;
+
+    *)
+        RUST_TARGET_ARCH=$NGX_MACHINE
+    ;;
+
+esac
+
+case "$NGX_PLATFORM" in
+
+    OpenBSD:*)
+        # ld: error: undefined symbol: _Unwind_...
+        RUST_LIBS="$RUST_LIBS -lutil"
+        RUST_LIBS="$RUST_LIBS -lexecinfo"
+        RUST_LIBS="$RUST_LIBS -lc++abi"
+    ;;
+
+    win32)
+        case "$NGX_CC_NAME" in
+
+            msvc)
+                # as suggested by rustc --print native-static-libs,
+                # excluding entries already present in CORE_LIBS
+                RUST_LIBS="$RUST_LIBS bcrypt.lib"   # ???
+                RUST_LIBS="$RUST_LIBS ntdll.lib"    # std::io, std::sys::pal::windows
+                RUST_LIBS="$RUST_LIBS userenv.lib"  # std::env::home_dir
+                RUST_LIBS="$RUST_LIBS dbghelp.lib"  # backtrace symbolization
+
+                RUST_TARGET=$RUST_TARGET_ARCH-pc-windows-msvc
+            ;;
+
+            gcc | clang)
+                RUST_LIBS="$RUST_LIBS -lbcrypt"
+                RUST_LIBS="$RUST_LIBS -lntdll"
+                RUST_LIBS="$RUST_LIBS -luserenv"
+                RUST_LIBS="$RUST_LIBS -ldbghelp"
+                # gnullvm on arm64?
+                RUST_TARGET=$RUST_TARGET_ARCH-pc-windows-gnu
+            ;;
+
+        esac
+    ;;
+
+esac
+
+
+# Prepare cargo configuration file
+
+if [ "$NGX_DEBUG" = YES ]; then
+    ngx_cargo_default_profile=ngx-debug
+else
+    ngx_cargo_default_profile=ngx-release
+fi
+
+ngx_cargo_config=$NGX_OBJS/.cargo/config.toml
+ngx_cargo_profile=${ngx_cargo_profile:-$ngx_cargo_default_profile}
+
+mkdir -p "$NGX_OBJS/.cargo"
+
+cat << END                                               > "$ngx_cargo_config"
+
+[profile.ngx-debug]
+inherits = "dev"
+
+[profile.ngx-release]
+inherits = "release"
+lto = "thin"
+strip = "none"
+
+# compatibility with LIBC=-MT set in auto/cc/msvc
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.i686-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[env]
+NGINX_BUILD_DIR = { value = ".", force = true, relative = true }
+END
+
+if [ "$NGX_PLATFORM" = win32 ] && command -v cygpath >/dev/null; then
+    printf >> "$ngx_cargo_config" 'NGINX_SOURCE_DIR = "%s"\n' \
+        "$(cygpath -m "$PWD")"
+else
+    printf >> "$ngx_cargo_config" 'NGINX_SOURCE_DIR = "%s"\n' "$PWD"
+fi
+
+
+# Reconstructs path to a static lib built with cargo rustc,
+# relative to the --target-dir
+
+ngx_rust_target_path () {
+    ngx_rust_obj=$(echo "$ngx_rust_target_name" | tr - _)
+
+    case "$NGX_CC_NAME" in
+
+        msvc)
+            ngx_rust_obj=${ngx_rust_obj}.lib
+        ;;
+
+        *)
+            ngx_rust_obj=lib${ngx_rust_obj}.a
+        ;;
+
+    esac
+
+    if [ "$ngx_rust_target_type" = EXAMPLE ]; then
+        ngx_rust_obj=examples/$ngx_rust_obj
+    fi
+
+    echo "${RUST_TARGET:+$RUST_TARGET/}$ngx_cargo_profile/$ngx_rust_obj"
+}
+
+
+# Registers a module in the buildsystem.
+# Expects two variables to be set:
+#
+#   ngx_rust_target_type=LIB|EXAMPLE
+#   ngx_rust_target_name=<library or example name[^1]>
+#
+# [^1]: https://doc.rust-lang.org/cargo/reference/cargo-targets.html#the-name-field)
+
+ngx_rust_module () {
+    ngx_addon_id=$(echo "$ngx_addon_name" | sed -e 's/[^A-Za-z0-9_]/_/g')
+    ngx_rust_target_name=${ngx_rust_target_name:-ngx_module_name}
+    ngx_rust_obj=$NGX_OBJS/$ngx_addon_id/$(ngx_rust_target_path)
+
+    ngx_module_deps_saved=$ngx_module_deps
+    ngx_module_deps="$ngx_rust_obj $ngx_module_deps"
+
+    ngx_module_libs_saved=$ngx_module_libs
+    ngx_module_libs="$ngx_rust_obj $ngx_module_libs $RUST_LIBS"
+
+    # Module deps are usually added to the object file targets, but we don't have any
+    LINK_DEPS="$LINK_DEPS $ngx_rust_obj"
+
+    eval ${ngx_addon_id}_MODULES=\"\$${ngx_addon_id}_MODULES \
+                                   $ngx_rust_target_type:$ngx_rust_target_name\"
+
+    if [ -n "$ngx_rust_target_features" ]; then
+        eval ${ngx_addon_id}_FEATURES=\"\$${ngx_addon_id}_FEATURES \
+                                        $ngx_rust_target_features\"
+    fi
+
+   . auto/module
+
+   ngx_module_deps=$ngx_module_deps_saved
+   ngx_module_libs=$ngx_module_libs_saved
+}
+
+
+# Writes a Makefile fragment for all the modules configured for "ngx_addon_name"
+
+ngx_rust_make_modules () {
+    ngx_addon_id=$(echo "$ngx_addon_name" | sed -e 's/[^A-Za-z0-9_]/_/g')
+    ngx_cargo_manifest=${ngx_cargo_manifest:-"$ngx_addon_dir/Cargo.toml"}
+
+    eval ngx_rust_features="\$${ngx_addon_id}_FEATURES"
+    eval ngx_rust_modules="\$${ngx_addon_id}_MODULES"
+
+    for module in $ngx_rust_modules; do
+        ngx_rust_target_type=${module%%:*}
+        ngx_rust_target_name=${module#*:}
+
+        ngx_rust_make_module
+    done
+}
+
+
+# Writes a Makefile fragment for a single module specified by
+# "ngx_addon_name", "ngx_rust_target_type" and "ngx_rust_target_name"
+
+ngx_rust_make_module () {
+    ngx_addon_id=$(echo "$ngx_addon_name" | sed -e 's/[^A-Za-z0-9_]/_/g')
+    ngx_rust_obj=$NGX_OBJS/$ngx_addon_id/$(ngx_rust_target_path)
+
+    ngx_rustc_module_opt=
+    if [ "$ngx_rust_target_type" = EXAMPLE ]; then
+        ngx_rustc_module_opt="--example $ngx_rust_target_name"
+    fi
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+# always run cargo instead of trying to track the source modifications
+.PHONY: $ngx_rust_obj
+
+$ngx_rust_obj:
+	$NGX_CARGO rustc \\
+		--config $ngx_cargo_config \\
+		--crate-type staticlib \\
+		--manifest-path "$ngx_cargo_manifest" \\
+		--no-default-features \\
+		--profile $ngx_cargo_profile \\
+		${RUST_TARGET:+--target $RUST_TARGET} \\
+		--target-dir $NGX_OBJS/$ngx_addon_id \\
+		--features "$ngx_rust_features" \\
+		$ngx_rustc_module_opt $NGX_RUSTC_OPT
+
+END
+}

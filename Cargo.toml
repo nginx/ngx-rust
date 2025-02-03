@@ -36,8 +36,9 @@ alloc = []
 # Currently the only difference to `alloc` flag is `std::error::Error` implementation.
 std = ["alloc"]
 # Build our own copy of the NGINX by default.
-# This could be disabled with `--no-default-features` to minimize the dependency tree
-# when building against an existing copy of the NGINX with the NGX_OBJS variable.
+# This could be disabled with `--no-default-features` to minimize the dependency
+# tree when building against an existing copy of the NGINX with the
+# NGINX_SOURCE_DIR/NGINX_BUILD_DIR variables.
 vendored = ["nginx-sys/vendored"]
 
 [badges]

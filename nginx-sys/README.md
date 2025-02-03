@@ -12,11 +12,33 @@ Add `nginx-sys` as a dependency in your `Cargo.toml`:
 nginx-sys = "0.5.0"
 ```
 
+Set the path to your nginx sources and build directory using the
+[environment variables](#input-variables), or enable the `nginx-sys/vendored`
+feature to use a downloaded copy of the nginx sources.
+
+Note that it is recommended to use the exact source and `configure` arguments
+of the nginx build you are planning to use in production.
+`configure` arguments alter the APIs and the symbols visible to the Rust code,
+and some OS distributions are known to ship nginx packages with API-breaking
+patches applied.
+
 ## Features
 
 - `vendored`: Enables the build scripts to download and build a copy of nginx
   source and link against it.
-  This feature is enabled by default.
+
+## Input variables
+
+`NGINX_SOURCE_DIR`, `NGINX_BUILD_DIR` control paths to an external nginx source
+tree and a configured build directory.  Normally, specifying either of these is
+sufficient, as the build directory defaults to `objs` under the source dir.
+
+However, it's possible to set the latter to any valid path with
+`configure --builddir=<...>`, and we need _both_ paths to support such
+configuration.
+
+The variables above are optional, but take preference when the `vendored` crate
+feature is enabled.
 
 ## Output variables
 

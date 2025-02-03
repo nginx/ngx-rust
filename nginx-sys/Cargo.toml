@@ -20,6 +20,7 @@ rust-version.workspace = true
 bindgen = "0.71"
 cc = "1.2.0"
 duct = { version = "0.13.7", optional = true }
+dunce = "1.0.5"
 flate2 = { version = "1.0.28", optional = true }
 # Disable non-ASCII domain names support in ureq. We don't need it for any
 # of the 4 domains the buildscript interacts with.
