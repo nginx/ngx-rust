@@ -2,6 +2,8 @@
 #![warn(missing_docs)]
 #![no_std]
 
+mod queue;
+
 use core::fmt;
 use core::mem::offset_of;
 use core::ptr::{self, copy_nonoverlapping};
@@ -21,6 +23,8 @@ mod bindings {
 }
 #[doc(no_inline)]
 pub use bindings::*;
+
+pub use queue::*;
 
 /// The offset of the `main_conf` field in the `ngx_http_conf_ctx_t` struct.
 ///
