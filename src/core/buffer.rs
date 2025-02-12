@@ -13,18 +13,12 @@ pub trait Buffer {
     fn as_ngx_buf_mut(&mut self) -> *mut ngx_buf_t;
 
     /// Returns the buffer contents as a byte slice.
-    ///
-    /// # Safety
-    /// This function is marked as unsafe because it involves raw pointer manipulation.
     fn as_bytes(&self) -> &[u8] {
         let buf = self.as_ngx_buf();
         unsafe { slice::from_raw_parts((*buf).pos, self.len()) }
     }
 
     /// Returns the length of the buffer contents.
-    ///
-    /// # Safety
-    /// This function is marked as unsafe because it involves raw pointer manipulation.
     fn len(&self) -> usize {
         let buf = self.as_ngx_buf();
         unsafe {
@@ -68,9 +62,6 @@ pub trait Buffer {
 /// The `MutableBuffer` trait extends the `Buffer` trait and provides methods for working with a mutable buffer.
 pub trait MutableBuffer: Buffer {
     /// Returns a mutable reference to the buffer contents as a byte slice.
-    ///
-    /// # Safety
-    /// This function is marked as unsafe because it involves raw pointer manipulation.
     fn as_bytes_mut(&mut self) -> &mut [u8] {
         let buf = self.as_ngx_buf_mut();
         unsafe { slice::from_raw_parts_mut((*buf).pos, self.len()) }
@@ -105,9 +96,6 @@ impl Buffer for TemporaryBuffer {
 
 impl MutableBuffer for TemporaryBuffer {
     /// Returns a mutable reference to the buffer contents as a byte slice.
-    ///
-    /// # Safety
-    /// This function is marked as unsafe because it involves raw pointer manipulation.
     fn as_bytes_mut(&mut self) -> &mut [u8] {
         unsafe { slice::from_raw_parts_mut((*self.0).pos, self.len()) }
     }

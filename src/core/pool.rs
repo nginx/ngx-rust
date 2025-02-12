@@ -135,9 +135,6 @@ impl Pool {
     /// Allocates memory for a value of a specified type and adds a cleanup handler to the memory pool.
     ///
     /// Returns a typed pointer to the allocated memory if successful, or a null pointer if allocation or cleanup handler addition fails.
-    ///
-    /// # Safety
-    /// This function is marked as unsafe because it involves raw pointer manipulation.
     pub fn allocate<T>(&mut self, value: T) -> *mut T {
         unsafe {
             let p = self.alloc(mem::size_of::<T>()) as *mut T;

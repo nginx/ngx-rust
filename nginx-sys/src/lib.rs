@@ -111,10 +111,6 @@ impl ngx_str_t {
 
     /// Convert the nginx string to a string slice (`&str`).
     ///
-    /// # Safety
-    /// This function is marked as unsafe because it involves raw pointer manipulation.
-    /// It assumes that the underlying `data` pointer is valid and points to a valid UTF-8 encoded string.
-    ///
     /// # Panics
     /// This function panics if the `ngx_str_t` is not valid UTF-8.
     ///
