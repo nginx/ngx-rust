@@ -2,6 +2,7 @@
 #![warn(missing_docs)]
 #![no_std]
 
+mod event;
 mod queue;
 
 use core::fmt;
@@ -24,6 +25,7 @@ mod bindings {
 #[doc(no_inline)]
 pub use bindings::*;
 
+pub use event::*;
 pub use queue::*;
 
 /// The offset of the `main_conf` field in the `ngx_http_conf_ctx_t` struct.

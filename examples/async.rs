@@ -8,7 +8,7 @@ use ngx::core;
 use ngx::ffi::{
     ngx_array_push, ngx_command_t, ngx_conf_t, ngx_cycle, ngx_event_t, ngx_http_core_module, ngx_http_core_run_phases,
     ngx_http_handler_pt, ngx_http_module_t, ngx_http_phases_NGX_HTTP_ACCESS_PHASE, ngx_http_request_t, ngx_int_t,
-    ngx_module_t, ngx_posted_events, ngx_queue_s, ngx_str_t, ngx_uint_t, NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF,
+    ngx_module_t, ngx_post_event, ngx_posted_events, ngx_str_t, ngx_uint_t, NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF,
     NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE,
 };
 use ngx::http::{self, HTTPModule, MergeConfigError};
@@ -112,7 +112,7 @@ unsafe extern "C" fn check_async_work_done(event: *mut ngx_event_t) {
         // this doesn't have have good performance but works as a simple thread-safe example and doesn't causes
         // segfault. The best method that provides both thread-safety and performance requires
         // an nginx patch.
-        post_event(event, addr_of_mut!(ngx_posted_events));
+        ngx_post_event(event, addr_of_mut!(ngx_posted_events));
     }
 }
 
@@ -127,20 +127,6 @@ struct EventData {
 
 unsafe impl Send for EventData {}
 unsafe impl Sync for EventData {}
-
-// same as ngx_post_event
-// source: https://github.com/nginx/ngx-rust/pull/31/files#diff-132330bb775bed17fb9990ec2b56e6c52e6a9e56d62f2114fade95e4decdba08R80-R90
-unsafe fn post_event(event: *mut ngx_event_t, queue: *mut ngx_queue_s) {
-    let event = &mut (*event);
-    if event.posted() == 0 {
-        event.set_posted(1);
-        // translated from ngx_queue_insert_tail macro
-        event.queue.prev = (*queue).prev;
-        (*event.queue.prev).next = &event.queue as *const _ as *mut _;
-        event.queue.next = queue;
-        (*queue).prev = &event.queue as *const _ as *mut _;
-    }
-}
 
 http_request_handler!(async_access_handler, |request: &mut http::Request| {
     let co = unsafe { request.get_module_loc_conf::<ModuleConfig>(&*addr_of!(ngx_http_async_module)) };
@@ -184,7 +170,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
         event.data = Arc::into_raw(event_data.clone()) as _;
         event.log = (*ngx_cycle).log;
 
-        post_event(event, addr_of_mut!(ngx_posted_events));
+        ngx_post_event(event, addr_of_mut!(ngx_posted_events));
     }
 
     ngx_log_debug_http!(request, "async module enabled: {}", co.enable);
