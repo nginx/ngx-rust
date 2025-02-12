@@ -159,7 +159,7 @@ impl Request {
     ///
     /// # Safety
     /// Caller must ensure that type `T` matches the configuration type for the specified module.
-    pub fn get_module_main_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
+    pub unsafe fn get_module_main_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
         // SAFETY: main conf is either NULL or allocated with ngx_p(c)alloc and
         // explicitly initialized by the module
         unsafe {
@@ -174,7 +174,7 @@ impl Request {
     ///
     /// # Safety
     /// Caller must ensure that type `T` matches the configuration type for the specified module.
-    pub fn get_module_srv_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
+    pub unsafe fn get_module_srv_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
         // SAFETY: server conf is either NULL or allocated with ngx_p(c)alloc and
         // explicitly initialized by the module
         unsafe {
@@ -189,7 +189,7 @@ impl Request {
     ///
     /// # Safety
     /// Caller must ensure that type `T` matches the configuration type for the specified module.
-    pub fn get_module_loc_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
+    pub unsafe fn get_module_loc_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
         // SAFETY: location conf is either NULL or allocated with ngx_p(c)alloc and
         // explicitly initialized by the module
         unsafe {
