@@ -101,6 +101,18 @@ impl<'a> From<&'a mut Request> for *mut ngx_http_request_t {
     }
 }
 
+impl AsRef<ngx_http_request_t> for Request {
+    fn as_ref(&self) -> &ngx_http_request_t {
+        &self.0
+    }
+}
+
+impl AsMut<ngx_http_request_t> for Request {
+    fn as_mut(&mut self) -> &mut ngx_http_request_t {
+        &mut self.0
+    }
+}
+
 impl Request {
     /// Create a [`Request`] from an [`ngx_http_request_t`].
     ///
@@ -401,11 +413,6 @@ impl Request {
     /// each header item is (&str, &str) (borrowed)
     pub fn headers_out_iterator(&self) -> NgxListIterator {
         unsafe { list_iterator(&self.0.headers_out.headers) }
-    }
-
-    /// Returns the inner data structure that the Request object is wrapping.
-    pub fn get_inner(&self) -> &ngx_http_request_t {
-        &self.0
     }
 }
 
