@@ -75,6 +75,7 @@ jobs:
         working-directory: nginx
         env:
           TEST_NGINX_GLOBALS: >-
+            load_module ${{ github.workspace }}/nginx/objs/ngx_http_async_module.so;
             load_module ${{ github.workspace }}/nginx/objs/ngx_http_awssigv4_module.so;
             load_module ${{ github.workspace }}/nginx/objs/ngx_http_curl_module.so;
             load_module ${{ github.workspace }}/nginx/objs/ngx_http_upstream_custom_module.so;

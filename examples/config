@@ -15,7 +15,7 @@ if [ $HTTP = YES ]; then
     ngx_rust_target_type=EXAMPLE
     ngx_rust_target_features=
 
-    if [ "$ngx_module_link" = DYNAMIC ]; then
+    if :; then
         ngx_module_name=ngx_http_async_module
         ngx_module_libs="-lm"
         ngx_rust_target_name=async
