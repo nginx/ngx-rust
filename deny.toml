@@ -11,7 +11,6 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "MIT",
-    "OpenSSL",
     "Unicode-3.0",
 ]
 confidence-threshold = 0.8
