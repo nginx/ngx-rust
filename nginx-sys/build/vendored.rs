@@ -31,7 +31,7 @@ const PCRE1_DOWNLOAD_URL_PREFIX: &str = "https://sourceforge.net/projects/pcre/f
 const PCRE2_DOWNLOAD_URL_PREFIX: &str = "https://github.com/PCRE2Project/pcre2/releases/download";
 /// The default version of openssl to use if the `OPENSSL_VERSION` environment variable is not present
 const OPENSSL1_DEFAULT_VERSION: &str = "1.1.1w";
-const OPENSSL3_DEFAULT_VERSION: &str = "3.2.1";
+const OPENSSL3_DEFAULT_VERSION: &str = "3.2.4";
 const OPENSSL_GPG_SERVER_AND_KEY_IDS: (&str, &str) = (
     UBUNTU_KEYSEVER,
     "\
@@ -42,11 +42,12 @@ B7C1C14360F353A36862E4D5231C84CDDCC69C45 \
 95A9908DDFA16830BE9FB9003D30A3A9FF1360DC \
 7953AC1FBC3DC8B3B292393ED5E9E43F7DF9EE8C \
 E5E52560DD91C556DDBDA5D02064C53641C25E5D \
-C1F33DD8CE1D4CC613AF14DA9195C48241FBF7DD",
+C1F33DD8CE1D4CC613AF14DA9195C48241FBF7DD \
+BA5473A2B0587B07FB27CF2D216094DFD0CB81EF",
 );
 const OPENSSL_DOWNLOAD_URL_PREFIX: &str = "https://github.com/openssl/openssl/releases/download";
 /// The default version of NGINX to use if the `NGX_VERSION` environment variable is not present
-const NGX_DEFAULT_VERSION: &str = "1.26.1";
+const NGX_DEFAULT_VERSION: &str = "1.26.3";
 
 /// Key 1: Konstantin Pavlov's public key. For Nginx 1.25.3 and earlier
 /// Key 2: Sergey Kandaurov's public key. For Nginx 1.25.4

@@ -9,8 +9,8 @@
 //!
 //! * `ZLIB_VERSION` (default 1.3.1) - zlib version
 //! * `PCRE2_VERSION` (default 10.42 for NGINX 1.22.0 and later, or 8.45 for earlier) - PCRE1 or PCRE2 version
-//! * `OPENSSL_VERSION` (default 3.2.1 for NGINX 1.22.0 and later, or 1.1.1w for earlier) - OpenSSL version
-//! * `NGX_VERSION` (default 1.26.1) - NGINX OSS version
+//! * `OPENSSL_VERSION` (default 3.2.4 for NGINX 1.22.0 and later, or 1.1.1w for earlier) - OpenSSL version
+//! * `NGX_VERSION` (default 1.26.3) - NGINX OSS version
 //! * `NGX_DEBUG` (default to false) -  if set to true, then will compile NGINX `--with-debug` option
 //!
 //! For example, this is how you would compile the [examples](https://github.com/nginx/ngx-rust/tree/master/examples) using a specific version of NGINX and enabling
