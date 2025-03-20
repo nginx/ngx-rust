@@ -368,7 +368,8 @@ fn download(cache_dir: &Path, url: &str) -> Result<PathBuf, Box<dyn StdError>> {
     let file_path = cache_dir.join(filename);
     if proceed_with_download(&file_path) {
         println!("Downloading: {} -> {}", url, file_path.display());
-        let mut reader = ureq::get(url).call()?.into_reader();
+        let mut response = ureq::get(url).call()?;
+        let mut reader = response.body_mut().as_reader();
         let mut file = File::create(&file_path)?;
         std::io::copy(&mut reader, &mut file)?;
     }
