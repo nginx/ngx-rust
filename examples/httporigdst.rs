@@ -7,7 +7,7 @@ use ngx::ffi::{
     ngx_http_variable_t, ngx_inet_get_port, ngx_int_t, ngx_module_t, ngx_sock_ntop, ngx_str_t, ngx_variable_value_t,
     sockaddr, sockaddr_storage, INET_ADDRSTRLEN, NGX_HTTP_MODULE,
 };
-use ngx::http::{self, HTTPModule};
+use ngx::http::{self, HttpModule};
 use ngx::{http_variable_get, ngx_log_debug_http, ngx_string};
 
 const IPV4_STRLEN: usize = INET_ADDRSTRLEN as usize;
@@ -70,12 +70,12 @@ impl NgxHttpOrigDstCtx {
 static NGX_HTTP_ORIG_DST_MODULE_CTX: ngx_http_module_t = ngx_http_module_t {
     preconfiguration: Some(Module::preconfiguration),
     postconfiguration: Some(Module::postconfiguration),
-    create_main_conf: Some(Module::create_main_conf),
-    init_main_conf: Some(Module::init_main_conf),
-    create_srv_conf: Some(Module::create_srv_conf),
-    merge_srv_conf: Some(Module::merge_srv_conf),
-    create_loc_conf: Some(Module::create_loc_conf),
-    merge_loc_conf: Some(Module::merge_loc_conf),
+    create_main_conf: None,
+    init_main_conf: None,
+    create_srv_conf: None,
+    merge_srv_conf: None,
+    create_loc_conf: None,
+    merge_loc_conf: None,
 };
 
 // Generate the `ngx_modules` table with exported modules.
@@ -258,10 +258,10 @@ http_variable_get!(
 
 struct Module;
 
-impl HTTPModule for Module {
-    type MainConf = ();
-    type SrvConf = ();
-    type LocConf = ();
+impl HttpModule for Module {
+    fn module() -> &'static ngx_module_t {
+        unsafe { &*::core::ptr::addr_of!(ngx_http_orig_dst_module) }
+    }
 
     // static ngx_int_t ngx_http_orig_dst_add_variables(ngx_conf_t *cf)
     unsafe extern "C" fn preconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
