@@ -164,51 +164,6 @@ impl Request {
         unsafe { (*self.connection()).log }
     }
 
-    /// Global configuration for a module.
-    ///
-    /// Applies to the entire `http` block.
-    ///
-    /// # Safety
-    /// Caller must ensure that type `T` matches the configuration type for the specified module.
-    pub unsafe fn get_module_main_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
-        // SAFETY: main conf is either NULL or allocated with ngx_p(c)alloc and
-        // explicitly initialized by the module
-        unsafe {
-            let scf = *self.0.main_conf.add(module.ctx_index);
-            scf.cast::<T>().as_ref()
-        }
-    }
-
-    /// Server-specific configuration for a module.
-    ///
-    /// Applies to a single `server` block.
-    ///
-    /// # Safety
-    /// Caller must ensure that type `T` matches the configuration type for the specified module.
-    pub unsafe fn get_module_srv_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
-        // SAFETY: server conf is either NULL or allocated with ngx_p(c)alloc and
-        // explicitly initialized by the module
-        unsafe {
-            let scf = *self.0.srv_conf.add(module.ctx_index);
-            scf.cast::<T>().as_ref()
-        }
-    }
-
-    /// Location-specific configuration for a module.
-    ///
-    /// Applies to a signle `location`, `if` or `limit_except` block.
-    ///
-    /// # Safety
-    /// Caller must ensure that type `T` matches the configuration type for the specified module.
-    pub unsafe fn get_module_loc_conf<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
-        // SAFETY: location conf is either NULL or allocated with ngx_p(c)alloc and
-        // explicitly initialized by the module
-        unsafe {
-            let lcf = *self.0.loc_conf.add(module.ctx_index);
-            lcf.cast::<T>().as_ref()
-        }
-    }
-
     /// Get Module context pointer
     fn get_module_ctx_ptr(&self, module: &ngx_module_t) -> *mut c_void {
         unsafe { *self.0.ctx.add(module.ctx_index) }
@@ -413,6 +368,39 @@ impl Request {
     /// each header item is (&str, &str) (borrowed)
     pub fn headers_out_iterator(&self) -> NgxListIterator {
         unsafe { list_iterator(&self.0.headers_out.headers) }
+    }
+}
+
+impl crate::http::HttpModuleConfExt for Request {
+    unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
+        // SAFETY: main_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { (*(self.0.main_conf).add(module.ctx_index)).cast::<T>().as_ref() }
+    }
+    unsafe fn http_main_conf_mut_unchecked<T>(&self, module: &ngx_module_t) -> Option<&'static mut T> {
+        // SAFETY: main_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { (*(self.0.main_conf).add(module.ctx_index)).cast::<T>().as_mut() }
+    }
+    unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
+        // SAFETY: srv_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { (*(self.0.srv_conf).add(module.ctx_index)).cast::<T>().as_ref() }
+    }
+    unsafe fn http_server_conf_mut_unchecked<T>(&self, module: &ngx_module_t) -> Option<&'static mut T> {
+        // SAFETY: srv_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { (*(self.0.srv_conf).add(module.ctx_index)).cast::<T>().as_mut() }
+    }
+    unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<&'static T> {
+        // SAFETY: loc_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { (*(self.0.loc_conf).add(module.ctx_index)).cast::<T>().as_ref() }
+    }
+    unsafe fn http_location_conf_mut_unchecked<T>(&self, module: &ngx_module_t) -> Option<&'static mut T> {
+        // SAFETY: loc_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { (*(self.0.loc_conf).add(module.ctx_index)).cast::<T>().as_mut() }
     }
 }
 
