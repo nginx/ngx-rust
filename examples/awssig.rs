@@ -1,10 +1,9 @@
 use std::ffi::{c_char, c_void};
-use std::ptr::addr_of;
 
 use http::HeaderMap;
 use ngx::core;
 use ngx::ffi::{
-    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_http_core_module, ngx_http_handler_pt, ngx_http_module_t,
+    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_http_handler_pt, ngx_http_module_t,
     ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t, NGX_CONF_TAKE1,
     NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF,
 };
@@ -13,15 +12,17 @@ use ngx::{http_request_handler, ngx_log_debug_http, ngx_string};
 
 struct Module;
 
-impl HTTPModule for Module {
-    type MainConf = ();
-    type SrvConf = ();
-    type LocConf = ModuleConfig;
+impl HttpModule for Module {
+    fn module() -> &'static ngx_module_t {
+        unsafe { &*::core::ptr::addr_of!(ngx_http_awssigv4_module) }
+    }
 
     unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
-        let cmcf = ngx_http_conf_get_module_main_conf(cf, &*addr_of!(ngx_http_core_module));
+        // SAFETY: this function is called with non-NULL cf always
+        let cf = &mut *cf;
+        let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
 
-        let h = ngx_array_push(&mut (*cmcf).phases[ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE as usize].handlers)
+        let h = ngx_array_push(&mut cmcf.phases[ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE as usize].handlers)
             as *mut ngx_http_handler_pt;
         if h.is_null() {
             return core::Status::NGX_ERROR.into();
@@ -39,6 +40,10 @@ struct ModuleConfig {
     secret_key: String,
     s3_bucket: String,
     s3_endpoint: String,
+}
+
+unsafe impl HttpModuleLocationConf for Module {
+    type LocationConf = ModuleConfig;
 }
 
 static mut NGX_HTTP_AWSSIGV4_COMMANDS: [ngx_command_t; 6] = [
@@ -88,10 +93,10 @@ static mut NGX_HTTP_AWSSIGV4_COMMANDS: [ngx_command_t; 6] = [
 static NGX_HTTP_AWSSIGV4_MODULE_CTX: ngx_http_module_t = ngx_http_module_t {
     preconfiguration: Some(Module::preconfiguration),
     postconfiguration: Some(Module::postconfiguration),
-    create_main_conf: Some(Module::create_main_conf),
-    init_main_conf: Some(Module::init_main_conf),
-    create_srv_conf: Some(Module::create_srv_conf),
-    merge_srv_conf: Some(Module::merge_srv_conf),
+    create_main_conf: None,
+    init_main_conf: None,
+    create_srv_conf: None,
+    merge_srv_conf: None,
     create_loc_conf: Some(Module::create_loc_conf),
     merge_loc_conf: Some(Module::merge_loc_conf),
 };
@@ -245,8 +250,7 @@ extern "C" fn ngx_http_awssigv4_commands_set_s3_endpoint(
 
 http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
     // get Module Config from request
-    let conf = unsafe { request.get_module_loc_conf::<ModuleConfig>(&*addr_of!(ngx_http_awssigv4_module)) };
-    let conf = conf.unwrap();
+    let conf = Module::location_conf(request).expect("module conf");
     ngx_log_debug_http!(request, "AWS signature V4 module {}", {
         if conf.enable {
             "enabled"
