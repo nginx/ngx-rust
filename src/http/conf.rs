@@ -240,7 +240,7 @@ mod upstream {
 
 pub use upstream::NgxHttpUpstreamModule;
 
-#[cfg(ngx_feature = "http_v2")]
+#[cfg(all(nginx1_25_1, ngx_feature = "http_v2"))]
 mod http_v2 {
     use crate::ffi::{ngx_http_v2_module, ngx_http_v2_srv_conf_t};
 
@@ -256,8 +256,8 @@ mod http_v2 {
         type ServerConf = ngx_http_v2_srv_conf_t;
     }
 }
-
-#[cfg(ngx_feature = "http_v2")]
+// ngx_http_v2_module was not exposed by default until aefd862a
+#[cfg(all(nginx1_25_1, ngx_feature = "http_v2"))]
 pub use http_v2::NgxHttpV2Module;
 
 #[cfg(ngx_feature = "http_v3")]

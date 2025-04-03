@@ -34,15 +34,24 @@ fn main() {
     }
 
     // Generate cfg values for version checks
-    // println!("cargo::rustc-check-cfg=cfg(nginx1_27_0)");
-    // println!("cargo::rerun-if-env-changed=DEP_NGINX_VERSION_NUMBER");
-    // if let Ok(version) = std::env::var("DEP_NGINX_VERSION_NUMBER") {
-    //     let version: u64 = version.parse().unwrap();
-    //
-    //     if version >= 1_027_000 {
-    //         println!("cargo::rustc-cfg=nginx1_27_0");
-    //     }
-    // }
+    const VERSION_CHECKS: &[(u64, &str)] = &[
+        //
+        (1_021_001, "nginx1_21_1"),
+        (1_025_001, "nginx1_25_1"),
+    ];
+    VERSION_CHECKS
+        .iter()
+        .for_each(|check| println!("cargo::rustc-check-cfg=cfg({})", check.1));
+    println!("cargo::rerun-if-env-changed=DEP_NGINX_VERSION_NUMBER");
+    if let Ok(version) = std::env::var("DEP_NGINX_VERSION_NUMBER") {
+        let version: u64 = version.parse().unwrap();
+
+        for check in VERSION_CHECKS {
+            if version >= check.0 {
+                println!("cargo::rustc-cfg={}", check.1);
+            }
+        }
+    }
 
     // Generate required compiler flags
     if cfg!(target_os = "macos") {
