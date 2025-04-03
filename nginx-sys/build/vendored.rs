@@ -364,7 +364,7 @@ fn download(cache_dir: &Path, url: &str) -> Result<PathBuf, Box<dyn StdError>> {
         // File does not exist or is zero bytes
         !file_path.exists() || file_path.metadata().is_ok_and(|m| m.len() < 1)
     }
-    let filename = url.split('/').last().unwrap();
+    let filename = url.split('/').next_back().unwrap();
     let file_path = cache_dir.join(filename);
     if proceed_with_download(&file_path) {
         println!("Downloading: {} -> {}", url, file_path.display());
