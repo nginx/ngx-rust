@@ -4,8 +4,8 @@ use std::ptr::addr_of;
 use ngx::core;
 use ngx::ffi::{
     in_port_t, ngx_conf_t, ngx_connection_local_sockaddr, ngx_http_add_variable, ngx_http_module_t,
-    ngx_http_variable_t, ngx_inet_get_port, ngx_int_t, ngx_module_t, ngx_sock_ntop, ngx_str_t, ngx_variable_value_t,
-    sockaddr, sockaddr_storage, INET_ADDRSTRLEN, NGX_HTTP_MODULE,
+    ngx_http_variable_t, ngx_inet_get_port, ngx_int_t, ngx_module_t, ngx_sock_ntop, ngx_str_t,
+    ngx_variable_value_t, sockaddr, sockaddr_storage, INET_ADDRSTRLEN, NGX_HTTP_MODULE,
 };
 use ngx::http::{self, HttpModule};
 use ngx::{http_variable_get, ngx_log_debug_http, ngx_string};
@@ -33,7 +33,13 @@ impl NgxHttpOrigDstCtx {
         if port_data.is_null() {
             return core::Status::NGX_ERROR;
         }
-        unsafe { libc::memcpy(port_data, port_str.as_bytes().as_ptr() as *const c_void, port_str.len()) };
+        unsafe {
+            libc::memcpy(
+                port_data,
+                port_str.as_bytes().as_ptr() as *const c_void,
+                port_str.len(),
+            )
+        };
         self.orig_dst_port.len = port_str.len();
         self.orig_dst_port.data = port_data as *mut u8;
 
@@ -118,7 +124,9 @@ static mut NGX_HTTP_ORIG_DST_VARS: [ngx_http_variable_t; 2] = [
     },
 ];
 
-unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_port_t), core::Status> {
+unsafe fn ngx_get_origdst(
+    request: &mut http::Request,
+) -> Result<(String, in_port_t), core::Status> {
     let c = request.connection();
 
     if (*c).type_ != libc::SOCK_STREAM {
@@ -168,7 +176,10 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
         )
     };
     if e == 0 {
-        ngx_log_debug_http!(request, "httporigdst: ngx_sock_ntop failed to convert sockaddr");
+        ngx_log_debug_http!(
+            request,
+            "httporigdst: ngx_sock_ntop failed to convert sockaddr"
+        );
         return Err(core::Status::NGX_ERROR);
     }
     ip.truncate(e);
@@ -201,16 +212,24 @@ http_variable_get!(
             Ok((ip, port)) => {
                 // create context,
                 // set context
-                let new_ctx = request.pool().allocate::<NgxHttpOrigDstCtx>(Default::default());
+                let new_ctx = request
+                    .pool()
+                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
                     return core::Status::NGX_ERROR;
                 }
 
-                ngx_log_debug_http!(request, "httporigdst: saving ip - {:?}, port - {}", ip, port,);
+                ngx_log_debug_http!(
+                    request,
+                    "httporigdst: saving ip - {:?}, port - {}",
+                    ip,
+                    port,
+                );
                 (*new_ctx).save(&ip, port, &mut request.pool());
                 (*new_ctx).bind_addr(v);
-                request.set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
+                request
+                    .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
             }
         }
         core::Status::NGX_OK
@@ -240,16 +259,24 @@ http_variable_get!(
             Ok((ip, port)) => {
                 // create context,
                 // set context
-                let new_ctx = request.pool().allocate::<NgxHttpOrigDstCtx>(Default::default());
+                let new_ctx = request
+                    .pool()
+                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
                     return core::Status::NGX_ERROR;
                 }
 
-                ngx_log_debug_http!(request, "httporigdst: saving ip - {:?}, port - {}", ip, port,);
+                ngx_log_debug_http!(
+                    request,
+                    "httporigdst: saving ip - {:?}, port - {}",
+                    ip,
+                    port,
+                );
                 (*new_ctx).save(&ip, port, &mut request.pool());
                 (*new_ctx).bind_port(v);
-                request.set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
+                request
+                    .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
             }
         }
         core::Status::NGX_OK

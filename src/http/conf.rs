@@ -1,7 +1,8 @@
 use ::core::ptr::NonNull;
 
 use crate::ffi::{
-    ngx_http_conf_ctx_t, ngx_http_core_srv_conf_t, ngx_http_request_t, ngx_http_upstream_srv_conf_t, ngx_module_t,
+    ngx_http_conf_ctx_t, ngx_http_core_srv_conf_t, ngx_http_request_t,
+    ngx_http_upstream_srv_conf_t, ngx_module_t,
 };
 use crate::http::HttpModule;
 
@@ -40,7 +41,10 @@ pub trait HttpModuleConfExt {
 impl HttpModuleConfExt for crate::ffi::ngx_cycle_t {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        let http_conf = self.conf_ctx.add(nginx_sys::ngx_http_module.index).as_ref()?;
+        let http_conf = self
+            .conf_ctx
+            .add(nginx_sys::ngx_http_module.index)
+            .as_ref()?;
         let conf_ctx = (*http_conf).cast::<ngx_http_conf_ctx_t>();
         let conf_ctx = conf_ctx.as_ref()?;
         NonNull::new((*conf_ctx.main_conf.add(module.ctx_index)).cast())
@@ -176,7 +180,8 @@ pub unsafe trait HttpModuleLocationConf: HttpModule {
 
 mod core {
     use crate::ffi::{
-        ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t, ngx_http_core_module, ngx_http_core_srv_conf_t,
+        ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t, ngx_http_core_module,
+        ngx_http_core_srv_conf_t,
     };
 
     /// Auxiliary structure to access `ngx_http_core_module` configuration.
@@ -220,7 +225,9 @@ mod ssl {
 pub use ssl::NgxHttpSslModule;
 
 mod upstream {
-    use crate::ffi::{ngx_http_upstream_main_conf_t, ngx_http_upstream_module, ngx_http_upstream_srv_conf_t};
+    use crate::ffi::{
+        ngx_http_upstream_main_conf_t, ngx_http_upstream_module, ngx_http_upstream_srv_conf_t,
+    };
 
     /// Auxiliary structure to access `ngx_http_upstream_module` configuration.
     pub struct NgxHttpUpstreamModule;

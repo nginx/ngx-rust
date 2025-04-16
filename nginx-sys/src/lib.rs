@@ -142,7 +142,10 @@ impl ngx_str_t {
     ///
     /// The caller must provide a valid pointer to a memory pool.
     pub unsafe fn from_bytes(pool: *mut ngx_pool_t, src: &[u8]) -> Option<Self> {
-        bytes_to_uchar(pool, src).map(|data| Self { data, len: src.len() })
+        bytes_to_uchar(pool, src).map(|data| Self {
+            data,
+            len: src.len(),
+        })
     }
 
     /// Create an `ngx_str_t` instance from a string slice (`&str`).

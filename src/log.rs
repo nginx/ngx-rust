@@ -8,7 +8,8 @@ use crate::ffi::{self, ngx_err_t, ngx_log_t, ngx_uint_t, NGX_MAX_ERROR_STR};
 ///
 /// Approximates the remaining space in `u_char[NGX_MAX_ERROR_STR]` after writing the standard
 /// prefix
-pub const LOG_BUFFER_SIZE: usize = NGX_MAX_ERROR_STR as usize - b"1970/01/01 00:00:00 [info] 1#1: ".len();
+pub const LOG_BUFFER_SIZE: usize =
+    NGX_MAX_ERROR_STR as usize - b"1970/01/01 00:00:00 [info] 1#1: ".len();
 
 /// Utility function to provide typed checking of the mask's field state.
 #[inline(always)]
@@ -275,7 +276,9 @@ mod tests {
     }
     #[test]
     fn test_mask_upper_bound() {
-        assert!(<DebugMask as Into<u32>>::into(DebugMask::Stream) == crate::ffi::NGX_LOG_DEBUG_LAST);
+        assert!(
+            <DebugMask as Into<u32>>::into(DebugMask::Stream) == crate::ffi::NGX_LOG_DEBUG_LAST
+        );
     }
     #[test]
     fn test_check_mask() {
@@ -305,10 +308,16 @@ mod tests {
 
         // overflow results in truncated output
         write!(&mut buf, " This is a test, {}", usize::MAX).unwrap();
-        assert_eq!(str::from_utf8(buf.filled()), Ok("Hello World! This is a test, 184"));
+        assert_eq!(
+            str::from_utf8(buf.filled()),
+            Ok("Hello World! This is a test, 184")
+        );
 
         // and any following writes are still safe
         write!(&mut buf, "test").unwrap();
-        assert_eq!(str::from_utf8(buf.filled()), Ok("Hello World! This is a test, 184"));
+        assert_eq!(
+            str::from_utf8(buf.filled()),
+            Ok("Hello World! This is a test, 184")
+        );
     }
 }

@@ -1,8 +1,8 @@
 use core::ptr;
 
 use crate::{
-    ngx_current_msec, ngx_event_t, ngx_event_timer_rbtree, ngx_msec_t, ngx_queue_insert_before, ngx_queue_remove,
-    ngx_queue_t, ngx_rbtree_delete, ngx_rbtree_insert, NGX_TIMER_LAZY_DELAY,
+    ngx_current_msec, ngx_event_t, ngx_event_timer_rbtree, ngx_msec_t, ngx_queue_insert_before,
+    ngx_queue_remove, ngx_queue_t, ngx_rbtree_delete, ngx_rbtree_insert, NGX_TIMER_LAZY_DELAY,
 };
 
 /// Sets a timeout for an event.

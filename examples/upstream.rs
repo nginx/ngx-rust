@@ -12,15 +12,19 @@ use std::slice;
 
 use ngx::core::{Pool, Status};
 use ngx::ffi::{
-    ngx_atoi, ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_free_peer_pt, ngx_event_get_peer_pt,
-    ngx_http_module_t, ngx_http_upstream_init_peer_pt, ngx_http_upstream_init_pt, ngx_http_upstream_init_round_robin,
-    ngx_http_upstream_srv_conf_t, ngx_http_upstream_t, ngx_int_t, ngx_module_t, ngx_peer_connection_t, ngx_str_t,
-    ngx_uint_t, NGX_CONF_NOARGS, NGX_CONF_TAKE1, NGX_CONF_UNSET, NGX_ERROR, NGX_HTTP_MODULE, NGX_HTTP_SRV_CONF_OFFSET,
-    NGX_HTTP_UPS_CONF, NGX_LOG_EMERG,
+    ngx_atoi, ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_free_peer_pt,
+    ngx_event_get_peer_pt, ngx_http_module_t, ngx_http_upstream_init_peer_pt,
+    ngx_http_upstream_init_pt, ngx_http_upstream_init_round_robin, ngx_http_upstream_srv_conf_t,
+    ngx_http_upstream_t, ngx_int_t, ngx_module_t, ngx_peer_connection_t, ngx_str_t, ngx_uint_t,
+    NGX_CONF_NOARGS, NGX_CONF_TAKE1, NGX_CONF_UNSET, NGX_ERROR, NGX_HTTP_MODULE,
+    NGX_HTTP_SRV_CONF_OFFSET, NGX_HTTP_UPS_CONF, NGX_LOG_EMERG,
 };
 use ngx::http::{HttpModule, Merge, MergeConfigError, Request};
 use ngx::http::{HttpModuleServerConf, NgxHttpUpstreamModule};
-use ngx::{http_upstream_init_peer_pt, ngx_conf_log_error, ngx_log_debug_http, ngx_log_debug_mask, ngx_string};
+use ngx::{
+    http_upstream_init_peer_pt, ngx_conf_log_error, ngx_log_debug_http, ngx_log_debug_mask,
+    ngx_string,
+};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -161,7 +165,10 @@ http_upstream_init_peer_pt!(
 // ngx_http_usptream_get_custom_peer
 // For demonstration purposes, use the original get callback, but log this callback proxies through
 // to the original.
-unsafe extern "C" fn ngx_http_upstream_get_custom_peer(pc: *mut ngx_peer_connection_t, data: *mut c_void) -> ngx_int_t {
+unsafe extern "C" fn ngx_http_upstream_get_custom_peer(
+    pc: *mut ngx_peer_connection_t,
+    data: *mut c_void,
+) -> ngx_int_t {
     let hcpd: *mut UpstreamPeerData = unsafe { mem::transmute(data) };
 
     ngx_log_debug_mask!(
@@ -209,7 +216,11 @@ unsafe extern "C" fn ngx_http_upstream_init_custom(
     cf: *mut ngx_conf_t,
     us: *mut ngx_http_upstream_srv_conf_t,
 ) -> ngx_int_t {
-    ngx_log_debug_mask!(DebugMask::Http, (*cf).log, "CUSTOM UPSTREAM peer init_upstream");
+    ngx_log_debug_mask!(
+        DebugMask::Http,
+        (*cf).log,
+        "CUSTOM UPSTREAM peer init_upstream"
+    );
 
     // SAFETY: this function is called with non-NULL uf always
     let us = unsafe { &mut *us };
@@ -226,14 +237,22 @@ unsafe extern "C" fn ngx_http_upstream_init_custom(
 
     let init_upstream_ptr = hccf.original_init_upstream.unwrap();
     if init_upstream_ptr(cf, us) != Status::NGX_OK.into() {
-        ngx_conf_log_error!(NGX_LOG_EMERG, cf, "CUSTOM UPSTREAM failed calling init_upstream");
+        ngx_conf_log_error!(
+            NGX_LOG_EMERG,
+            cf,
+            "CUSTOM UPSTREAM failed calling init_upstream"
+        );
         return isize::from(Status::NGX_ERROR);
     }
 
     hccf.original_init_peer = us.peer.init;
     us.peer.init = Some(http_upstream_init_custom_peer);
 
-    ngx_log_debug_mask!(DebugMask::Http, (*cf).log, "CUSTOM UPSTREAM end peer init_upstream");
+    ngx_log_debug_mask!(
+        DebugMask::Http,
+        (*cf).log,
+        "CUSTOM UPSTREAM end peer init_upstream"
+    );
     isize::from(Status::NGX_OK)
 }
 
@@ -252,7 +271,8 @@ unsafe extern "C" fn ngx_http_upstream_commands_set_custom(
     let ccf = &mut (*(conf as *mut SrvConfig));
 
     if (*cf.args).nelts == 2 {
-        let value: &[ngx_str_t] = slice::from_raw_parts((*cf.args).elts as *const ngx_str_t, (*cf.args).nelts);
+        let value: &[ngx_str_t] =
+            slice::from_raw_parts((*cf.args).elts as *const ngx_str_t, (*cf.args).nelts);
         let n = ngx_atoi(value[1].data, value[1].len);
         if n == (NGX_ERROR as isize) || n == 0 {
             ngx_conf_log_error!(
@@ -306,7 +326,11 @@ impl HttpModule for Module {
 
         (*conf).max = NGX_CONF_UNSET as u32;
 
-        ngx_log_debug_mask!(DebugMask::Http, (*cf).log, "CUSTOM UPSTREAM end create_srv_conf");
+        ngx_log_debug_mask!(
+            DebugMask::Http,
+            (*cf).log,
+            "CUSTOM UPSTREAM end create_srv_conf"
+        );
         conf as *mut c_void
     }
 }

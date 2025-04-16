@@ -110,7 +110,11 @@ pub trait HttpModule {
     ///
     /// Callers should provide valid non-null `ngx_conf_t` arguments. Implementers must
     /// guard against null inputs or risk runtime errors.
-    unsafe extern "C" fn merge_srv_conf(_cf: *mut ngx_conf_t, prev: *mut c_void, conf: *mut c_void) -> *mut c_char
+    unsafe extern "C" fn merge_srv_conf(
+        _cf: *mut ngx_conf_t,
+        prev: *mut c_void,
+        conf: *mut c_void,
+    ) -> *mut c_char
     where
         Self: super::HttpModuleServerConf,
         Self::ServerConf: Merge,
@@ -140,7 +144,11 @@ pub trait HttpModule {
     ///
     /// Callers should provide valid non-null `ngx_conf_t` arguments. Implementers must
     /// guard against null inputs or risk runtime errors.
-    unsafe extern "C" fn merge_loc_conf(_cf: *mut ngx_conf_t, prev: *mut c_void, conf: *mut c_void) -> *mut c_char
+    unsafe extern "C" fn merge_loc_conf(
+        _cf: *mut ngx_conf_t,
+        prev: *mut c_void,
+        conf: *mut c_void,
+    ) -> *mut c_char
     where
         Self: super::HttpModuleLocationConf,
         Self::LocationConf: Merge,
