@@ -70,6 +70,14 @@ fn main() -> Result<(), BoxError> {
     println!("cargo:rerun-if-changed=build/wrapper.h");
 
     let nginx = NginxSource::from_env();
+    println!(
+        "cargo:rerun-if-changed={}",
+        nginx.build_dir.join("Makefile").to_string_lossy()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        nginx.build_dir.join("ngx_auto_config.h").to_string_lossy()
+    );
     // Read autoconf generated makefile for NGINX and generate Rust bindings based on its includes
     generate_binding(&nginx);
     Ok(())
