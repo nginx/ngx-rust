@@ -17,6 +17,7 @@ pub use string::*;
 #[macro_export]
 macro_rules! ngx_container_of {
     ($ptr:expr, $type:path, $field:ident) => {
-        $ptr.byte_sub(::core::mem::offset_of!($type, $field)).cast::<$type>()
+        $ptr.byte_sub(::core::mem::offset_of!($type, $field))
+            .cast::<$type>()
     };
 }

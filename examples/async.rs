@@ -7,10 +7,10 @@ use std::time::Instant;
 
 use ngx::core;
 use ngx::ffi::{
-    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_t, ngx_http_handler_pt, ngx_http_module_t,
-    ngx_http_phases_NGX_HTTP_ACCESS_PHASE, ngx_int_t, ngx_module_t, ngx_post_event, ngx_posted_events,
-    ngx_posted_next_events, ngx_str_t, ngx_uint_t, NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET,
-    NGX_HTTP_MODULE,
+    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_t, ngx_http_handler_pt,
+    ngx_http_module_t, ngx_http_phases_NGX_HTTP_ACCESS_PHASE, ngx_int_t, ngx_module_t,
+    ngx_post_event, ngx_posted_events, ngx_posted_next_events, ngx_str_t, ngx_uint_t,
+    NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE,
 };
 use ngx::http::{self, HttpModule, MergeConfigError};
 use ngx::http::{HttpModuleLocationConf, HttpModuleMainConf, NgxHttpCoreModule};
@@ -29,8 +29,9 @@ impl http::HttpModule for Module {
         let cf = &mut *cf;
         let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
 
-        let h = ngx_array_push(&mut cmcf.phases[ngx_http_phases_NGX_HTTP_ACCESS_PHASE as usize].handlers)
-            as *mut ngx_http_handler_pt;
+        let h = ngx_array_push(
+            &mut cmcf.phases[ngx_http_phases_NGX_HTTP_ACCESS_PHASE as usize].handlers,
+        ) as *mut ngx_http_handler_pt;
         if h.is_null() {
             return core::Status::NGX_ERROR.into();
         }
@@ -148,7 +149,9 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
         return core::Status::NGX_DECLINED;
     }
 
-    if let Some(ctx) = unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_async_module)) } {
+    if let Some(ctx) =
+        unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_async_module)) }
+    {
         if !ctx.done.load(Ordering::Relaxed) {
             return core::Status::NGX_AGAIN;
         }
@@ -180,7 +183,10 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
         // not really thread safe, we should apply all these operation in nginx thread
         // but this is just an example. proper way would be storing these headers in the request ctx
         // and apply them when we get back to the nginx thread.
-        req.add_header_out("X-Async-Time", start.elapsed().as_millis().to_string().as_str());
+        req.add_header_out(
+            "X-Async-Time",
+            start.elapsed().as_millis().to_string().as_str(),
+        );
 
         done_flag.store(true, Ordering::Release);
         // there is a small issue here. If traffic is low we may get stuck behind a 300ms timer
@@ -216,7 +222,10 @@ extern "C" fn ngx_http_async_commands_set_enable(
 
 fn ngx_http_async_runtime() -> &'static Runtime {
     // Should not be called from the master process
-    assert_ne!(unsafe { ngx::ffi::ngx_process }, ngx::ffi::NGX_PROCESS_MASTER as _);
+    assert_ne!(
+        unsafe { ngx::ffi::ngx_process },
+        ngx::ffi::NGX_PROCESS_MASTER as _
+    );
 
     static RUNTIME: OnceLock<Runtime> = OnceLock::new();
     RUNTIME.get_or_init(|| {

@@ -85,11 +85,17 @@ impl NginxSource {
         let source_dir = NginxSource::check_source_dir(source_dir).expect("source directory");
         let build_dir = NginxSource::check_build_dir(build_dir).expect("build directory");
 
-        Self { source_dir, build_dir }
+        Self {
+            source_dir,
+            build_dir,
+        }
     }
 
     pub fn from_env() -> Self {
-        match (env::var_os("NGINX_SOURCE_DIR"), env::var_os("NGINX_BUILD_DIR")) {
+        match (
+            env::var_os("NGINX_SOURCE_DIR"),
+            env::var_os("NGINX_BUILD_DIR"),
+        ) {
             (Some(source_dir), Some(build_dir)) => NginxSource::new(source_dir, build_dir),
             (Some(source_dir), None) => Self::from_source_dir(source_dir),
             (None, Some(build_dir)) => Self::from_build_dir(build_dir),
@@ -106,7 +112,11 @@ impl NginxSource {
     }
 
     pub fn from_build_dir(build_dir: impl AsRef<Path>) -> Self {
-        let source_dir = build_dir.as_ref().parent().expect("source directory").to_owned();
+        let source_dir = build_dir
+            .as_ref()
+            .parent()
+            .expect("source directory")
+            .to_owned();
         Self::new(source_dir, build_dir)
     }
 
@@ -115,7 +125,10 @@ impl NginxSource {
         let build_dir = vendored::build().expect("vendored build");
         let source_dir = build_dir.parent().expect("source directory").to_path_buf();
 
-        Self { source_dir, build_dir }
+        Self {
+            source_dir,
+            build_dir,
+        }
     }
 
     #[cfg(not(feature = "vendored"))]
@@ -189,7 +202,8 @@ fn generate_binding(nginx: &NginxSource) {
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
-    let out_dir_env = env::var("OUT_DIR").expect("The required environment variable OUT_DIR was not set");
+    let out_dir_env =
+        env::var("OUT_DIR").expect("The required environment variable OUT_DIR was not set");
     let out_path = PathBuf::from(out_dir_env);
     bindings
         .write_to_file(out_path.join("bindings.rs"))
@@ -266,7 +280,11 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dy
 
     let expanded = expand_definitions(includes)?;
     for line in String::from_utf8(expanded)?.lines() {
-        let Some((name, value)) = line.trim().strip_prefix("RUST_CONF_").and_then(|x| x.split_once('=')) else {
+        let Some((name, value)) = line
+            .trim()
+            .strip_prefix("RUST_CONF_")
+            .and_then(|x| x.split_once('='))
+        else {
             continue;
         };
 
@@ -295,7 +313,10 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dy
     );
 
     // A quoted list of all recognized features to be passed to rustc-check-cfg.
-    println!("cargo::metadata=features_check=\"{}\"", NGX_CONF_FEATURES.join("\",\""));
+    println!(
+        "cargo::metadata=features_check=\"{}\"",
+        NGX_CONF_FEATURES.join("\",\"")
+    );
     // A list of features enabled in the nginx build we're using
     println!("cargo::metadata=features={}", ngx_features.join(","));
 
@@ -337,5 +358,8 @@ RUST_CONF_{flag}=NGX_{flag}
     writer.flush()?;
     drop(writer);
 
-    Ok(cc::Build::new().includes(includes).file(path).try_expand()?)
+    Ok(cc::Build::new()
+        .includes(includes)
+        .file(path)
+        .try_expand()?)
 }

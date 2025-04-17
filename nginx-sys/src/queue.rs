@@ -11,7 +11,8 @@ use crate::bindings::ngx_queue_t;
 #[macro_export]
 macro_rules! ngx_queue_data {
     ($q:expr, $type:path, $link:ident) => {
-        $q.byte_sub(::core::mem::offset_of!($type, $link)).cast::<$type>()
+        $q.byte_sub(::core::mem::offset_of!($type, $link))
+            .cast::<$type>()
     };
 }
 
@@ -168,12 +169,20 @@ mod tests {
     impl Iter {
         pub fn new(h: *mut ngx_queue_t) -> Self {
             let next = |x: *mut ngx_queue_t| unsafe { (*x).next };
-            Self { h, q: next(h), next }
+            Self {
+                h,
+                q: next(h),
+                next,
+            }
         }
 
         pub fn new_reverse(h: *mut ngx_queue_t) -> Self {
             let next = |x: *mut ngx_queue_t| unsafe { (*x).prev };
-            Self { h, q: next(h), next }
+            Self {
+                h,
+                q: next(h),
+                next,
+            }
         }
     }
 
@@ -200,7 +209,9 @@ mod tests {
         // Check forward and reverse iteration
         fn cmp(h: *mut ngx_queue_t, other: &[usize]) -> bool {
             Iter::new(h).map(value).eq(other.iter().cloned())
-                && Iter::new_reverse(h).map(value).eq(other.iter().rev().cloned())
+                && Iter::new_reverse(h)
+                    .map(value)
+                    .eq(other.iter().rev().cloned())
         }
 
         // Note how this test does not use references or borrows to avoid triggering UBs
@@ -234,7 +245,11 @@ mod tests {
 
             assert!(cmp(ptr::addr_of_mut!(h1), &[1, 2, 3, 4, 5, 5, 4, 3, 2, 1]));
 
-            ngx_queue_split(ptr::addr_of_mut!(h1), (*h2.next).next, ptr::addr_of_mut!(h2));
+            ngx_queue_split(
+                ptr::addr_of_mut!(h1),
+                (*h2.next).next,
+                ptr::addr_of_mut!(h2),
+            );
 
             assert!(cmp(ptr::addr_of_mut!(h1), &[1, 2, 3, 4, 5, 5]));
             assert!(cmp(ptr::addr_of_mut!(h2), &[4, 3, 2, 1]));

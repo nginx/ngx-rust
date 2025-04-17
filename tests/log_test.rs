@@ -90,7 +90,11 @@ impl Nginx {
 
     // replace config with another config
     pub fn replace_config<P: AsRef<Path>>(&mut self, from: P) -> Result<u64> {
-        println!("copying config from: {:?} to: {:?}", from.as_ref(), self.config_path); // replace with logging
+        println!(
+            "copying config from: {:?} to: {:?}",
+            from.as_ref(),
+            self.config_path
+        ); // replace with logging
         fs::copy(from, &self.config_path)
     }
 }
@@ -117,9 +121,12 @@ mod tests {
             current_dir.to_string_lossy()
         );
 
-        nginx
-            .replace_config(&test_config_path)
-            .unwrap_or_else(|_| panic!("Unable to load config file: {}", test_config_path.to_string_lossy()));
+        nginx.replace_config(&test_config_path).unwrap_or_else(|_| {
+            panic!(
+                "Unable to load config file: {}",
+                test_config_path.to_string_lossy()
+            )
+        });
         let output = nginx.restart().expect("Unable to restart NGINX");
         assert!(output.status.success());
 

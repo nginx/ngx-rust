@@ -20,13 +20,15 @@ const UBUNTU_KEYSEVER: &str = "hkps://keyserver.ubuntu.com";
 /// The default version of zlib to use if the `ZLIB_VERSION` environment variable is not present
 const ZLIB_DEFAULT_VERSION: &str = "1.3.1";
 /// Key 1: Mark Adler's public key. For zlib 1.3.1 and earlier
-const ZLIB_GPG_SERVER_AND_KEY_ID: (&str, &str) = (UBUNTU_KEYSEVER, "5ED46A6721D365587791E2AA783FCD8E58BCAFBA");
+const ZLIB_GPG_SERVER_AND_KEY_ID: (&str, &str) =
+    (UBUNTU_KEYSEVER, "5ED46A6721D365587791E2AA783FCD8E58BCAFBA");
 const ZLIB_DOWNLOAD_URL_PREFIX: &str = "https://github.com/madler/zlib/releases/download";
 /// The default version of pcre to use if the `PCRE2_VERSION` environment variable is not present
 const PCRE1_DEFAULT_VERSION: &str = "8.45";
 const PCRE2_DEFAULT_VERSION: &str = "10.42";
 /// Key 1: Phillip Hazel's public key. For PCRE2 10.42 and earlier
-const PCRE2_GPG_SERVER_AND_KEY_ID: (&str, &str) = (UBUNTU_KEYSEVER, "45F68D54BBE23FB3039B46E59766E084FB0F43D8");
+const PCRE2_GPG_SERVER_AND_KEY_ID: (&str, &str) =
+    (UBUNTU_KEYSEVER, "45F68D54BBE23FB3039B46E59766E084FB0F43D8");
 const PCRE1_DOWNLOAD_URL_PREFIX: &str = "https://sourceforge.net/projects/pcre/files/pcre";
 const PCRE2_DOWNLOAD_URL_PREFIX: &str = "https://github.com/PCRE2Project/pcre2/releases/download";
 /// The default version of openssl to use if the `OPENSSL_VERSION` environment variable is not present
@@ -204,7 +206,10 @@ fn all_archives() -> Vec<(String, String)> {
     let ngx_version = env::var("NGX_VERSION").unwrap_or_else(|_| NGX_DEFAULT_VERSION.into());
     let zlib_version = env::var("ZLIB_VERSION").unwrap_or_else(|_| ZLIB_DEFAULT_VERSION.into());
     // While Nginx 1.22.0 and later support pcre2 and openssl3, earlier ones only support pcre1 and openssl1. Here provides the appropriate (and as latest as possible) versions of these two dependencies as default, switching `***[major_version]_DEFAULT_VERSION` based on `is_after_1_22`. This facilitates to compile backport versions targeted for Nginx ealier than 1.22.0, which are still used in LTS releases of major Linux distributions.
-    let ngx_version_vec: Vec<i16> = ngx_version.split('.').map(|s| s.parse().unwrap_or(-1)).collect();
+    let ngx_version_vec: Vec<i16> = ngx_version
+        .split('.')
+        .map(|s| s.parse().unwrap_or(-1))
+        .collect();
     let is_after_1_22 = (ngx_version_vec.len() >= 2)
         && (ngx_version_vec[0] > 1 || (ngx_version_vec[0] == 1 && ngx_version_vec[1] >= 22));
     // keep env name `PCRE2_VERSION` for compat
@@ -255,7 +260,11 @@ fn nginx_install_dir(base_dir: &Path, target: &str) -> PathBuf {
 
 /// Ensure the correct permissions are applied to the local gnupg directory
 fn ensure_gpg_permissions(cache_dir: &Path) -> Result<(), Box<dyn StdError>> {
-    fn change_permissions_recursively(path: &Path, dir_mode: u32, file_mode: u32) -> std::io::Result<()> {
+    fn change_permissions_recursively(
+        path: &Path,
+        dir_mode: u32,
+        file_mode: u32,
+    ) -> std::io::Result<()> {
         if path.is_dir() {
             // Set directory permissions to 700
             fs::set_permissions(path, Permissions::from_mode(dir_mode))?;
@@ -275,7 +284,8 @@ fn ensure_gpg_permissions(cache_dir: &Path) -> Result<(), Box<dyn StdError>> {
     }
 
     let gnupghome = cache_dir.join(".gnupg");
-    change_permissions_recursively(gnupghome.as_path(), 0o700, 0o600).map_err(|e| Box::new(e) as Box<dyn StdError>)
+    change_permissions_recursively(gnupghome.as_path(), 0o700, 0o600)
+        .map_err(|e| Box::new(e) as Box<dyn StdError>)
 }
 
 /// Iterates through the tuples in `ALL_SERVERS_AND_PUBLIC_KEY_IDS` and returns a map of
@@ -310,7 +320,11 @@ fn import_gpg_keys(cache_dir: &Path) -> Result<(), Box<dyn StdError>> {
         ensure_gpg_permissions(cache_dir)?;
 
         for (server, key_ids) in keys_indexed_by_key_server() {
-            println!("Importing {} GPG keys for key server: {}", key_ids.len(), server);
+            println!(
+                "Importing {} GPG keys for key server: {}",
+                key_ids.len(),
+                server
+            );
 
             let homedir = gnupghome.clone();
             let homedir_str = homedir.to_string_lossy().to_string();
@@ -375,7 +389,11 @@ fn download(cache_dir: &Path, url: &str) -> Result<PathBuf, Box<dyn StdError>> {
     }
 
     if !file_path.exists() {
-        return Err(format!("Downloaded file was not written to the expected location: {}", url).into());
+        return Err(format!(
+            "Downloaded file was not written to the expected location: {}",
+            url
+        )
+        .into());
     }
     Ok(file_path)
 }
@@ -390,7 +408,13 @@ fn verify_signature_file(cache_dir: &Path, signature_path: &Path) -> Result<(), 
     }
     if let Some(gpg) = gpg_path() {
         let gnupghome = cache_dir.join(".gnupg");
-        let cmd = cmd!(gpg, "--homedir", &gnupghome, "--list-packets", signature_path);
+        let cmd = cmd!(
+            gpg,
+            "--homedir",
+            &gnupghome,
+            "--list-packets",
+            signature_path
+        );
         let output = cmd.stderr_to_stdout().stdout_capture().unchecked().run()?;
 
         if !output.status.success() {
@@ -419,7 +443,14 @@ fn verify_archive_signature(
 ) -> Result<(), Box<dyn StdError>> {
     if let Some(gpg) = gpg_path() {
         let gnupghome = cache_dir.join(".gnupg");
-        let cmd = cmd!(gpg, "--homedir", &gnupghome, "--verify", signature_path, archive_path);
+        let cmd = cmd!(
+            gpg,
+            "--homedir",
+            &gnupghome,
+            "--verify",
+            signature_path,
+            archive_path
+        );
         let output = cmd.stderr_to_stdout().stdout_capture().unchecked().run()?;
         if !output.status.success() {
             eprintln!("{}", String::from_utf8_lossy(&output.stdout));
@@ -439,7 +470,11 @@ fn verify_archive_signature(
 }
 
 /// Get a given tarball and signature file from a remote URL and copy it to the `.cache` directory.
-fn get_archive(cache_dir: &Path, archive_url: &str, signature_url: &str) -> Result<PathBuf, Box<dyn StdError>> {
+fn get_archive(
+    cache_dir: &Path,
+    archive_url: &str,
+    signature_url: &str,
+) -> Result<PathBuf, Box<dyn StdError>> {
     let signature_path = download(cache_dir, signature_url)?;
     if let Err(e) = verify_signature_file(cache_dir, &signature_path) {
         fs::remove_file(&signature_path)?;
@@ -464,8 +499,8 @@ fn extract_archive(
     if !extract_output_base_dir.exists() {
         fs::create_dir_all(extract_output_base_dir)?;
     }
-    let archive_file =
-        File::open(archive_path).unwrap_or_else(|_| panic!("Unable to open archive file: {}", archive_path.display()));
+    let archive_file = File::open(archive_path)
+        .unwrap_or_else(|_| panic!("Unable to open archive file: {}", archive_path.display()));
     let stem = archive_path
         .file_name()
         .and_then(|s| s.to_str())
@@ -485,7 +520,9 @@ fn extract_archive(
             .for_each(|mut entry| {
                 let path = entry.path().unwrap();
                 let stripped_path = path.components().skip(1).collect::<PathBuf>();
-                entry.unpack(archive_output_dir.join(stripped_path)).unwrap();
+                entry
+                    .unpack(archive_output_dir.join(stripped_path))
+                    .unwrap();
             });
     } else {
         println!(
@@ -499,7 +536,10 @@ fn extract_archive(
 }
 
 /// Extract all of the tarballs into subdirectories within the source base directory.
-fn extract_all_archives(cache_dir: &Path, target: &str) -> Result<Vec<(String, PathBuf)>, Box<dyn StdError>> {
+fn extract_all_archives(
+    cache_dir: &Path,
+    target: &str,
+) -> Result<Vec<(String, PathBuf)>, Box<dyn StdError>> {
     let archives = all_archives();
     let mut sources = Vec::new();
     let extract_output_base_dir = source_output_dir(cache_dir, target);
@@ -518,7 +558,10 @@ fn extract_all_archives(cache_dir: &Path, target: &str) -> Result<Vec<(String, P
 /// Invoke external processes to run autoconf `configure` to generate a makefile for NGINX and
 /// then run `make install`.
 fn compile_nginx(cache_dir: &Path) -> Result<(PathBuf, PathBuf), Box<dyn StdError>> {
-    fn find_dependency_path<'a>(sources: &'a [(String, PathBuf)], name: &str) -> Result<&'a PathBuf, String> {
+    fn find_dependency_path<'a>(
+        sources: &'a [(String, PathBuf)],
+        name: &str,
+    ) -> Result<&'a PathBuf, String> {
         sources
             .iter()
             .find(|(n, _)| n == name)
@@ -535,9 +578,15 @@ fn compile_nginx(cache_dir: &Path) -> Result<(PathBuf, PathBuf), Box<dyn StdErro
     let sources = extract_all_archives(cache_dir, &target)?;
     let zlib_src_dir = find_dependency_path(&sources, "zlib")?;
     let openssl_src_dir = find_dependency_path(&sources, "openssl")?;
-    let pcre2_src_dir = find_dependency_path(&sources, "pcre2").or(find_dependency_path(&sources, "pcre"))?;
+    let pcre2_src_dir =
+        find_dependency_path(&sources, "pcre2").or(find_dependency_path(&sources, "pcre"))?;
     let nginx_src_dir = find_dependency_path(&sources, "nginx")?;
-    let nginx_configure_flags = nginx_configure_flags(&nginx_install_dir, zlib_src_dir, openssl_src_dir, pcre2_src_dir);
+    let nginx_configure_flags = nginx_configure_flags(
+        &nginx_install_dir,
+        zlib_src_dir,
+        openssl_src_dir,
+        pcre2_src_dir,
+    );
     let nginx_binary_exists = nginx_install_dir.join("sbin").join("nginx").exists();
     let autoconf_makefile_exists = nginx_src_dir.join("Makefile").exists();
     // We find out how NGINX was configured last time, so that we can compare it to what
@@ -586,7 +635,9 @@ fn nginx_configure_flags(
         format!(
             "{}={}",
             flag,
-            path.as_os_str().to_str().expect("Unable to read source path as string")
+            path.as_os_str()
+                .to_str()
+                .expect("Unable to read source path as string")
         )
     }
     let modules = || -> Vec<String> {
@@ -647,7 +698,10 @@ fn make(nginx_src_dir: &Path, arg: &str) -> std::io::Result<Output> {
     let make_bin_path = match (which("gmake"), which("make")) {
         (Ok(path), _) => Ok(path),
         (_, Ok(path)) => Ok(path),
-        _ => Err(IoError::new(NotFound, "Unable to find make in path (gmake or make)")),
+        _ => Err(IoError::new(
+            NotFound,
+            "Unable to find make in path (gmake or make)",
+        )),
     }?;
 
     // Level of concurrency to use when building nginx - cargo nicely provides this information
