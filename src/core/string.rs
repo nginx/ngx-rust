@@ -1,4 +1,3 @@
-use core::slice;
 use core::str::{self, Utf8Error};
 
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
@@ -39,7 +38,7 @@ impl NgxStr {
     /// to range of bytes of at least `len` bytes, whose content remains valid and doesn't
     /// change for the lifetime of the returned `NgxStr`.
     pub unsafe fn from_ngx_str<'a>(str: ngx_str_t) -> &'a NgxStr {
-        slice::from_raw_parts(str.data, str.len).into()
+        str.as_bytes().into()
     }
 
     /// Access the [`NgxStr`] as a byte slice.
