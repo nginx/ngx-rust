@@ -40,9 +40,13 @@ std = ["alloc"]
 # tree when building against an existing copy of the NGINX with the
 # NGINX_SOURCE_DIR/NGINX_BUILD_DIR variables.
 vendored = ["nginx-sys/vendored"]
+# test utility
+test_util = []
+
 
 [badges]
 maintenance = { status = "experimental" }
 
 [dev-dependencies]
 target-triple = "0.1.2"
+ngx = { path ="./", features = ["test_util"] }
