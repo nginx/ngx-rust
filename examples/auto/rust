@@ -247,12 +247,12 @@ ngx_rust_module () {
     # Module deps are usually added to the object file targets, but we don't have any
     LINK_DEPS="$LINK_DEPS $ngx_rust_obj"
 
-    eval ${ngx_addon_id}_MODULES=\"\$${ngx_addon_id}_MODULES \
-                                   $ngx_rust_target_type:$ngx_rust_target_name\"
+    eval ${ngx_addon_id}_RUST_TARGETS=\"\$${ngx_addon_id}_RUST_TARGETS \
+                                        $ngx_rust_target_type:$ngx_rust_target_name\"
 
     if [ -n "$ngx_rust_target_features" ]; then
-        eval ${ngx_addon_id}_FEATURES=\"\$${ngx_addon_id}_FEATURES \
-                                        $ngx_rust_target_features\"
+        eval ${ngx_addon_id}_RUST_FEATURES=\"\$${ngx_addon_id}_RUST_FEATURES \
+                                             $ngx_rust_target_features\"
     fi
 
    . auto/module
@@ -268,12 +268,12 @@ ngx_rust_make_modules () {
     ngx_addon_id=$(echo "$ngx_addon_name" | sed -e 's/[^A-Za-z0-9_]/_/g')
     ngx_cargo_manifest=${ngx_cargo_manifest:-"$ngx_addon_dir/Cargo.toml"}
 
-    eval ngx_rust_features="\$${ngx_addon_id}_FEATURES"
-    eval ngx_rust_modules="\$${ngx_addon_id}_MODULES"
+    eval ngx_rust_features="\$${ngx_addon_id}_RUST_FEATURES"
+    eval ngx_rust_targets="\$${ngx_addon_id}_RUST_TARGETS"
 
-    for module in $ngx_rust_modules; do
-        ngx_rust_target_type=${module%%:*}
-        ngx_rust_target_name=${module#*:}
+    for target in $ngx_rust_targets; do
+        ngx_rust_target_type=${target%%:*}
+        ngx_rust_target_name=${target#*:}
 
         ngx_rust_make_module
     done
