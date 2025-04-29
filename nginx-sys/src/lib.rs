@@ -12,6 +12,7 @@ use core::slice;
 
 #[doc(hidden)]
 mod bindings {
+    #![allow(unknown_lints)] // unnecessary_transmutes
     #![allow(missing_docs)]
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -20,6 +21,7 @@ mod bindings {
     #![allow(clippy::all)]
     #![allow(improper_ctypes)]
     #![allow(rustdoc::broken_intra_doc_links)]
+    #![allow(unnecessary_transmutes)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 #[doc(no_inline)]

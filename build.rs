@@ -17,7 +17,7 @@ fn main() {
     println!("cargo::rerun-if-env-changed=DEP_NGINX_FEATURES");
     if let Ok(features) = std::env::var("DEP_NGINX_FEATURES") {
         for feature in features.split(',').map(str::trim) {
-            println!("cargo::rustc-cfg=ngx_feature=\"{}\"", feature);
+            println!("cargo::rustc-cfg=ngx_feature=\"{feature}\"");
         }
     }
 
@@ -30,7 +30,7 @@ fn main() {
     // Read operating system detected by nginx-sys and pass to the compiler.
     println!("cargo::rerun-if-env-changed=DEP_NGINX_OS");
     if let Ok(os) = std::env::var("DEP_NGINX_OS") {
-        println!("cargo::rustc-cfg=ngx_os=\"{}\"", os);
+        println!("cargo::rustc-cfg=ngx_os=\"{os}\"");
     }
 
     // Generate cfg values for version checks

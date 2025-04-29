@@ -34,7 +34,7 @@ pub unsafe fn ngx_queue_init(q: *mut ngx_queue_t) {
 /// `q` must be a valid pointer to [ngx_queue_t], initialized with [ngx_queue_init].
 #[inline]
 pub unsafe fn ngx_queue_empty(q: *const ngx_queue_t) -> bool {
-    q == (*q).prev
+    ptr::eq(q, (*q).prev)
 }
 
 /// Inserts a new node after the current.
@@ -190,7 +190,7 @@ mod tests {
         type Item = *mut ngx_queue_t;
 
         fn next(&mut self) -> Option<Self::Item> {
-            if self.h == self.q {
+            if ptr::eq(self.h, self.q) {
                 return None;
             }
 

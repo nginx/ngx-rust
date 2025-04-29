@@ -395,11 +395,9 @@ fn download(cache_dir: &Path, url: &str) -> Result<PathBuf, Box<dyn StdError>> {
     }
 
     if !file_path.exists() {
-        return Err(format!(
-            "Downloaded file was not written to the expected location: {}",
-            url
-        )
-        .into());
+        return Err(
+            format!("Downloaded file was not written to the expected location: {url}",).into(),
+        );
     }
     Ok(file_path)
 }
@@ -425,14 +423,11 @@ fn verify_signature_file(cache_dir: &Path, signature_path: &Path) -> Result<(), 
 
         if !output.status.success() {
             eprintln!("{}", String::from_utf8_lossy(&output.stdout));
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!(
-                    "Command: {:?} \nGPG signature file verification failed for signature: {}",
-                    cmd,
-                    signature_path.display()
-                ),
-            )));
+            return Err(Box::new(std::io::Error::other(format!(
+                "Command: {:?} \nGPG signature file verification failed for signature: {}",
+                cmd,
+                signature_path.display()
+            ))));
         }
     } else {
         println!("GPG not found, skipping signature file verification");
@@ -460,14 +455,11 @@ fn verify_archive_signature(
         let output = cmd.stderr_to_stdout().stdout_capture().unchecked().run()?;
         if !output.status.success() {
             eprintln!("{}", String::from_utf8_lossy(&output.stdout));
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!(
-                    "Command: {:?}\nGPG signature verification failed of archive failed [{}]",
-                    cmd,
-                    archive_path.display()
-                ),
-            )));
+            return Err(Box::new(std::io::Error::other(format!(
+                "Command: {:?}\nGPG signature verification failed of archive failed [{}]",
+                cmd,
+                archive_path.display()
+            ))));
         }
     } else {
         println!("GPG not found, skipping signature verification");
