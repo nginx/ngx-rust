@@ -26,6 +26,7 @@ const NGX_CONF_FEATURES: &[&str] = &[
     "have_file_aio",
     "have_kqueue",
     "have_variadic_macros",
+    "http",
     "http_cache",
     "http_dav",
     "http_gzip",
@@ -40,6 +41,7 @@ const NGX_CONF_FEATURES: &[&str] = &[
     "pcre2",
     "quic",
     "ssl",
+    "stream",
     "stream_ssl",
     "stream_upstream_zone",
     "threads",
@@ -336,17 +338,26 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dy
     );
 
     // A quoted list of all recognized features to be passed to rustc-check-cfg.
+    let values = NGX_CONF_FEATURES.join("\",\"");
+    println!("cargo::metadata=features_check=\"{}\"", values);
     println!(
-        "cargo::metadata=features_check=\"{}\"",
-        NGX_CONF_FEATURES.join("\",\"")
+        "cargo::rustc-check-cfg=cfg(ngx_feature, values(\"{}\"))",
+        values
     );
+
     // A list of features enabled in the nginx build we're using
     println!("cargo::metadata=features={}", ngx_features.join(","));
+    for feature in ngx_features {
+        println!("cargo::rustc-cfg=ngx_feature=\"{}\"", feature);
+    }
 
     // A quoted list of all recognized operating systems to be passed to rustc-check-cfg.
-    println!("cargo::metadata=os_check=\"{}\"", NGX_CONF_OS.join("\",\""));
+    let values = NGX_CONF_OS.join("\",\"");
+    println!("cargo::metadata=os_check=\"{}\"", values);
+    println!("cargo::rustc-check-cfg=cfg(ngx_os, values(\"{}\"))", values);
     // Current detected operating system
     println!("cargo::metadata=os={ngx_os}");
+    println!("cargo::rustc-cfg=ngx_os=\"{ngx_os}\"");
 
     Ok(())
 }
@@ -360,6 +371,22 @@ fn expand_definitions<T: AsRef<Path>>(includes: &[T]) -> Result<Vec<u8>, Box<dyn
         "
 #include <ngx_config.h>
 #include <ngx_core.h>
+
+/* C23 or Clang/GCC/MSVC >= 15.3 extension */
+#if defined(__has_include)
+
+#if __has_include(<ngx_http.h>)
+RUST_CONF_HTTP=1
+#endif
+
+#if __has_include(<ngx_stream.h>)
+RUST_CONF_STREAM=1
+#endif
+
+#else
+/* fallback */
+RUST_CONF_HTTP=1
+#endif
 
 RUST_CONF_NGINX_BUILD=NGINX_VER_BUILD
 RUST_CONF_NGINX_VERSION=NGINX_VER
