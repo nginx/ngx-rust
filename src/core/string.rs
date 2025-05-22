@@ -24,6 +24,7 @@ macro_rules! ngx_string {
 /// Representation of a borrowed [Nginx string].
 ///
 /// [Nginx string]: https://nginx.org/en/docs/dev/development_guide.html#string_overview
+#[repr(transparent)]
 pub struct NgxStr([u_char]);
 
 impl NgxStr {
@@ -37,7 +38,15 @@ impl NgxStr {
     /// to range of bytes of at least `len` bytes, whose content remains valid and doesn't
     /// change for the lifetime of the returned `NgxStr`.
     pub unsafe fn from_ngx_str<'a>(str: ngx_str_t) -> &'a NgxStr {
-        str.as_bytes().into()
+        let bytes: &[u8] = str.as_bytes();
+        &*(bytes as *const [u8] as *const NgxStr)
+    }
+
+    /// Create an [NgxStr] from a borrowed byte slice.
+    #[inline]
+    pub fn from_bytes(bytes: &[u8]) -> &Self {
+        // SAFETY: An `NgxStr` is identical to a `[u8]` slice, given `u_char` is an alias for `u8`
+        unsafe { &*(bytes as *const [u8] as *const NgxStr) }
     }
 
     /// Access the [`NgxStr`] as a byte slice.
@@ -64,16 +73,15 @@ impl NgxStr {
     }
 }
 
-impl From<&[u8]> for &NgxStr {
-    fn from(bytes: &[u8]) -> Self {
-        // SAFETY: An `NgxStr` is identical to a `[u8]` slice, given `u_char` is an alias for `u8`.
-        unsafe { &*(bytes as *const [u8] as *const NgxStr) }
+impl<'a> From<&'a [u8]> for &'a NgxStr {
+    fn from(bytes: &'a [u8]) -> Self {
+        NgxStr::from_bytes(bytes)
     }
 }
 
-impl From<&str> for &NgxStr {
-    fn from(s: &str) -> Self {
-        s.as_bytes().into()
+impl<'a> From<&'a str> for &'a NgxStr {
+    fn from(s: &'a str) -> Self {
+        NgxStr::from_bytes(s.as_bytes())
     }
 }
 
@@ -85,7 +93,28 @@ impl AsRef<[u8]> for NgxStr {
 
 impl Default for &NgxStr {
     fn default() -> Self {
-        // SAFETY: The empty `ngx_str_t` is always a valid Nginx string.
-        unsafe { NgxStr::from_ngx_str(ngx_str_t::default()) }
+        NgxStr::from_bytes(&[])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate alloc;
+
+    use alloc::string::ToString;
+
+    use super::*;
+
+    #[test]
+    fn test_lifetimes() {
+        let a: &NgxStr = "Hello World!".into();
+
+        let s = "Hello World!".to_string();
+        let b: &NgxStr = s.as_bytes().into();
+
+        // The compiler should detect that s is borrowed and fail.
+        // drop(s); // ☢️
+
+        assert_eq!(a.0, b.0);
     }
 }
