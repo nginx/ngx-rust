@@ -198,8 +198,7 @@ impl fmt::Display for ngx_str_t {
         for chunk in self.as_bytes().utf8_chunks() {
             f.write_str(chunk.valid())?;
             for byte in chunk.invalid() {
-                f.write_str("\\x")?;
-                fmt::LowerHex::fmt(byte, f)?;
+                write!(f, "\\x{byte:02x}")?;
             }
         }
         Ok(())
@@ -318,6 +317,7 @@ pub unsafe fn add_to_ngx_table(
 #[cfg(test)]
 mod tests {
     extern crate alloc;
+    use alloc::format;
     use alloc::string::ToString;
 
     use super::*;
@@ -339,6 +339,15 @@ mod tests {
                 len: bytes.len(),
             };
             assert_eq!(str.to_string(), *expected);
+        }
+
+        // Check that the formatter arguments are ignored correctly
+        for (bytes, expected) in &pairs[2..3] {
+            let str = ngx_str_t {
+                data: bytes.as_ptr().cast_mut(),
+                len: bytes.len(),
+            };
+            assert_eq!(format!("{str:12.12}"), *expected);
         }
     }
 }
