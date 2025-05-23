@@ -92,6 +92,18 @@ impl ngx_str_t {
     }
 }
 
+impl AsRef<[u8]> for ngx_str_t {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl AsMut<[u8]> for ngx_str_t {
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.as_bytes_mut()
+    }
+}
+
 impl Default for ngx_str_t {
     fn default() -> Self {
         Self::empty()
@@ -111,6 +123,26 @@ impl fmt::Display for ngx_str_t {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         detail::display_bytes(f, self.as_bytes())
+    }
+}
+
+impl PartialEq for ngx_str_t {
+    fn eq(&self, other: &Self) -> bool {
+        PartialEq::eq(self.as_bytes(), other.as_bytes())
+    }
+}
+
+impl Eq for ngx_str_t {}
+
+impl PartialOrd<Self> for ngx_str_t {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ngx_str_t {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        Ord::cmp(self.as_bytes(), other.as_bytes())
     }
 }
 
