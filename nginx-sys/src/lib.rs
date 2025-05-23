@@ -174,6 +174,20 @@ impl ngx_str_t {
     }
 }
 
+impl AsRef<[u8]> for ngx_str_t {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl AsMut<[u8]> for ngx_str_t {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.as_bytes_mut()
+    }
+}
+
 impl Default for ngx_str_t {
     fn default() -> Self {
         Self::empty()
