@@ -9,18 +9,17 @@ on:
 env:
   CARGO_TERM_COLOR: 'always'
   RUST_BACKTRACE: '1'
-  NGX_CONFIGURE: |
+  NGX_CONFIGURE: >-
     auto/configure
-      --with-compat
-      --with-debug
-      --with-http_realip_module
-      --with-http_ssl_module
-      --with-http_v2_module
-      --with-http_v3_module
-      --with-stream
-      --with-stream_realip_module
-      --with-stream_ssl_module
-      --with-threads
+    --with-compat
+    --with-debug
+    --with-http_realip_module
+    --with-http_ssl_module
+    --with-http_v2_module
+    --with-stream
+    --with-stream_realip_module
+    --with-stream_ssl_module
+    --with-threads
 
 jobs:
   test:
@@ -29,12 +28,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        nginx-ref:
+          - master
+          - stable-1.28
         module:
           - static
           - dynamic
-        nginx-ref:
-          # master
-          - stable-1.26
+        include:
+          - nginx-ref: stable-1.24
+            module: dynamic
 
     steps:
       - uses: actions/checkout@v4
@@ -62,6 +64,12 @@ jobs:
             nginx/objs/ngx_rust_examples
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Update configure arguments
+        if: matrix.nginx-ref != 'stable-1.24'
+        run: |
+            echo NGX_CONFIGURE="${NGX_CONFIGURE} --with-http_v3_module" \
+                >> "$GITHUB_ENV"
 
       - name: Configure nginx with static modules
         if: matrix.module == 'static'
