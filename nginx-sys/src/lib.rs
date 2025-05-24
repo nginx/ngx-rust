@@ -2,6 +2,7 @@
 #![warn(missing_docs)]
 #![no_std]
 
+pub mod detail;
 mod event;
 mod queue;
 
@@ -173,6 +174,20 @@ impl ngx_str_t {
     }
 }
 
+impl AsRef<[u8]> for ngx_str_t {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl AsMut<[u8]> for ngx_str_t {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [u8] {
+        self.as_bytes_mut()
+    }
+}
+
 impl Default for ngx_str_t {
     fn default() -> Self {
         Self::empty()
@@ -189,20 +204,9 @@ impl From<ngx_str_t> for &[u8] {
 }
 
 impl fmt::Display for ngx_str_t {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // The implementation is similar to an inlined `String::from_utf8_lossy`, with two
-        // important differences:
-        //
-        //  - it writes directly to the Formatter instead of allocating a temporary String
-        //  - invalid sequences are represented as escaped individual bytes
-        for chunk in self.as_bytes().utf8_chunks() {
-            f.write_str(chunk.valid())?;
-            for byte in chunk.invalid() {
-                f.write_str("\\x")?;
-                fmt::LowerHex::fmt(byte, f)?;
-            }
-        }
-        Ok(())
+        detail::display_bytes(f, self.as_bytes())
     }
 }
 
@@ -313,32 +317,4 @@ pub unsafe fn add_to_ngx_table(
         return Some(());
     }
     None
-}
-
-#[cfg(test)]
-mod tests {
-    extern crate alloc;
-    use alloc::string::ToString;
-
-    use super::*;
-
-    #[test]
-    fn ngx_str_display() {
-        let pairs: &[(&[u8], &str)] = &[
-            (b"", ""),
-            (b"Ferris the \xf0\x9f\xa6\x80", "Ferris the 🦀"),
-            (b"\xF0\x90\x80", "\\xf0\\x90\\x80"),
-            (b"\xF0\x90\x80Hello World", "\\xf0\\x90\\x80Hello World"),
-            (b"Hello \xF0\x90\x80World", "Hello \\xf0\\x90\\x80World"),
-            (b"Hello World\xF0\x90\x80", "Hello World\\xf0\\x90\\x80"),
-        ];
-
-        for (bytes, expected) in pairs {
-            let str = ngx_str_t {
-                data: bytes.as_ptr().cast_mut(),
-                len: bytes.len(),
-            };
-            assert_eq!(str.to_string(), *expected);
-        }
-    }
 }
