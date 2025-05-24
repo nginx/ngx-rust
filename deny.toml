@@ -14,9 +14,10 @@ allow = [
     "Unicode-3.0",
 ]
 confidence-threshold = 0.8
-exceptions = [
-    { allow = ["MPL-2.0"], crate = "webpki-roots" },
-]
+
+[[licenses.exceptions]]
+crate = "webpki-roots"
+allow = ["CDLA-Permissive-2.0", "MPL-2.0"]
 
 [[licenses.clarify]]
 crate = "ring"
