@@ -1,0 +1,17 @@
+# LeakSanitizer suppressions list for nginx
+#
+# To be used with -fsanitize=address and
+# LSAN_OPTIONS=suppressions=lsan-suppressions.txt.
+#
+# https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#suppressions
+
+# cycle->connections, cycle->read_events, cycle->write_events
+leak:ngx_event_process_init
+
+# XXX: can silence leaks from nginx SSL callbacks
+leak:SSL_do_handshake
+leak:SSL_read
+
+# rcf->ranges not freed at process exit
+leak:ngx_http_upstream_update_random
+leak:ngx_stream_upstream_update_random

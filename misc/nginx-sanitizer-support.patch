@@ -1,0 +1,28 @@
+diff --git a/src/core/ngx_string.h b/src/core/ngx_string.h
+index 713eb42a7..999c6b25f 100644
+--- a/src/core/ngx_string.h
++++ b/src/core/ngx_string.h
+@@ -96,6 +96,23 @@ void ngx_explicit_memzero(void *buf, size_t n);
+ void *ngx_memcpy(void *dst, const void *src, size_t n);
+ #define ngx_cpymem(dst, src, n)   (((u_char *) ngx_memcpy(dst, src, n)) + (n))
+ 
++#elif (NGX_SUPPRESS_WARN)
++
++/*
++ * Checked versions for sanitizers.
++ * See https://mailman.nginx.org/pipermail/nginx-devel/2023-December/7VNQZEBNXEKAYTYE4Y65FORF4HNELM6V.html
++ */
++
++static ngx_inline void *
++ngx_memcpy(void *dst, const void *src, size_t n) {
++    return (n == 0) ? dst : memcpy(dst, src, n);
++}
++
++static ngx_inline void *
++ngx_cpymem(void *dst, const void *src, size_t n) {
++    return (n == 0) ? dst : ((u_char *) memcpy(dst, src, n)) + n;
++}
++
+ #else
+ 
+ /*

@@ -1,0 +1,28 @@
+# UndefinedBehaviorSanitizer suppressions list for nginx
+#
+# To be used with -fsanitize=undefined and
+# UBSAN_OPTIONS=suppressions=ubsan-suppressions.txt.
+#
+# https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#runtime-suppressions
+
+# src/http/v2/ngx_http_v2.c:2747:17: runtime error: store to misaligned address 0x7b35a1a19885 for type 'uint32_t' (aka 'unsigned int'), which requires 4 byte alignment
+alignment:src/http/v2/ngx_http_v2.c
+alignment:src/http/v2/ngx_http_v2_filter_module.c
+alignment:ngx_http_huff_encode
+alignment:ngx_http_parse_request_line
+
+# ngx_quic_write_uint32 at src/event/quic/ngx_event_quic_transport.c:642
+alignment:ngx_quic_create_long_header
+alignment:ngx_quic_read_uint32
+
+# src/core/ngx_output_chain.c:70:20: runtime error: call to function ngx_http_trailers_filter through pointer to incorrect function type 'long (*)(void *, struct ngx_chain_s *)'
+# src/http/modules/ngx_http_headers_filter_module.c:249: note: ngx_http_trailers_filter defined here
+function:ngx_output_chain
+
+# violates nonnull on memcmp
+nonnull-attribute:ngx_http_upstream_zone_preresolve
+nonnull-attribute:ngx_stream_upstream_zone_preresolve
+
+# src/http/ngx_http_script.c:800:16: runtime error: applying non-zero offset 112 to null pointer
+pointer-overflow:ngx_http_script_add_code
+pointer-overflow:ngx_stream_script_add_code

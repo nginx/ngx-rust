@@ -1,0 +1,109 @@
+name: sanitizers
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: 'always'
+  RUST_BACKTRACE: '1'
+  BUILDREQUIRES: >-
+    openssl-devel pcre2-devel zlib-devel
+    cargo rust-src rustfmt
+    clang compiler-rt
+    git-core
+    make patch
+    perl-FindBin
+    perl-IO-Socket-SSL
+    perl-Test-Harness
+    perl-Test-Simple
+    perl-lib
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: ghcr.io/almalinux/almalinux:10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        nginx-ref:
+          # master
+          - stable-1.28
+
+    steps:
+      - name: Install dependencies
+        run:  dnf install -y ${BUILDREQUIRES}
+
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.nginx-ref }}
+          repository: 'nginx/nginx'
+          path: 'nginx'
+      - uses: actions/checkout@v4
+        with:
+          repository: 'nginx/nginx-tests'
+          path: 'nginx/tests'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            nginx/objs/ngx_rust_examples
+          key: ${{ runner.os }}-cargo-asan-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-asan-
+
+      - name: Configure and build nginx
+        working-directory: nginx
+        env:
+          CFLAGS: >-
+            -DNGX_DEBUG_PALLOC=1
+            -DNGX_SUPPRESS_WARN=1
+            -O1
+            -fno-omit-frame-pointer
+            -fsanitize=address,undefined
+          LDFLAGS: -fsanitize=address,undefined
+          RUST_TARGET: x86_64-unknown-linux-gnu
+          RUSTFLAGS: -Zsanitizer=address -Zexternal-clangrt
+          # Extra options passed to cargo rustc
+          NGX_RUSTC_OPT: -Zbuild-std
+          # Enable unstable features, such as the -Z options above,
+          # in the stable toolchain.
+          RUSTC_BOOTSTRAP: 1
+        run: |
+          patch -p1 < $GITHUB_WORKSPACE/misc/nginx-sanitizer-support.patch
+          auto/configure \
+            --with-cc=clang \
+            --with-cc-opt="$CFLAGS" \
+            --with-ld-opt="$LDFLAGS" \
+            --with-compat \
+            --with-debug \
+            --with-http_ssl_module \
+            --with-http_v2_module \
+            --with-http_v3_module \
+            --with-stream \
+            --with-stream_ssl_module \
+            --with-threads \
+            --add-module=$(realpath ../examples)
+          make -j$(nproc)
+
+      - name: Run tests
+        env:
+          ASAN_OPTIONS: detect_stack_use_after_return=1:detect_odr_violation=0
+          # `container` job steps are running as root, and thus all the files
+          # created by the test scripts are owned by root.
+          # But the worker processes are spawned as "nobody" by default,
+          # resulting in permission errors.
+          TEST_NGINX_GLOBALS: >-
+              user root;
+        run: |
+            TEST_NGINX_BINARY="$PWD/nginx/objs/nginx" \
+            LSAN_OPTIONS="suppressions=$PWD/misc/lsan-suppressions.txt" \
+            UBSAN_OPTIONS="suppressions=$PWD/misc/ubsan-suppressions.txt" \
+            prove -v -Inginx/tests/lib examples/t
