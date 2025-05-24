@@ -1,5 +1,6 @@
 #[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::{borrow::Cow, string::String};
+use core::fmt;
 use core::str::{self, Utf8Error};
 #[cfg(feature = "std")]
 use std::{borrow::Cow, string::String};
@@ -91,9 +92,26 @@ impl AsRef<[u8]> for NgxStr {
     }
 }
 
+impl fmt::Debug for NgxStr {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // XXX: Use debug_tuple() and feature(debug_closure_helpers) once it's stabilized
+        f.write_str("NgxStr(")?;
+        nginx_sys::detail::debug_bytes(f, &self.0)?;
+        f.write_str(")")
+    }
+}
+
 impl Default for &NgxStr {
     fn default() -> Self {
         NgxStr::from_bytes(&[])
+    }
+}
+
+impl fmt::Display for NgxStr {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        nginx_sys::detail::display_bytes(f, &self.0)
     }
 }
 
