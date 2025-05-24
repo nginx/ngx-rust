@@ -19,7 +19,7 @@ rust-version.workspace = true
 [build-dependencies]
 bindgen = "0.71"
 cc = "1.2.0"
-duct = { version = "0.13.7", optional = true }
+duct = { version = "1", optional = true }
 dunce = "1.0.5"
 flate2 = { version = "1.0.28", optional = true }
 regex = "1.11.1"

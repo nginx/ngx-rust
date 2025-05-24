@@ -25,16 +25,21 @@ const ZLIB_GPG_SERVER_AND_KEY_ID: (&str, &str) =
 const ZLIB_DOWNLOAD_URL_PREFIX: &str = "https://github.com/madler/zlib/releases/download";
 /// The default version of pcre to use if the `PCRE2_VERSION` environment variable is not present
 const PCRE1_DEFAULT_VERSION: &str = "8.45";
-const PCRE2_DEFAULT_VERSION: &str = "10.42";
-/// Key 1: Phillip Hazel's public key. For PCRE2 10.42 and earlier
-const PCRE2_GPG_SERVER_AND_KEY_ID: (&str, &str) =
-    (UBUNTU_KEYSEVER, "45F68D54BBE23FB3039B46E59766E084FB0F43D8");
+const PCRE2_DEFAULT_VERSION: &str = "10.45";
+/// Key 1: Phillip Hazel's public key. For PCRE2 10.44 and earlier
+/// Key 2: Nicholas Wilson's public key. For PCRE2 10.45
+const PCRE2_GPG_SERVER_AND_KEY_ID: (&str, &str) = (
+    UBUNTU_KEYSEVER,
+    "\
+45F68D54BBE23FB3039B46E59766E084FB0F43D8 \
+A95536204A3BB489715231282A98E77EB6F24CA8",
+);
 const PCRE1_DOWNLOAD_URL_PREFIX: &str = "https://sourceforge.net/projects/pcre/files/pcre";
 const PCRE2_DOWNLOAD_URL_PREFIX: &str = "https://github.com/PCRE2Project/pcre2/releases/download";
 /// The default version of openssl to use if the `OPENSSL_VERSION` environment variable is not
 /// present
 const OPENSSL1_DEFAULT_VERSION: &str = "1.1.1w";
-const OPENSSL3_DEFAULT_VERSION: &str = "3.2.4";
+const OPENSSL3_DEFAULT_VERSION: &str = "3.5.0";
 const OPENSSL_GPG_SERVER_AND_KEY_IDS: (&str, &str) = (
     UBUNTU_KEYSEVER,
     "\
@@ -50,7 +55,7 @@ BA5473A2B0587B07FB27CF2D216094DFD0CB81EF",
 );
 const OPENSSL_DOWNLOAD_URL_PREFIX: &str = "https://github.com/openssl/openssl/releases/download";
 /// The default version of NGINX to use if the `NGX_VERSION` environment variable is not present
-const NGX_DEFAULT_VERSION: &str = "1.26.3";
+const NGX_DEFAULT_VERSION: &str = "1.28.0";
 
 /// Key 1: Konstantin Pavlov's public key. For Nginx 1.25.3 and earlier
 /// Key 2: Sergey Kandaurov's public key. For Nginx 1.25.4
