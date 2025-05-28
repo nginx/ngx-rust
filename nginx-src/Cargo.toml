@@ -1,0 +1,13 @@
+[package]
+name = "nginx-src"
+version = "1028.0.0"
+license = "BSD-2-Clause"
+description = "Source of NGINX"
+keywords = ["nginx", "module", "sys"]
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+duct = "1"

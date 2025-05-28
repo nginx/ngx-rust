@@ -1,0 +1,4 @@
+[submodule "nginx-src/nginx"]
+	path = nginx-src/nginx
+	url = https://github.com/nginx/nginx.git
+	branch = stable-1.28

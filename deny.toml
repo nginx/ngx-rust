@@ -6,18 +6,14 @@ all-features = true
 
 [licenses]
 allow = [
-    "Apache-2.0 WITH LLVM-exception",
     "Apache-2.0",
+    "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
     "MIT",
     "Unicode-3.0",
 ]
 confidence-threshold = 0.8
-
-[[licenses.exceptions]]
-crate = "webpki-roots"
-allow = ["CDLA-Permissive-2.0", "MPL-2.0"]
 
 [[licenses.clarify]]
 crate = "ring"

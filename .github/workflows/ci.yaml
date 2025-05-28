@@ -34,6 +34,8 @@ jobs:
     steps:
       - name: checkout source
         uses: actions/checkout@v4
+        with:
+            submodules: true
       - name: set up cargo cache
         uses: actions/cache@v4
         continue-on-error: false
@@ -89,6 +91,8 @@ jobs:
     steps:
       - name: checkout source
         uses: actions/checkout@v4
+        with:
+            submodules: true
       - name: set up cargo cache
         uses: actions/cache@v4
         continue-on-error: false
@@ -123,6 +127,8 @@ jobs:
       - name: install command line dependencies
         run: brew install make gnupg
       - uses: actions/checkout@v4
+        with:
+            submodules: true
       - uses: dtolnay/rust-toolchain@stable
       - name: set up cargo cache
         uses: actions/cache@v4
