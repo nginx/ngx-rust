@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "nginx-src",
     "nginx-sys",
     "examples",
 ]

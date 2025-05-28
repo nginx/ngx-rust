@@ -26,6 +26,7 @@ patches applied.
 
 - `vendored`: Enables the build scripts to download and build a copy of nginx
   source and link against it.
+  See `nginx-src` crate documentation for additional details.
 
 ## Input variables
 

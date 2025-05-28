@@ -1,0 +1,19 @@
+[package]
+name = "nginx-src"
+# Version format: <NGINX major>.<NGINX minor>.<crate patch>+<NGINX version>
+version = "1.28.0+1.28.0"
+# Crate sources are licensed under Apache-2.0, with exception of the
+# NGINX submodlue that is redistributed under BSD-2-Clause.
+license = "Apache-2.0 AND BSD-2-Clause"
+description = "Source of NGINX"
+keywords = ["nginx", "module", "sys"]
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+duct = "1"
+flate2 = "1"
+tar = "0.4"
+ureq = "3.0.10"
