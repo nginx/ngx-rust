@@ -1,4 +1,6 @@
+use std::env;
 use std::fs;
+use std::io;
 use std::io::Result;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
@@ -6,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::process::Output;
 
-use ngx::ffi::{NGX_CONF_PATH, NGX_PREFIX, NGX_SBIN_PATH};
+const NGINX_BINARY_NAME: &str = "nginx";
 
 /// Convert a CStr to a PathBuf
 pub fn cstr_to_path(val: &std::ffi::CStr) -> Option<PathBuf> {
@@ -22,42 +24,68 @@ pub fn cstr_to_path(val: &std::ffi::CStr) -> Option<PathBuf> {
     Some(PathBuf::from(str))
 }
 
+/// Find nginx binary in the build directory
+pub fn find_nginx_binary() -> io::Result<PathBuf> {
+    let path = [
+        // TEST_NGINX_BINARY is specified for tests
+        env::var("TEST_NGINX_BINARY").ok().map(PathBuf::from),
+        // The module is built against an external NGINX source tree
+        env::var("NGINX_BUILD_DIR")
+            .map(PathBuf::from)
+            .map(|x| x.join(NGINX_BINARY_NAME))
+            .ok(),
+        env::var("NGINX_SOURCE_DIR")
+            .map(PathBuf::from)
+            .map(|x| x.join("objs").join(NGINX_BINARY_NAME))
+            .ok(),
+        // Fallback to the build directory exposed by nginx-sys
+        option_env!("DEP_NGINX_BUILD_DIR")
+            .map(PathBuf::from)
+            .map(|x| x.join(NGINX_BINARY_NAME)),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|x| x.is_file())
+    .ok_or(io::ErrorKind::NotFound)?;
+
+    Ok(path)
+}
+
 /// harness to test nginx
 pub struct Nginx {
-    pub install_path: PathBuf,
+    pub prefix: tempfile::TempDir,
+    pub bin_path: PathBuf,
     pub config_path: PathBuf,
 }
 
 impl Default for Nginx {
     /// create nginx with default
     fn default() -> Nginx {
-        let install_path = cstr_to_path(NGX_PREFIX).expect("installation prefix");
-        Nginx::new(install_path)
+        let binary = find_nginx_binary().expect("nginx binary");
+        Nginx::new(binary).expect("test harness")
     }
 }
 
 impl Nginx {
-    pub fn new<P: AsRef<Path>>(path: P) -> Nginx {
-        let install_path = path.as_ref();
-        let config_path = cstr_to_path(NGX_CONF_PATH).expect("configuration path");
-        let config_path = install_path.join(config_path);
+    pub fn new(binary: impl AsRef<Path>) -> io::Result<Nginx> {
+        let prefix = tempfile::tempdir()?;
+        let config = prefix.path().join("nginx.conf");
 
-        Nginx {
-            install_path: install_path.into(),
-            config_path,
-        }
-    }
+        fs::create_dir(prefix.path().join("logs"))?;
 
-    /// get bin path to nginx instance
-    pub fn bin_path(&mut self) -> PathBuf {
-        let bin_path = cstr_to_path(NGX_SBIN_PATH).expect("binary path");
-        self.install_path.join(bin_path)
+        Ok(Nginx {
+            prefix,
+            bin_path: binary.as_ref().to_owned(),
+            config_path: config,
+        })
     }
 
     /// start nginx process with arguments
-    pub fn cmd(&mut self, args: &[&str]) -> Result<Output> {
-        let bin_path = self.bin_path();
-        let result = Command::new(bin_path).args(args).output();
+    pub fn cmd(&self, args: &[&str]) -> Result<Output> {
+        let prefix = self.prefix.path().to_string_lossy();
+        let config_path = self.config_path.to_string_lossy();
+        let args = [&["-p", &prefix, "-c", &config_path], args].concat();
+        let result = Command::new(&self.bin_path).args(args).output();
 
         match result {
             Err(e) => Err(e),
