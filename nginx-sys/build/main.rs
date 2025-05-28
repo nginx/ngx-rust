@@ -6,9 +6,6 @@ use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-#[cfg(feature = "vendored")]
-mod vendored;
-
 const ENV_VARS_TRIGGERING_RECOMPILE: &[&str] = &["OUT_DIR", "NGINX_BUILD_DIR", "NGINX_SOURCE_DIR"];
 
 /// The feature flags set by the nginx configuration script.
@@ -130,8 +127,9 @@ impl NginxSource {
 
     #[cfg(feature = "vendored")]
     pub fn from_vendored() -> Self {
-        let build_dir = vendored::build().expect("vendored build");
-        let source_dir = build_dir.parent().expect("source directory").to_path_buf();
+        let out_dir = env::var("OUT_DIR").unwrap();
+        let build_dir = PathBuf::from(out_dir).join("objs");
+        let (source_dir, build_dir) = nginx_src::build(build_dir).expect("nginx-src build");
 
         Self {
             source_dir,
