@@ -53,6 +53,12 @@ fn main() {
         }
     }
 
+    // Pass build directory to the tests
+    println!("cargo::rerun-if-env-changed=DEP_NGINX_BUILD_DIR");
+    if let Ok(build_dir) = std::env::var("DEP_NGINX_BUILD_DIR") {
+        println!("cargo::rustc-env=DEP_NGINX_BUILD_DIR={build_dir}");
+    }
+
     // Generate required compiler flags
     if cfg!(target_os = "macos") {
         // https://stackoverflow.com/questions/28124221/error-linking-with-cc-failed-exit-code-1

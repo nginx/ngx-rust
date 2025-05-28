@@ -207,7 +207,7 @@ fn generate_binding(nginx: &NginxSource) {
         .map(|path| format!("-I{}", path.to_string_lossy()))
         .collect();
 
-    print_cargo_metadata(&includes).expect("cargo dependency metadata");
+    print_cargo_metadata(nginx, &includes).expect("cargo dependency metadata");
 
     // bindgen targets the latest known stable by default
     let rust_target: bindgen::RustTarget = env::var("CARGO_PKG_RUST_VERSION")
@@ -294,7 +294,10 @@ fn parse_includes_from_makefile(nginx_autoconf_makefile_path: &PathBuf) -> Vec<P
 
 /// Collect info about the nginx configuration and expose it to the dependents via
 /// `DEP_NGINX_...` variables.
-pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dyn StdError>> {
+pub fn print_cargo_metadata<T: AsRef<Path>>(
+    nginx: &NginxSource,
+    includes: &[T],
+) -> Result<(), Box<dyn StdError>> {
     // Unquote and merge C string constants
     let unquote_re = regex::Regex::new(r#""(.*?[^\\])"\s*"#).unwrap();
     let unquote = |data: &str| -> String {
@@ -333,6 +336,11 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dy
             ngx_features.push(name);
         }
     }
+
+    println!(
+        "cargo::metadata=build_dir={}",
+        nginx.build_dir.to_str().expect("Unicode build path")
+    );
 
     println!(
         "cargo::metadata=include={}",

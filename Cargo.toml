@@ -60,4 +60,4 @@ vendored = ["nginx-sys/vendored"]
 maintenance = { status = "experimental" }
 
 [dev-dependencies]
-target-triple = "0.1.2"
+tempfile = { version = "3.20.0", default-features = false }
