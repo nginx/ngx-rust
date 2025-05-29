@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: 'always'
   RUST_BACKTRACE: '1'
-  NGX_CONFIGURE: >-
+  NGX_CONFIGURE_CMD: >-
     auto/configure
     --with-compat
     --with-debug
@@ -19,10 +19,47 @@ env:
     --with-stream
     --with-stream_realip_module
     --with-stream_ssl_module
+
+  NGX_CONFIGURE_UNIX: >-
     --with-threads
 
+  NGX_CONFIGURE_WINDOWS: >-
+    --with-cc=cl
+    --prefix=
+    --conf-path=conf/nginx.conf
+    --pid-path=logs/nginx.pid
+    --http-log-path=logs/access.log
+    --error-log-path=logs/error.log
+    --sbin-path=nginx.exe
+    --http-client-body-temp-path=temp/client_body_temp
+    --http-proxy-temp-path=temp/proxy_temp
+    --http-fastcgi-temp-path=temp/fastcgi_temp
+    --http-scgi-temp-path=temp/scgi_temp
+    --http-uwsgi-temp-path=temp/uwsgi_temp
+    --with-cc-opt=-DFD_SETSIZE=1024
+    --with-pcre=objs/lib/pcre
+    --with-zlib=objs/lib/zlib
+    --with-openssl=objs/lib/openssl
+    --with-openssl-opt="no-asm no-module no-tests -D_WIN32_WINNT=0x0601"
+
+  NGX_CONFIGURE_DYNAMIC_MODULES: >-
+    --add-dynamic-module=${{ github.workspace }}/examples
+  NGX_CONFIGURE_STATIC_MODULES: >-
+    --add-module=${{ github.workspace }}/examples
+
+  NGX_TEST_FILES: examples/t
+  NGX_TEST_GLOBALS_DYNAMIC: >-
+    load_module ${{ github.workspace }}/nginx/objs/ngx_http_async_module.so;
+    load_module ${{ github.workspace }}/nginx/objs/ngx_http_awssigv4_module.so;
+    load_module ${{ github.workspace }}/nginx/objs/ngx_http_curl_module.so;
+    load_module ${{ github.workspace }}/nginx/objs/ngx_http_upstream_custom_module.so;
+
+  OPENSSL_VERSION: '3.0.16'
+  PCRE2_VERSION: '10.45'
+  ZLIB_VERSION: '1.3.1'
+
 jobs:
-  test:
+  linux:
     runs-on: ubuntu-latest
 
     strategy:
@@ -61,36 +98,34 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            nginx/objs/ngx_rust_examples
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+            nginx/objs/**/CACHEDIR.TAG
+            nginx/objs/**/ngx-debug
+            nginx/objs/**/ngx-release
+          key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-nginx-
 
       - name: Update configure arguments
         if: matrix.nginx-ref != 'stable-1.24'
         run: |
-            echo NGX_CONFIGURE="${NGX_CONFIGURE} --with-http_v3_module" \
+            echo NGX_CONFIGURE_UNIX="${NGX_CONFIGURE_UNIX} --with-http_v3_module" \
                 >> "$GITHUB_ENV"
 
       - name: Configure nginx with static modules
         if: matrix.module == 'static'
         working-directory: nginx
         run: |
-          ${NGX_CONFIGURE} \
-              --add-module=${{ github.workspace }}/examples
+          ${NGX_CONFIGURE_CMD} \
+              ${NGX_CONFIGURE_UNIX} \
+              ${NGX_CONFIGURE_STATIC_MODULES}
 
       - name: Configure nginx with dynamic modules
         if: matrix.module != 'static'
         working-directory: nginx
-        env:
-          TEST_NGINX_GLOBALS: >-
-            load_module ${{ github.workspace }}/nginx/objs/ngx_http_async_module.so;
-            load_module ${{ github.workspace }}/nginx/objs/ngx_http_awssigv4_module.so;
-            load_module ${{ github.workspace }}/nginx/objs/ngx_http_curl_module.so;
-            load_module ${{ github.workspace }}/nginx/objs/ngx_http_upstream_custom_module.so;
         run: |
-          ${NGX_CONFIGURE} \
-              --add-dynamic-module=${{ github.workspace }}/examples
-          echo "TEST_NGINX_GLOBALS=$TEST_NGINX_GLOBALS" >> $GITHUB_ENV
+          ${NGX_CONFIGURE_CMD} \
+              ${NGX_CONFIGURE_UNIX} \
+              ${NGX_CONFIGURE_DYNAMIC_MODULES}
+          echo TEST_NGINX_GLOBALS="$NGX_TEST_GLOBALS_DYNAMIC" >> "$GITHUB_ENV"
 
       - name: Build nginx
         working-directory: nginx
@@ -98,8 +133,99 @@ jobs:
 
       - name: Run tests
         env:
+          PERL5LIB: ${{ github.workspace }}/nginx/tests/lib
           TEST_NGINX_BINARY: ${{ github.workspace }}/nginx/objs/nginx
           TEST_NGINX_MODULES: ${{ github.workspace }}/nginx/objs
+          TEST_NGINX_VERBOSE: 1
         run: |
-          prove -v -j$(nproc) -Inginx/tests/lib --state=save examples/t \
-              || prove -v -Inginx/tests/lib --state=failed
+          prove -j$(nproc) --state=save ${NGX_TEST_FILES} || prove -v --state=failed
+
+  windows:
+    runs-on: windows-2022
+    env:
+      TEMP: "C:\\TEMP"
+      TMP: "C:\\TEMP"
+      TMPDIR: "C:\\TEMP"
+      VCARCH: x64
+
+    strategy:
+      fail-fast: false
+      matrix:
+        nginx-ref:
+          - master
+        module:
+          - static
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.nginx-ref }}
+          repository: 'nginx/nginx'
+          path: 'nginx'
+      - uses: actions/checkout@v4
+        with:
+          repository: 'nginx/nginx-tests'
+          path: 'nginx/tests'
+          sparse-checkout: |
+            lib
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            nginx/objs/**/CACHEDIR.TAG
+            nginx/objs/**/ngx-debug
+            nginx/objs/**/ngx-release
+          key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-nginx-
+
+      - name: Prepare build environment
+        shell: bash
+        working-directory: nginx
+        run: |
+          # Disable dynamic lookup of WSAPoll(); it crashes if the symbol is already imported by
+          # Rust stdlib.
+          sed 's/\(_WIN32_WINNT\s*\) 0x0501/\1 0x0601/' -i src/os/win32/ngx_win32_config.h
+
+          echo VCVARSALL="$('C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -products \* -latest -property installationPath)\\VC\\Auxiliary\\Build\\vcvarsall.bat" \
+              >> "$GITHUB_ENV"
+
+          mkdir -p $TEMP
+          mkdir -p objs/lib
+
+          curl -sLO https://github.com/PCRE2Project/pcre2/releases/download/pcre2-$PCRE2_VERSION/pcre2-$PCRE2_VERSION.tar.gz
+          tar -C objs/lib --transform "s/pcre2-$PCRE2_VERSION/pcre/" -xzf ./pcre2-$PCRE2_VERSION.tar.gz
+          echo '#include <stdint.h>' > objs/lib/pcre/src/inttypes.h
+
+          curl -sLO https://github.com/madler/zlib/releases/download/v$ZLIB_VERSION/zlib-$ZLIB_VERSION.tar.gz
+          tar -C objs/lib --transform "s/zlib-$ZLIB_VERSION/zlib/" -xzf ./zlib-$ZLIB_VERSION.tar.gz
+
+          curl -sLO https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz
+          tar -C objs/lib --transform "s/openssl-$OPENSSL_VERSION/openssl/" -xzf ./openssl-$OPENSSL_VERSION.tar.gz
+
+      - name: Configure and build nginx
+        shell: cmd
+        working-directory: nginx
+        run: |
+          @echo on
+          call "%VCVARSALL%" %VCARCH%
+          bash.exe ^
+              %NGX_CONFIGURE_CMD% ^
+              %NGX_CONFIGURE_WINDOWS% ^
+              %NGX_CONFIGURE_STATIC_MODULES%
+          nmake -f objs/Makefile
+
+      - name: Run tests
+        shell: cmd
+        env:
+          PERL5LIB: "${{ github.workspace }}\\nginx\\tests\\lib"
+          TEST_NGINX_BINARY: "${{ github.workspace }}\\nginx\\objs\\nginx.exe"
+          TEST_NGINX_VERBOSE: 1
+        run: |
+          prove --state=save %NGX_TEST_FILES% || prove -v --state=failed
