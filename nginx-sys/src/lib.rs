@@ -146,6 +146,23 @@ pub fn ngx_set_socket_errno(err: ngx_err_t) {
     errno::set_errno(errno::Errno(err as _))
 }
 
+/// Returns a non cryptograhpically-secure pseudo-random integer.
+#[inline]
+pub fn ngx_random() -> core::ffi::c_long {
+    #[cfg(windows)]
+    unsafe {
+        // Emulate random() as Microsoft CRT does not provide it.
+        // rand() should be thread-safe in the multi-threaded CRT we link to, but will not be seeded
+        // outside of the main thread.
+        let x: u32 = ((rand() as u32) << 16) ^ ((rand() as u32) << 8) ^ (rand() as u32);
+        (0x7fffffff & x) as _
+    }
+    #[cfg(not(windows))]
+    unsafe {
+        random()
+    }
+}
+
 /// Add a key-value pair to an nginx table entry (`ngx_table_elt_t`) in the given nginx memory pool.
 ///
 /// # Arguments
