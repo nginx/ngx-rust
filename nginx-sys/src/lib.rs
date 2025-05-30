@@ -163,6 +163,26 @@ pub fn ngx_random() -> core::ffi::c_long {
     }
 }
 
+/// Returns cached timestamp in seconds, updated at the start of the event loop iteration.
+///
+/// Can be stale when accessing from threads, see [ngx_time_update].
+#[inline]
+pub fn ngx_time() -> time_t {
+    // SAFETY: ngx_cached_time is initialized before any module code can run
+    unsafe { (*ngx_cached_time).sec }
+}
+
+/// Returns cached time, updated at the start of the event loop iteration.
+///
+/// Can be stale when accessing from threads, see [ngx_time_update].
+/// A cached reference to the ngx_timeofday() result is guaranteed to remain unmodified for the next
+/// NGX_TIME_SLOTS seconds.
+#[inline]
+pub fn ngx_timeofday() -> &'static ngx_time_t {
+    // SAFETY: ngx_cached_time is initialized before any module code can run
+    unsafe { &*ngx_cached_time }
+}
+
 /// Add a key-value pair to an nginx table entry (`ngx_table_elt_t`) in the given nginx memory pool.
 ///
 /// # Arguments
