@@ -14,7 +14,7 @@ jobs:
       version: ${{ steps.read_version.outputs.msrv }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - id: read_version
         run: |
           awk -F '=' \
@@ -33,9 +33,9 @@ jobs:
           - stable
     steps:
       - name: checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: set up cargo cache
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         continue-on-error: false
         with:
           path: |
@@ -47,7 +47,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ matrix.rust-version}}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-${{ matrix.rust-version }}-
       - name: set up nginx deps cache
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         continue-on-error: false
         with:
           path: |
@@ -59,7 +59,7 @@ jobs:
           key:  ${{ runner.os }}-deps-${{ hashFiles('**/nginx-sys/build.rs') }}
           restore-keys: ${{ runner.os }}-deps-
 
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
         with:
           components: rustfmt, clippy
           toolchain: ${{ matrix.rust-version }}
@@ -88,9 +88,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: set up cargo cache
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         continue-on-error: false
         with:
           path: |
@@ -102,7 +102,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
       - name: set up nginx deps cache
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         continue-on-error: false
         with:
           path: |
@@ -122,10 +122,12 @@ jobs:
     steps:
       - name: install command line dependencies
         run: brew install make gnupg
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+        with:
+          toolchain: stable
       - name: set up cargo cache
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         continue-on-error: false
         with:
           path: |
@@ -137,7 +139,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
       - name: set up nginx deps cache
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         continue-on-error: false
         with:
           path: |
@@ -161,10 +163,11 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
         with:
           components: rustfmt
+          toolchain: stable
       - name: rustfmt version
         run: rustfmt --version
       - name: cargo fmt
