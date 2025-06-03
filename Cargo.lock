@@ -549,6 +549,7 @@ dependencies = [
  "cc",
  "duct",
  "dunce",
+ "errno",
  "flate2",
  "regex",
  "tar",

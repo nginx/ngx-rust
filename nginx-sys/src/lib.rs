@@ -96,6 +96,56 @@ impl ngx_module_t {
     }
 }
 
+/// Returns the error code of the last failed operation (`errno`).
+#[inline]
+pub fn ngx_errno() -> ngx_err_t {
+    // SAFETY: GetLastError takes no arguments and reads a thread-local variable
+    #[cfg(windows)]
+    let err = unsafe { GetLastError() };
+
+    #[cfg(not(windows))]
+    let err = errno::errno().0;
+
+    err as ngx_err_t
+}
+
+/// Sets the error code (`errno`).
+#[inline]
+pub fn ngx_set_errno(err: ngx_err_t) {
+    #[cfg(windows)]
+    // SAFETY: SetLastError takes one argument by value and updates a thread-local variable
+    unsafe {
+        SetLastError(err as _)
+    }
+    #[cfg(not(windows))]
+    errno::set_errno(errno::Errno(err as _))
+}
+
+/// Returns the error code of the last failed sockets operation.
+#[inline]
+pub fn ngx_socket_errno() -> ngx_err_t {
+    // SAFETY: WSAGetLastError takes no arguments and reads a thread-local variable
+    #[cfg(windows)]
+    let err = unsafe { WSAGetLastError() };
+
+    #[cfg(not(windows))]
+    let err = errno::errno().0;
+
+    err as ngx_err_t
+}
+
+/// Sets the error code of the sockets operation.
+#[inline]
+pub fn ngx_set_socket_errno(err: ngx_err_t) {
+    #[cfg(windows)]
+    // SAFETY: WSaSetLastError takes one argument by value and updates a thread-local variable
+    unsafe {
+        WSASetLastError(err as _)
+    }
+    #[cfg(not(windows))]
+    errno::set_errno(errno::Errno(err as _))
+}
+
 /// Add a key-value pair to an nginx table entry (`ngx_table_elt_t`) in the given nginx memory pool.
 ///
 /// # Arguments

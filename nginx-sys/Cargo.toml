@@ -16,6 +16,9 @@ rust-version.workspace = true
 
 [dependencies]
 
+[target.'cfg(not(windows))'.dependencies]
+errno = { version = "0.3", default-features = false }
+
 [build-dependencies]
 bindgen = "0.71"
 cc = "1.2.0"
