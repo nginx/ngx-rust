@@ -7,6 +7,7 @@ mod event;
 #[cfg(ngx_feature = "http")]
 mod http;
 mod queue;
+mod rbtree;
 #[cfg(ngx_feature = "stream")]
 mod stream;
 mod string;
@@ -33,6 +34,7 @@ pub use event::*;
 #[cfg(ngx_feature = "http")]
 pub use http::*;
 pub use queue::*;
+pub use rbtree::*;
 #[cfg(ngx_feature = "stream")]
 pub use stream::*;
 
