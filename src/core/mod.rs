@@ -1,11 +1,13 @@
 mod buffer;
 mod pool;
+pub mod rbtree;
 pub mod slab;
 mod status;
 mod string;
 
 pub use buffer::*;
 pub use pool::*;
+pub use rbtree::RbTreeMap;
 pub use slab::SlabPool;
 pub use status::*;
 pub use string::*;
