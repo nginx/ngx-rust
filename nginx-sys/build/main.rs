@@ -6,9 +6,6 @@ use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-#[cfg(feature = "vendored")]
-mod vendored;
-
 const ENV_VARS_TRIGGERING_RECOMPILE: &[&str] = &["OUT_DIR", "NGINX_BUILD_DIR", "NGINX_SOURCE_DIR"];
 
 /// The feature flags set by the nginx configuration script.
@@ -130,8 +127,9 @@ impl NginxSource {
 
     #[cfg(feature = "vendored")]
     pub fn from_vendored() -> Self {
-        let build_dir = vendored::build().expect("vendored build");
-        let source_dir = build_dir.parent().expect("source directory").to_path_buf();
+        let out_dir = env::var("OUT_DIR").unwrap();
+        let build_dir = PathBuf::from(out_dir).join("objs");
+        let (source_dir, build_dir) = nginx_src::build(build_dir).expect("nginx-src build");
 
         Self {
             source_dir,
@@ -202,7 +200,7 @@ fn generate_binding(nginx: &NginxSource) {
         .map(|path| format!("-I{}", path.to_string_lossy()))
         .collect();
 
-    print_cargo_metadata(&includes).expect("cargo dependency metadata");
+    print_cargo_metadata(nginx, &includes).expect("cargo dependency metadata");
 
     // bindgen targets the latest known stable by default
     let rust_target: bindgen::RustTarget = env::var("CARGO_PKG_RUST_VERSION")
@@ -287,7 +285,10 @@ fn parse_includes_from_makefile(nginx_autoconf_makefile_path: &PathBuf) -> Vec<P
 
 /// Collect info about the nginx configuration and expose it to the dependents via
 /// `DEP_NGINX_...` variables.
-pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dyn StdError>> {
+pub fn print_cargo_metadata<T: AsRef<Path>>(
+    nginx: &NginxSource,
+    includes: &[T],
+) -> Result<(), Box<dyn StdError>> {
     // Unquote and merge C string constants
     let unquote_re = regex::Regex::new(r#""(.*?[^\\])"\s*"#).unwrap();
     let unquote = |data: &str| -> String {
@@ -326,6 +327,11 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dy
             ngx_features.push(name);
         }
     }
+
+    println!(
+        "cargo::metadata=build_dir={}",
+        nginx.build_dir.to_str().expect("Unicode build path")
+    );
 
     println!(
         "cargo::metadata=include={}",
