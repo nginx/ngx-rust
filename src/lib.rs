@@ -40,6 +40,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod allocator;
+
 /// The core module.
 ///
 /// This module provides fundamental utilities needed to interface with many NGINX primitives.
