@@ -25,15 +25,19 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+allocator-api2 = { version = "0.2.21", default-features = false }
 nginx-sys = { path = "nginx-sys", default-features=false, version = "0.5.0"}
 
 [features]
 default = ["vendored","std"]
 # Enables the components using memory allocation.
 # If no `std` flag, `alloc` crate is internally used instead. This flag is mainly for `no_std` build.
-alloc = []
+alloc = ["allocator-api2/alloc"]
 # Enables the components using `std` crate.
-std = ["alloc"]
+std = [
+    "alloc",
+    "allocator-api2/std"
+]
 # Build our own copy of the NGINX by default.
 # This could be disabled with `--no-default-features` to minimize the dependency
 # tree when building against an existing copy of the NGINX with the
