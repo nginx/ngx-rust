@@ -1,13 +1,89 @@
+use core::alloc::Layout;
 use core::ffi::c_void;
-use core::{mem, ptr};
+use core::mem;
+use core::ptr::{self, NonNull};
 
+use nginx_sys::{
+    ngx_buf_t, ngx_create_temp_buf, ngx_palloc, ngx_pcalloc, ngx_pfree, ngx_pmemalign, ngx_pnalloc,
+    ngx_pool_cleanup_add, ngx_pool_t, NGX_ALIGNMENT,
+};
+
+use crate::allocator::{dangling_for_layout, AllocError, Allocator};
 use crate::core::buffer::{Buffer, MemoryBuffer, TemporaryBuffer};
-use crate::ffi::*;
 
-/// Wrapper struct for an [`ngx_pool_t`] pointer, providing methods for working with memory pools.
+/// Non-owning wrapper for an [`ngx_pool_t`] pointer, providing methods for working with memory pools.
 ///
 /// See <https://nginx.org/en/docs/dev/development_guide.html#pool>
-pub struct Pool(*mut ngx_pool_t);
+#[derive(Clone, Debug)]
+#[repr(transparent)]
+pub struct Pool(NonNull<ngx_pool_t>);
+
+unsafe impl Allocator for Pool {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        // SAFETY:
+        // * This wrapper should be constructed with a valid pointer to ngx_pool_t.
+        // * The Pool type is !Send, thus we expect exclusive access for this call.
+        // * Pointers are considered mutable unless obtained from an immutable reference.
+        let ptr = if layout.size() == 0 {
+            // We can guarantee alignment <= NGX_ALIGNMENT for allocations of size 0 made with
+            // ngx_palloc_small. Any other cases are implementation-defined, and we can't tell which
+            // one will be used internally.
+            return Ok(NonNull::slice_from_raw_parts(
+                dangling_for_layout(&layout),
+                layout.size(),
+            ));
+        } else if layout.align() == 1 {
+            unsafe { ngx_pnalloc(self.0.as_ptr(), layout.size()) }
+        } else if layout.align() <= NGX_ALIGNMENT {
+            unsafe { ngx_palloc(self.0.as_ptr(), layout.size()) }
+        } else if cfg!(any(
+            ngx_feature = "have_posix_memalign",
+            ngx_feature = "have_memalign"
+        )) {
+            // ngx_pmemalign is always defined, but does not guarantee the requested alignment
+            // unless memalign/posix_memalign exists.
+            unsafe { ngx_pmemalign(self.0.as_ptr(), layout.size(), layout.align()) }
+        } else {
+            return Err(AllocError);
+        };
+
+        // Verify the alignment of the result
+        debug_assert_eq!(ptr.align_offset(layout.align()), 0);
+
+        let ptr = NonNull::new(ptr.cast()).ok_or(AllocError)?;
+        Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        // ngx_pfree is noop for small allocations unless NGX_DEBUG_PALLOC is set.
+        //
+        // Note: there should be no cleanup handlers for the allocations made using this API.
+        // Violating that could result in the following issues:
+        //  - use-after-free on large allocation
+        //  - multiple cleanup handlers attached to a dangling ptr (these are not unique)
+        if layout.size() > 0 // 0 is dangling ptr
+            && (layout.size() > self.as_ref().max || layout.align() > NGX_ALIGNMENT)
+        {
+            ngx_pfree(self.0.as_ptr(), ptr.as_ptr().cast());
+        }
+    }
+}
+
+impl AsRef<ngx_pool_t> for Pool {
+    #[inline]
+    fn as_ref(&self) -> &ngx_pool_t {
+        // SAFETY: this wrapper should be constructed with a valid pointer to ngx_pool_t
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl AsMut<ngx_pool_t> for Pool {
+    #[inline]
+    fn as_mut(&mut self) -> &mut ngx_pool_t {
+        // SAFETY: this wrapper should be constructed with a valid pointer to ngx_pool_t
+        unsafe { self.0.as_mut() }
+    }
+}
 
 impl Pool {
     /// Creates a new `Pool` from an `ngx_pool_t` pointer.
@@ -16,8 +92,9 @@ impl Pool {
     /// The caller must ensure that a valid `ngx_pool_t` pointer is provided, pointing to valid
     /// memory and non-null. A null argument will cause an assertion failure and panic.
     pub unsafe fn from_ngx_pool(pool: *mut ngx_pool_t) -> Pool {
-        assert!(!pool.is_null());
-        Pool(pool)
+        debug_assert!(!pool.is_null());
+        debug_assert!(pool.is_aligned());
+        Pool(NonNull::new_unchecked(pool))
     }
 
     /// Creates a buffer of the specified size in the memory pool.
@@ -25,7 +102,7 @@ impl Pool {
     /// Returns `Some(TemporaryBuffer)` if the buffer is successfully created, or `None` if
     /// allocation fails.
     pub fn create_buffer(&mut self, size: usize) -> Option<TemporaryBuffer> {
-        let buf = unsafe { ngx_create_temp_buf(self.0, size) };
+        let buf = unsafe { ngx_create_temp_buf(self.as_mut(), size) };
         if buf.is_null() {
             return None;
         }
@@ -80,7 +157,7 @@ impl Pool {
     /// # Safety
     /// This function is marked as unsafe because it involves raw pointer manipulation.
     unsafe fn add_cleanup_for_value<T>(&mut self, value: *mut T) -> Result<(), ()> {
-        let cln = ngx_pool_cleanup_add(self.0, 0);
+        let cln = ngx_pool_cleanup_add(self.0.as_ptr(), 0);
         if cln.is_null() {
             return Err(());
         }
@@ -95,7 +172,7 @@ impl Pool {
     ///
     /// Returns a raw pointer to the allocated memory.
     pub fn alloc(&mut self, size: usize) -> *mut c_void {
-        unsafe { ngx_palloc(self.0, size) }
+        unsafe { ngx_palloc(self.0.as_ptr(), size) }
     }
 
     /// Allocates memory for a type from the pool.
@@ -111,7 +188,7 @@ impl Pool {
     ///
     /// Returns a raw pointer to the allocated memory.
     pub fn calloc(&mut self, size: usize) -> *mut c_void {
-        unsafe { ngx_pcalloc(self.0, size) }
+        unsafe { ngx_pcalloc(self.0.as_ptr(), size) }
     }
 
     /// Allocates zeroed memory for a type from the pool.
@@ -126,7 +203,7 @@ impl Pool {
     ///
     /// Returns a raw pointer to the allocated memory.
     pub fn alloc_unaligned(&mut self, size: usize) -> *mut c_void {
-        unsafe { ngx_pnalloc(self.0, size) }
+        unsafe { ngx_pnalloc(self.0.as_ptr(), size) }
     }
 
     /// Allocates unaligned memory for a type from the pool.

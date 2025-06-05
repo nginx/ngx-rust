@@ -25,6 +25,8 @@ const NGX_CONF_FEATURES: &[&str] = &[
     "have_epollrdhup",
     "have_file_aio",
     "have_kqueue",
+    "have_memalign",
+    "have_posix_memalign",
     "have_variadic_macros",
     "http",
     "http_cache",
