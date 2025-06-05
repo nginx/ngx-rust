@@ -27,6 +27,7 @@ jobs:
     needs: rust-version
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         rust-version:
           - ${{ needs.rust-version.outputs.version }}
