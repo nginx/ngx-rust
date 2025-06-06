@@ -131,5 +131,5 @@ extern "C" fn ngx_http_curl_commands_set_enable(
         }
     };
 
-    std::ptr::null_mut()
+    ngx::core::NGX_CONF_OK
 }

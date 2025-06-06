@@ -1,4 +1,6 @@
+use core::ffi::c_char;
 use core::fmt;
+use core::ptr;
 
 use crate::ffi::*;
 
@@ -62,6 +64,7 @@ ngx_codes! {
     (NGX_ABORT);
 }
 
-/// NGX_CONF_ERROR - An error occurred while parsing and validating configuration.
-pub const NGX_CONF_ERROR: *const () = -1isize as *const ();
-// pub const CONF_OK: Status = Status(NGX_CONF_OK as ngx_int_t);
+/// An error occurred while parsing and validating configuration.
+pub const NGX_CONF_ERROR: *mut c_char = ptr::null_mut::<c_char>().wrapping_offset(-1);
+/// Configuration handler succeeded.
+pub const NGX_CONF_OK: *mut c_char = ptr::null_mut();

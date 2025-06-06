@@ -188,7 +188,7 @@ extern "C" fn ngx_http_awssigv4_commands_set_enable(
         }
     };
 
-    std::ptr::null_mut()
+    ngx::core::NGX_CONF_OK
 }
 
 extern "C" fn ngx_http_awssigv4_commands_set_access_key(
@@ -202,7 +202,7 @@ extern "C" fn ngx_http_awssigv4_commands_set_access_key(
         conf.access_key = (*args.add(1)).to_string();
     };
 
-    std::ptr::null_mut()
+    ngx::core::NGX_CONF_OK
 }
 
 extern "C" fn ngx_http_awssigv4_commands_set_secret_key(
@@ -216,7 +216,7 @@ extern "C" fn ngx_http_awssigv4_commands_set_secret_key(
         conf.secret_key = (*args.add(1)).to_string();
     };
 
-    std::ptr::null_mut()
+    ngx::core::NGX_CONF_OK
 }
 
 extern "C" fn ngx_http_awssigv4_commands_set_s3_bucket(
@@ -230,10 +230,11 @@ extern "C" fn ngx_http_awssigv4_commands_set_s3_bucket(
         conf.s3_bucket = (*args.add(1)).to_string();
         if conf.s3_bucket.len() == 1 {
             println!("Validation failed");
-            return ngx::core::NGX_CONF_ERROR as _;
+            return ngx::core::NGX_CONF_ERROR;
         }
     };
-    std::ptr::null_mut()
+
+    ngx::core::NGX_CONF_OK
 }
 
 extern "C" fn ngx_http_awssigv4_commands_set_s3_endpoint(
@@ -247,7 +248,7 @@ extern "C" fn ngx_http_awssigv4_commands_set_s3_endpoint(
         conf.s3_endpoint = (*args.add(1)).to_string();
     };
 
-    std::ptr::null_mut()
+    ngx::core::NGX_CONF_OK
 }
 
 http_request_handler!(awssigv4_header_handler, |request: &mut Request| {

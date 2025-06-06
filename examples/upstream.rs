@@ -282,7 +282,7 @@ unsafe extern "C" fn ngx_http_upstream_commands_set_custom(
                 value[1],
                 &(*cmd).name
             );
-            return usize::MAX as *mut c_char;
+            return ngx::core::NGX_CONF_ERROR;
         }
         ccf.max = n as u32;
     }
@@ -298,8 +298,8 @@ unsafe extern "C" fn ngx_http_upstream_commands_set_custom(
     uscf.peer.init_upstream = Some(ngx_http_upstream_init_custom);
 
     ngx_log_debug_mask!(DebugMask::Http, cf.log, "CUSTOM UPSTREAM end module init");
-    // NGX_CONF_OK
-    std::ptr::null_mut()
+
+    ngx::core::NGX_CONF_OK
 }
 
 // The upstream module.

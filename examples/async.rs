@@ -218,7 +218,7 @@ extern "C" fn ngx_http_async_commands_set_enable(
         }
     };
 
-    std::ptr::null_mut()
+    ngx::core::NGX_CONF_OK
 }
 
 fn ngx_http_async_runtime() -> &'static Runtime {
