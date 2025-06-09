@@ -26,6 +26,7 @@ rust-version.workspace = true
 
 [dependencies]
 allocator-api2 = { version = "0.2.21", default-features = false }
+lock_api = "0.4.13"
 nginx-sys = { path = "nginx-sys", default-features=false, version = "0.5.0"}
 
 [features]

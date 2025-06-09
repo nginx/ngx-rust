@@ -163,6 +163,23 @@ pub fn ngx_random() -> core::ffi::c_long {
     }
 }
 
+/// Causes the calling thread to relinquish the CPU.
+#[inline]
+pub fn ngx_sched_yield() {
+    #[cfg(windows)]
+    unsafe {
+        SwitchToThread()
+    };
+    #[cfg(all(not(windows), ngx_feature = "have_sched_yield"))]
+    unsafe {
+        sched_yield()
+    };
+    #[cfg(not(any(windows, ngx_feature = "have_sched_yield")))]
+    unsafe {
+        usleep(1)
+    }
+}
+
 /// Returns cached timestamp in seconds, updated at the start of the event loop iteration.
 ///
 /// Can be stale when accessing from threads, see [ngx_time_update].
