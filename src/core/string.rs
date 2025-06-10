@@ -73,7 +73,7 @@ impl NgxStr {
     ///
     /// See [`String::from_utf8_lossy`].
     #[cfg(feature = "alloc")]
-    pub fn to_string_lossy(&self) -> Cow<str> {
+    pub fn to_string_lossy(&self) -> Cow<'_, str> {
         String::from_utf8_lossy(self.as_bytes())
     }
 

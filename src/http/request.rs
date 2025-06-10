@@ -375,13 +375,13 @@ impl Request {
 
     /// Iterate over headers_in
     /// each header item is (&str, &str) (borrowed)
-    pub fn headers_in_iterator(&self) -> NgxListIterator {
+    pub fn headers_in_iterator(&self) -> NgxListIterator<'_> {
         unsafe { list_iterator(&self.0.headers_in.headers) }
     }
 
     /// Iterate over headers_out
     /// each header item is (&str, &str) (borrowed)
-    pub fn headers_out_iterator(&self) -> NgxListIterator {
+    pub fn headers_out_iterator(&self) -> NgxListIterator<'_> {
         unsafe { list_iterator(&self.0.headers_out.headers) }
     }
 }
@@ -448,7 +448,7 @@ impl<'a> From<&'a ngx_list_part_t> for ListPart<'a> {
 /// # Safety
 ///
 /// The caller has provided a valid [`ngx_str_t`] which can be dereferenced validly.
-pub unsafe fn list_iterator(list: &ngx_list_t) -> NgxListIterator {
+pub unsafe fn list_iterator(list: &ngx_list_t) -> NgxListIterator<'_> {
     NgxListIterator {
         part: Some((&list.part).into()),
         i: 0,

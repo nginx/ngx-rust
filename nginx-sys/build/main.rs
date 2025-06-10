@@ -341,22 +341,19 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(includes: &[T]) -> Result<(), Box<dy
 
     // A quoted list of all recognized features to be passed to rustc-check-cfg.
     let values = NGX_CONF_FEATURES.join("\",\"");
-    println!("cargo::metadata=features_check=\"{}\"", values);
-    println!(
-        "cargo::rustc-check-cfg=cfg(ngx_feature, values(\"{}\"))",
-        values
-    );
+    println!("cargo::metadata=features_check=\"{values}\"");
+    println!("cargo::rustc-check-cfg=cfg(ngx_feature, values(\"{values}\"))");
 
     // A list of features enabled in the nginx build we're using
     println!("cargo::metadata=features={}", ngx_features.join(","));
     for feature in ngx_features {
-        println!("cargo::rustc-cfg=ngx_feature=\"{}\"", feature);
+        println!("cargo::rustc-cfg=ngx_feature=\"{feature}\"");
     }
 
     // A quoted list of all recognized operating systems to be passed to rustc-check-cfg.
     let values = NGX_CONF_OS.join("\",\"");
-    println!("cargo::metadata=os_check=\"{}\"", values);
-    println!("cargo::rustc-check-cfg=cfg(ngx_os, values(\"{}\"))", values);
+    println!("cargo::metadata=os_check=\"{values}\"");
+    println!("cargo::rustc-check-cfg=cfg(ngx_os, values(\"{values}\"))");
     // Current detected operating system
     println!("cargo::metadata=os={ngx_os}");
     println!("cargo::rustc-cfg=ngx_os=\"{ngx_os}\"");
