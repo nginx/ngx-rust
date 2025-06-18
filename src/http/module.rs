@@ -1,3 +1,4 @@
+use core::error;
 use core::ffi::{c_char, c_void};
 use core::fmt;
 use core::ptr;
@@ -13,8 +14,7 @@ pub enum MergeConfigError {
     NoValue,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for MergeConfigError {}
+impl error::Error for MergeConfigError {}
 
 impl fmt::Display for MergeConfigError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {

@@ -1,3 +1,4 @@
+use core::error;
 use core::ffi::c_void;
 use core::fmt;
 use core::ptr::NonNull;
@@ -711,8 +712,7 @@ impl fmt::Display for InvalidMethod {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for InvalidMethod {}
+impl error::Error for InvalidMethod {}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum MethodInner {

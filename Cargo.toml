@@ -9,7 +9,7 @@ edition = "2021"
 license = "Apache-2.0"
 homepage = "https://github.com/nginx/ngx-rust"
 repository = "https://github.com/nginx/ngx-rust"
-rust-version = "1.79.0"
+rust-version = "1.81.0"
 
 [package]
 name = "ngx"
@@ -33,7 +33,6 @@ default = ["vendored","std"]
 # If no `std` flag, `alloc` crate is internally used instead. This flag is mainly for `no_std` build.
 alloc = []
 # Enables the components using `std` crate.
-# Currently the only difference to `alloc` flag is `std::error::Error` implementation.
 std = ["alloc"]
 # Build our own copy of the NGINX by default.
 # This could be disabled with `--no-default-features` to minimize the dependency
