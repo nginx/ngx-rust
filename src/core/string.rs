@@ -207,9 +207,8 @@ mod _alloc {
 
     use super::*;
 
-    use crate::allocator::collections::TryReserveError;
-    use crate::allocator::vec::Vec;
     use crate::allocator::{self, Allocator};
+    use crate::collections::{TryReserveError, Vec};
 
     /// Owned byte string type with Allocator support.
     ///

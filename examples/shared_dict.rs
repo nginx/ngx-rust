@@ -10,9 +10,8 @@ use nginx_sys::{
     NGX_HTTP_MAIN_CONF, NGX_HTTP_MAIN_CONF_OFFSET, NGX_HTTP_MODULE, NGX_HTTP_VAR_CHANGEABLE,
     NGX_HTTP_VAR_NOCACHEABLE, NGX_LOG_EMERG,
 };
-use ngx::core::{
-    NgxStr, NgxString, Pool, RbTreeMap, SlabPool, Status, NGX_CONF_ERROR, NGX_CONF_OK,
-};
+use ngx::collections::RbTreeMap;
+use ngx::core::{NgxStr, NgxString, Pool, SlabPool, Status, NGX_CONF_ERROR, NGX_CONF_OK};
 use ngx::http::{HttpModule, HttpModuleMainConf};
 use ngx::{ngx_conf_log_error, ngx_log_debug, ngx_string};
 

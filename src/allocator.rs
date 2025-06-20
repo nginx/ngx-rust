@@ -14,7 +14,7 @@ use ::core::ptr::{self, NonNull};
 pub use allocator_api2::alloc::{AllocError, Allocator, Global};
 
 #[cfg(feature = "alloc")]
-pub use allocator_api2::{boxed, collections, vec};
+pub use allocator_api2::boxed;
 
 /// Explicitly duplicate an object using the specified Allocator.
 pub trait TryCloneIn: Sized {
