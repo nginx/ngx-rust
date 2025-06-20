@@ -10,6 +10,8 @@ pub use allocator_api2::{
     vec::Vec,
 };
 
+pub use queue::Queue;
 pub use rbtree::RbTreeMap;
 
+pub mod queue;
 pub mod rbtree;
