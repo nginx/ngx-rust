@@ -98,6 +98,23 @@ impl ngx_module_t {
     }
 }
 
+impl ngx_variable_value_t {
+    /// Returns the contents of this variable value as a byte slice.
+    pub fn as_bytes(&self) -> &[u8] {
+        match self.len() {
+            0 => &[],
+            // SAFETY: data for non-empty value must be a valid well-aligned pointer.
+            len => unsafe { core::slice::from_raw_parts(self.data, len as usize) },
+        }
+    }
+}
+
+impl AsRef<[u8]> for ngx_variable_value_t {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
 /// Returns the error code of the last failed operation (`errno`).
 #[inline]
 pub fn ngx_errno() -> ngx_err_t {
