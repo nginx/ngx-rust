@@ -7,6 +7,7 @@ mod event;
 #[cfg(ngx_feature = "http")]
 mod http;
 mod queue;
+mod rbtree;
 #[cfg(ngx_feature = "stream")]
 mod stream;
 mod string;
@@ -33,6 +34,7 @@ pub use event::*;
 #[cfg(ngx_feature = "http")]
 pub use http::*;
 pub use queue::*;
+pub use rbtree::*;
 #[cfg(ngx_feature = "stream")]
 pub use stream::*;
 
@@ -93,6 +95,23 @@ impl ngx_module_t {
             spare_hook6: 0,
             spare_hook7: 0,
         }
+    }
+}
+
+impl ngx_variable_value_t {
+    /// Returns the contents of this variable value as a byte slice.
+    pub fn as_bytes(&self) -> &[u8] {
+        match self.len() {
+            0 => &[],
+            // SAFETY: data for non-empty value must be a valid well-aligned pointer.
+            len => unsafe { core::slice::from_raw_parts(self.data, len as usize) },
+        }
+    }
+}
+
+impl AsRef<[u8]> for ngx_variable_value_t {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
@@ -160,6 +179,23 @@ pub fn ngx_random() -> core::ffi::c_long {
     #[cfg(not(windows))]
     unsafe {
         random()
+    }
+}
+
+/// Causes the calling thread to relinquish the CPU.
+#[inline]
+pub fn ngx_sched_yield() {
+    #[cfg(windows)]
+    unsafe {
+        SwitchToThread()
+    };
+    #[cfg(all(not(windows), ngx_feature = "have_sched_yield"))]
+    unsafe {
+        sched_yield()
+    };
+    #[cfg(not(any(windows, ngx_feature = "have_sched_yield")))]
+    unsafe {
+        usleep(1)
     }
 }
 

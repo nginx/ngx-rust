@@ -40,6 +40,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod allocator;
+
 /// The core module.
 ///
 /// This module provides fundamental utilities needed to interface with many NGINX primitives.
@@ -62,6 +64,8 @@ pub mod http;
 ///
 /// This module provides an interface into the NGINX logger framework.
 pub mod log;
+
+pub mod sync;
 
 /// Define modules exported by this library.
 ///

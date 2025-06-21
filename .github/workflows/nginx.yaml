@@ -52,6 +52,7 @@ env:
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_async_module.so;
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_awssigv4_module.so;
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_curl_module.so;
+    load_module ${{ github.workspace }}/nginx/objs/ngx_http_shared_dict_module.so;
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_upstream_custom_module.so;
 
   OPENSSL_VERSION: '3.0.16'

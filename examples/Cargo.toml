@@ -51,6 +51,11 @@ name = "async"
 path = "async.rs"
 crate-type = ["cdylib"]
 
+[[example]]
+name = "shared_dict"
+path = "shared_dict.rs"
+crate-type = ["cdylib"]
+
 [features]
 default = ["export-modules", "ngx/vendored"]
 # Generate `ngx_modules` table with module exports
