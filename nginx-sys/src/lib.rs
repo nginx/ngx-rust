@@ -183,6 +183,34 @@ pub fn ngx_timeofday() -> &'static ngx_time_t {
     unsafe { &*ngx_cached_time }
 }
 
+/// Initialize a list, using a pool for the backing memory, with capacity to store the given number
+/// of elements and element size.
+///
+/// # Safety
+/// * `list` must be non-null
+/// * `pool` must be a valid pool
+#[inline]
+pub unsafe fn ngx_list_init(
+    list: *mut ngx_list_t,
+    pool: *mut ngx_pool_t,
+    n: ngx_uint_t,
+    size: usize,
+) -> ngx_int_t {
+    unsafe {
+        (*list).part.elts = ngx_palloc(pool, n * size);
+        if (*list).part.elts.is_null() {
+            return NGX_ERROR as ngx_int_t;
+        }
+        (*list).part.nelts = 0;
+        (*list).part.next = ptr::null_mut();
+        (*list).last = ptr::addr_of_mut!((*list).part);
+        (*list).size = size;
+        (*list).nalloc = n;
+        (*list).pool = pool;
+        NGX_OK as ngx_int_t
+    }
+}
+
 /// Add a key-value pair to an nginx table entry (`ngx_table_elt_t`) in the given nginx memory pool.
 ///
 /// # Arguments
