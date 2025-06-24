@@ -40,7 +40,7 @@ env:
     --with-pcre=objs/lib/pcre
     --with-zlib=objs/lib/zlib
     --with-openssl=objs/lib/openssl
-    --with-openssl-opt="no-asm no-module no-tests -D_WIN32_WINNT=0x0601"
+    --with-openssl-opt="no-asm no-module no-tests no-makedepend -D_WIN32_WINNT=0x0601"
 
   NGX_CONFIGURE_DYNAMIC_MODULES: >-
     --add-dynamic-module=${{ github.workspace }}/examples
