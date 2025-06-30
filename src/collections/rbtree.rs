@@ -19,6 +19,96 @@ use nginx_sys::{
 
 use crate::allocator::{self, AllocError, Allocator};
 
+/// Trait for pointer conversions between the tree entry and its container.
+///
+/// # Safety
+///
+/// This trait must only be implemented on types that contain a tree node or wrappers with
+/// compatible layout. The type then can be used to access elements of a raw rbtree type
+/// [NgxRbTree] linked via specified field.
+///
+/// If the struct can belong to several trees through multiple embedded `ngx_rbtree_node_t` fields,
+/// a separate [NgxRbTreeEntry] implementation via wrapper type should be used for each tree.
+pub unsafe trait NgxRbTreeEntry {
+    /// Gets a container pointer from tree node.
+    fn from_rbtree_node(node: NonNull<ngx_rbtree_node_t>) -> NonNull<Self>;
+    /// Gets an rbtree node from a container reference.
+    fn to_rbtree_node(&mut self) -> &mut ngx_rbtree_node_t;
+}
+
+unsafe impl NgxRbTreeEntry for ngx_rbtree_node_t {
+    fn from_rbtree_node(node: NonNull<ngx_rbtree_node_t>) -> NonNull<Self> {
+        node
+    }
+
+    fn to_rbtree_node(&mut self) -> &mut ngx_rbtree_node_t {
+        self
+    }
+}
+
+/// A wrapper over a raw `ngx_rbtree_t`, a red-black tree implementation.
+///
+/// This wrapper is defined in terms of type `T` that embeds and can be converted from or to the
+/// tree nodes.
+///
+/// See <https://nginx.org/en/docs/dev/development_guide.html#red_black_tree>.
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct NgxRbTree<T> {
+    inner: ngx_rbtree_t,
+    _type: PhantomData<T>,
+}
+
+impl<T> NgxRbTree<T>
+where
+    T: NgxRbTreeEntry,
+{
+    /// Creates a tree reference from a pointer to [ngx_rbtree_t].
+    ///
+    /// # Safety
+    ///
+    /// `tree` is a valid pointer to [ngx_rbtree_t], and `T::from_rbtree_node` on the tree nodes
+    /// results in valid pointers to `T`.
+    pub unsafe fn from_ptr<'a>(tree: *const ngx_rbtree_t) -> &'a Self {
+        &*tree.cast()
+    }
+
+    /// Creates a mutable tree reference from a pointer to [ngx_rbtree_t].
+    ///
+    /// # Safety
+    ///
+    /// `tree` is a valid pointer to [ngx_rbtree_t], and `T::from_rbtree_node` on the tree nodes
+    /// results in valid pointers to `T`.
+    pub unsafe fn from_ptr_mut<'a>(tree: *mut ngx_rbtree_t) -> &'a mut Self {
+        &mut *tree.cast()
+    }
+
+    /// Returns `true` if the tree contains no elements.
+    pub fn is_empty(&self) -> bool {
+        ptr::addr_eq(self.inner.root, self.inner.sentinel)
+    }
+
+    /// Appends a node to the tree.
+    pub fn insert(&mut self, node: &mut T) {
+        unsafe { ngx_rbtree_insert(&mut self.inner, node.to_rbtree_node()) };
+    }
+
+    /// Removes the specified node from the tree.
+    pub fn remove(&mut self, node: &mut T) {
+        unsafe { ngx_rbtree_delete(&mut self.inner, node.to_rbtree_node()) };
+    }
+
+    /// Returns an iterator over the nodes of the tree.
+    pub fn iter(&self) -> NgxRbTreeIter<'_> {
+        unsafe { NgxRbTreeIter::new(NonNull::from(&self.inner)) }
+    }
+
+    /// Returns a mutable iterator over the nodes of the tree.
+    pub fn iter_mut(&mut self) -> NgxRbTreeIter<'_> {
+        unsafe { NgxRbTreeIter::new(NonNull::from(&mut self.inner)) }
+    }
+}
+
 /// Raw iterator over the `ngx_rbtree_t` nodes.
 ///
 /// This iterator type can be used to access elements of any correctly initialized `ngx_rbtree_t`
@@ -31,7 +121,7 @@ pub struct NgxRbTreeIter<'a> {
     _lifetime: PhantomData<&'a ()>,
 }
 
-impl<'a> NgxRbTreeIter<'a> {
+impl NgxRbTreeIter<'_> {
     /// Creates an iterator for the `ngx_rbtree_t`.
     ///
     /// # Safety
@@ -54,7 +144,7 @@ impl<'a> NgxRbTreeIter<'a> {
     }
 }
 
-impl<'a> Iterator for NgxRbTreeIter<'a> {
+impl Iterator for NgxRbTreeIter<'_> {
     type Item = NonNull<ngx_rbtree_node_t>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -79,15 +169,15 @@ pub struct RbTreeMap<K, V, A>
 where
     A: Allocator,
 {
-    tree: ngx_rbtree_t,
+    tree: NgxRbTree<MapEntry<K, V>>,
     sentinel: NonNull<ngx_rbtree_node_t>,
     alloc: A,
-    _kv_type: PhantomData<(K, V)>,
 }
 
 /// Entry type for the [RbTreeMap].
 ///
 /// The struct is used from the Rust code only and thus does not need to be compatible with C.
+#[derive(Debug)]
 struct MapEntry<K, V> {
     node: ngx_rbtree_node_t,
     key: K,
@@ -110,20 +200,30 @@ where
     }
 }
 
-/// An iterator for the [RbTreeMap].
-pub struct Iter<'a, K: 'a, V: 'a>(NgxRbTreeIter<'a>, PhantomData<(K, V)>);
+unsafe impl<K, V> NgxRbTreeEntry for MapEntry<K, V> {
+    fn from_rbtree_node(node: NonNull<ngx_rbtree_node_t>) -> NonNull<Self> {
+        unsafe { ngx_rbtree_data!(node, Self, node) }
+    }
 
-impl<'a, K: 'a, V: 'a> Iter<'a, K, V> {
+    fn to_rbtree_node(&mut self) -> &mut ngx_rbtree_node_t {
+        &mut self.node
+    }
+}
+
+/// An iterator for the [RbTreeMap].
+pub struct MapIter<'a, K: 'a, V: 'a>(NgxRbTreeIter<'a>, PhantomData<(K, V)>);
+
+impl<'a, K: 'a, V: 'a> MapIter<'a, K, V> {
     /// Creates an iterator for the [RbTreeMap].
     pub fn new<A: Allocator>(tree: &'a RbTreeMap<K, V, A>) -> Self {
         // msrv(1.89.0): NonNull::from_ref()
-        let rbtree = NonNull::from(&tree.tree);
+        let rbtree = NonNull::from(&tree.tree.inner);
         // SAFETY: Iter borrows from the tree, ensuring that the tree would outlive it.
         Self(unsafe { NgxRbTreeIter::new(rbtree) }, Default::default())
     }
 }
 
-impl<'a, K: 'a, V: 'a> Iterator for Iter<'a, K, V> {
+impl<'a, K: 'a, V: 'a> Iterator for MapIter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -134,24 +234,24 @@ impl<'a, K: 'a, V: 'a> Iterator for Iter<'a, K, V> {
 }
 
 /// A mutable iterator for the [RbTreeMap].
-pub struct IterMut<'a, K: 'a, V: 'a>(NgxRbTreeIter<'a>, PhantomData<(K, V)>);
+pub struct MapIterMut<'a, K: 'a, V: 'a>(NgxRbTreeIter<'a>, PhantomData<(K, V)>);
 
-impl<'a, K: 'a, V: 'a> IterMut<'a, K, V> {
+impl<'a, K: 'a, V: 'a> MapIterMut<'a, K, V> {
     /// Creates an iterator for the [RbTreeMap].
     pub fn new<A: Allocator>(tree: &'a mut RbTreeMap<K, V, A>) -> Self {
         // msrv(1.89.0): NonNull::from_mut()
-        let rbtree = NonNull::from(&mut tree.tree);
+        let rbtree = NonNull::from(&mut tree.tree.inner);
         // SAFETY: IterMut borrows from the tree, ensuring that the tree would outlive it.
         Self(unsafe { NgxRbTreeIter::new(rbtree) }, Default::default())
     }
 }
 
-impl<'a, K: 'a, V: 'a> Iterator for IterMut<'a, K, V> {
+impl<'a, K: 'a, V: 'a> Iterator for MapIterMut<'a, K, V> {
     type Item = (&'a K, &'a mut V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let item = self.0.next()?;
-        let item = unsafe { ngx_rbtree_data!(item, MapEntry<K, V>, node).as_mut() };
+        let mut item = MapEntry::<K, V>::from_rbtree_node(self.0.next()?);
+        let item = unsafe { item.as_mut() };
         Some((&item.key, &mut item.value))
     }
 }
@@ -168,14 +268,14 @@ where
     /// Clears the tree, removing all elements.
     pub fn clear(&mut self) {
         // SAFETY: the iter lives until the end of the scope
-        let iter = unsafe { NgxRbTreeIter::new(NonNull::from(&self.tree)) };
+        let iter = unsafe { NgxRbTreeIter::new(NonNull::from(&self.tree.inner)) };
         let layout = Layout::new::<MapEntry<K, V>>();
 
         for node in iter {
             unsafe {
-                let mut data = ngx_rbtree_data!(node, MapEntry<K, V>, node);
+                let mut data = MapEntry::<K, V>::from_rbtree_node(node);
 
-                ngx_rbtree_delete(&mut self.tree, &mut data.as_mut().node);
+                ngx_rbtree_delete(&mut self.tree.inner, &mut data.as_mut().node);
                 ptr::drop_in_place(data.as_mut());
                 self.allocator().deallocate(data.cast(), layout)
             }
@@ -184,19 +284,19 @@ where
 
     /// Returns true if the tree contains no entries.
     pub fn is_empty(&self) -> bool {
-        ptr::addr_eq(self.tree.root, self.tree.sentinel)
+        self.tree.is_empty()
     }
 
     /// Returns an iterator over the entries of the tree.
     #[inline]
-    pub fn iter(&self) -> Iter<'_, K, V> {
-        Iter::new(self)
+    pub fn iter(&self) -> MapIter<'_, K, V> {
+        MapIter::new(self)
     }
 
     /// Returns a mutable iterator over the entries of the tree.
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
-        IterMut::new(self)
+    pub fn iter_mut(&mut self) -> MapIterMut<'_, K, V> {
+        MapIterMut::new(self)
     }
 }
 
@@ -210,14 +310,24 @@ where
         let layout = Layout::new::<ngx_rbtree_node_t>();
         let sentinel: NonNull<ngx_rbtree_node_t> = alloc.allocate_zeroed(layout)?.cast();
 
-        let mut this = RbTreeMap {
-            tree: unsafe { mem::zeroed() },
-            sentinel,
-            alloc,
-            _kv_type: PhantomData,
+        let tree = NgxRbTree {
+            inner: unsafe { mem::zeroed() },
+            _type: PhantomData,
         };
 
-        unsafe { ngx_rbtree_init(&mut this.tree, this.sentinel.as_ptr(), Some(Self::insert)) };
+        let mut this = RbTreeMap {
+            tree,
+            sentinel,
+            alloc,
+        };
+
+        unsafe {
+            ngx_rbtree_init(
+                &mut this.tree.inner,
+                this.sentinel.as_ptr(),
+                Some(Self::insert),
+            )
+        };
 
         Ok(this)
     }
@@ -260,7 +370,8 @@ where
     {
         let mut node = self.lookup(key)?;
         unsafe {
-            ngx_rbtree_delete(&mut self.tree, &mut node.as_mut().node);
+            self.tree.remove(node.as_mut());
+
             let layout = Layout::for_value(node.as_ref());
             // SAFETY: we make a bitwise copy of the node and dispose of the original value without
             // dropping it.
@@ -278,7 +389,7 @@ where
         } else {
             let node = MapEntry::new(key, value);
             let mut node = allocator::allocate(node, self.allocator())?;
-            unsafe { ngx_rbtree_insert(&mut self.tree, &mut node.as_mut().node) };
+            self.tree.insert(unsafe { node.as_mut() });
             node
         };
 
@@ -324,10 +435,10 @@ where
         K: borrow::Borrow<Q>,
         Q: Hash + Ord + ?Sized,
     {
-        let mut node = self.tree.root;
+        let mut node = self.tree.inner.root;
         let hash = BuildMapHasher::default().hash_one(key) as ngx_rbtree_key_t;
 
-        while !ptr::addr_eq(node, self.tree.sentinel) {
+        while !ptr::addr_eq(node, self.tree.inner.sentinel) {
             let n = unsafe { NonNull::new_unchecked(ngx_rbtree_data!(node, MapEntry<K, V>, node)) };
             let nr = unsafe { n.as_ref() };
 
