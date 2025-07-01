@@ -41,6 +41,8 @@ extern crate alloc;
 extern crate std;
 
 pub mod allocator;
+#[cfg(feature = "async")]
+pub mod async_;
 
 /// The core module.
 ///

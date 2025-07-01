@@ -26,11 +26,18 @@ rust-version.workspace = true
 
 [dependencies]
 allocator-api2 = { version = "0.2.21", default-features = false }
+async-task = { version = "4.7.1", optional = true }
 lock_api = "0.4.13"
 nginx-sys = { path = "nginx-sys", default-features=false, version = "0.5.0"}
+pin-project-lite = { version = "0.2.16", optional = true }
 
 [features]
-default = ["vendored","std"]
+default = ["std", "vendored"]
+async = [
+    "alloc",
+    "dep:async-task",
+    "dep:pin-project-lite",
+]
 # Enables the components using memory allocation.
 # If no `std` flag, `alloc` crate is internally used instead. This flag is mainly for `no_std` build.
 alloc = ["allocator-api2/alloc"]
