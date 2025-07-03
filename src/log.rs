@@ -1,6 +1,7 @@
 use core::cmp;
 use core::fmt::{self, Write};
 use core::mem::MaybeUninit;
+use core::ptr::NonNull;
 
 use crate::ffi::{self, ngx_err_t, ngx_log_t, ngx_uint_t, NGX_MAX_ERROR_STR};
 
@@ -10,6 +11,19 @@ use crate::ffi::{self, ngx_err_t, ngx_log_t, ngx_uint_t, NGX_MAX_ERROR_STR};
 /// prefix
 pub const LOG_BUFFER_SIZE: usize =
     NGX_MAX_ERROR_STR as usize - b"1970/01/01 00:00:00 [info] 1#1: ".len();
+
+/// Obtains a pointer to the global (cycle) log object.
+///
+/// The returned pointer is tied to the current cycle lifetime, and will be invalidated by a
+/// configuration reload in the master process or in a single-process mode. If you plan to store it,
+/// make sure that your storage is also tied to the cycle lifetime (e.g. module configuration or
+/// connection/request data).
+///
+/// The function may panic if you call it before the main() in nginx creates an initial cycle.
+#[inline(always)]
+pub fn ngx_cycle_log() -> NonNull<ngx_log_t> {
+    NonNull::new(unsafe { (*nginx_sys::ngx_cycle).log }).expect("global logger")
+}
 
 /// Utility function to provide typed checking of the mask's field state.
 #[inline(always)]
