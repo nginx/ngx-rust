@@ -82,7 +82,7 @@ jobs:
       - name: rustdoc
         # always run if build succeeds
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: cargo doc --no-deps
+        run: cargo doc --all-features --no-deps
 
   examples-linux:
     name: Examples (Linux)
@@ -156,9 +156,9 @@ jobs:
       - name: disable ipv6 for gpg
         run: echo "disable-ipv6" > .cache/.gnupg/dirmngr.conf
       - name: build
-        run: cargo build
+        run: cargo build --workspace --all-targets --features "async,vendored"
       - name: run tests
-        run: cargo test --workspace
+        run: cargo test --workspace --features "async,vendored"
 
   fmt:
     name: Rustfmt

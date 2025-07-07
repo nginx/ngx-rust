@@ -37,7 +37,7 @@ nginx-sys = { path = "nginx-sys", default-features=false, version = "0.5.0"}
 pin-project-lite = { version = "0.2.16", optional = true }
 
 [features]
-default = ["std", "vendored"]
+default = ["std"]
 async = [
     "alloc",
     "dep:async-task",
@@ -55,10 +55,7 @@ std = [
     "alloc",
     "allocator-api2/std"
 ]
-# Build our own copy of the NGINX by default.
-# This could be disabled with `--no-default-features` to minimize the dependency
-# tree when building against an existing copy of the NGINX with the
-# NGINX_SOURCE_DIR/NGINX_BUILD_DIR variables.
+# Build our own copy of the NGINX from `nginx-src` crate.
 vendored = ["nginx-sys/vendored"]
 
 [badges]
