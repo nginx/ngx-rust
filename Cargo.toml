@@ -41,6 +41,10 @@ async = [
 # Enables the components using memory allocation.
 # If no `std` flag, `alloc` crate is internally used instead. This flag is mainly for `no_std` build.
 alloc = ["allocator-api2/alloc"]
+# Enables serde support for some of the provided types.
+serde = [
+    "allocator-api2/serde",
+]
 # Enables the components using `std` crate.
 std = [
     "alloc",
