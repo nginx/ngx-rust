@@ -1,6 +1,9 @@
+use core::cmp;
 use core::fmt;
+use core::hash;
 use core::ptr;
 use core::slice;
+use core::str;
 
 use crate::bindings::{ngx_pool_t, ngx_str_t};
 use crate::detail;
@@ -45,7 +48,7 @@ impl ngx_str_t {
     /// # Returns
     /// A string slice (`&str`) representing the nginx string.
     pub fn to_str(&self) -> &str {
-        core::str::from_utf8(self.as_bytes()).unwrap()
+        str::from_utf8(self.as_bytes()).unwrap()
     }
 
     /// Creates an empty `ngx_str_t` instance.
@@ -110,6 +113,13 @@ impl Default for ngx_str_t {
     }
 }
 
+impl fmt::Display for ngx_str_t {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        detail::display_bytes(f, self.as_bytes())
+    }
+}
+
 impl From<ngx_str_t> for &[u8] {
     fn from(s: ngx_str_t) -> Self {
         if s.len == 0 || s.data.is_null() {
@@ -119,10 +129,9 @@ impl From<ngx_str_t> for &[u8] {
     }
 }
 
-impl fmt::Display for ngx_str_t {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        detail::display_bytes(f, self.as_bytes())
+impl hash::Hash for ngx_str_t {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.as_bytes().hash(state)
     }
 }
 
@@ -135,21 +144,21 @@ impl PartialEq for ngx_str_t {
 impl Eq for ngx_str_t {}
 
 impl PartialOrd<Self> for ngx_str_t {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for ngx_str_t {
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
         Ord::cmp(self.as_bytes(), other.as_bytes())
     }
 }
 
 impl TryFrom<ngx_str_t> for &str {
-    type Error = core::str::Utf8Error;
+    type Error = str::Utf8Error;
 
     fn try_from(s: ngx_str_t) -> Result<Self, Self::Error> {
-        core::str::from_utf8(s.into())
+        str::from_utf8(s.into())
     }
 }
