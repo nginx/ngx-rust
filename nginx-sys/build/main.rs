@@ -232,10 +232,19 @@ fn generate_binding(nginx: &NginxSource) {
         .parse()
         .expect("rust-version is valid and supported by bindgen");
 
+    // Functions that we need for macro and inline fn reimplementations in the nginx-sys itself.
+    let macro_dependencies: &[_] = if env::var("CARGO_CFG_WINDOWS").is_ok() {
+        &["SwitchToThread", "rand"]
+    } else {
+        &["random", "sched_yield", "usleep"]
+    };
+
     let bindings = bindgen::Builder::default()
-        // Bindings will not compile on Linux without block listing this item
-        // It is worth investigating why this is
-        .blocklist_item("IPPORT_RESERVED")
+        // Allow all the NGINX symbols,
+        .allowlist_item("ngx_.*")
+        .allowlist_var("(NGX|NGINX|nginx)_.*")
+        // ...and a couple of symbols we need in nginx-sys.
+        .allowlist_function(macro_dependencies.join("|"))
         // will be restored later in build.rs
         .blocklist_item("NGX_ALIGNMENT")
         .generate_cstr(true)
