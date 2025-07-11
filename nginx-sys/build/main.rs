@@ -215,10 +215,29 @@ fn generate_binding(nginx: &NginxSource) {
         .parse()
         .expect("rust-version is valid and supported by bindgen");
 
+    // Functions that we need for macro and inline fn reimplementations in the nginx-sys itself.
+    #[cfg(windows)]
+    let macro_dependencies = [
+        "GetLastError",
+        "SetLastError",
+        "SwitchToThread",
+        "WSAGetLastError",
+        "WSASetLastError",
+        "rand",
+    ];
+    #[cfg(not(windows))]
+    let macro_dependencies = ["random", "sched_yield", "usleep"];
+
     let bindings = bindgen::Builder::default()
-        // Bindings will not compile on Linux without block listing this item
-        // It is worth investigating why this is
-        .blocklist_item("IPPORT_RESERVED")
+        // Allow all the NGINX symbols,
+        .allowlist_function("ngx_.*")
+        .allowlist_type("ngx_.*")
+        .allowlist_var("(NGX|NGINX|ngx|nginx)_.*")
+        // ...and a few symbols required for compilation,
+        .allowlist_type("bpf_.*")
+        .allowlist_type("sig_atomic_t|time_t|u_char|u_short")
+        // ...and a couple of symbols we need in nginx-sys.
+        .allowlist_function(macro_dependencies.join("|"))
         // will be restored later in build.rs
         .blocklist_item("NGX_ALIGNMENT")
         .generate_cstr(true)
