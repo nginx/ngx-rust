@@ -250,7 +250,11 @@ fn generate_binding(nginx: &NginxSource) {
         .rust_target(rust_target)
         .use_core();
 
-    if cfg!(any(feature = "libc", feature = "openssl-sys")) {
+    if cfg!(any(
+        feature = "libc",
+        feature = "openssl-sys",
+        feature = "pcre2-sys"
+    )) {
         use bindgen_callbacks::TypeFlags as TF;
 
         let mut callbacks = bindgen_callbacks::NgxBindgenCallbacks::new();
@@ -300,6 +304,16 @@ fn generate_binding(nginx: &NginxSource) {
                     ("SSL_SESSION", TF::empty()),
                 ],
             )
+        }
+
+        if cfg!(feature = "pcre2-sys") {
+            callbacks.add_external_types(
+                "pcre2_sys",
+                [
+                    ("pcre2_code_8", TF::COPY | TF::DEBUG),
+                    ("pcre2_real_code_8", TF::COPY | TF::DEBUG),
+                ],
+            );
         }
 
         bindings = callbacks.add_to_builder(bindings);
