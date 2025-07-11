@@ -20,6 +20,7 @@ default-target = "x86_64-unknown-linux-gnu"
 targets = []
 
 [dependencies]
+libc = { optional = true, workspace = true }
 openssl-sys = { version = "0.9.109", optional = true }
 
 [target.'cfg(not(windows))'.dependencies]
@@ -34,6 +35,8 @@ regex = "1.11.1"
 nginx-src = { version = "~1.28.0", optional = true, path = "../nginx-src" }
 
 [features]
+# Reexport types from "libc" instead of generating our own bindings.
+libc = ["dep:libc"]
 # Reexport types from "openssl-sys" instead of generating our own bindings.
 # Note that openssl-sys depends on "std".
 openssl-sys = ["dep:openssl-sys"]

@@ -250,18 +250,57 @@ fn generate_binding(nginx: &NginxSource) {
         .rust_target(rust_target)
         .use_core();
 
-    if cfg!(feature = "openssl-sys") {
+    if cfg!(any(feature = "libc", feature = "openssl-sys")) {
         use bindgen_callbacks::TypeFlags as TF;
 
         let mut callbacks = bindgen_callbacks::NgxBindgenCallbacks::new();
-        callbacks.add_external_types(
-            "openssl_sys",
-            [
-                ("SSL", TF::empty()),
-                ("SSL_CTX", TF::empty()),
-                ("SSL_SESSION", TF::empty()),
-            ],
-        );
+        if cfg!(feature = "libc") {
+            callbacks.add_external_types(
+                "libc",
+                [
+                    ("glob_t", TF::COPY),
+                    ("in6_addr", TF::COPY),
+                    ("iocb", TF::COPY),
+                    ("sem_t", TF::COPY),
+                    ("sockaddr_in", TF::COPY),
+                    ("sockaddr_in6", TF::COPY),
+                    ("stat", TF::COPY),
+                    ("DIR", TF::COPY | TF::DEBUG),
+                    ("cmsghdr", TF::COPY | TF::DEBUG),
+                    ("cpu_set_t", TF::COPY | TF::DEBUG),
+                    ("dirent", TF::COPY | TF::DEBUG),
+                    ("gid_t", TF::COPY | TF::DEBUG),
+                    ("in6_pktinfo", TF::COPY | TF::DEBUG),
+                    ("in_addr_t", TF::COPY | TF::DEBUG),
+                    ("in_pktinfo", TF::COPY | TF::DEBUG),
+                    ("in_port_t", TF::COPY | TF::DEBUG),
+                    ("ino_t", TF::COPY | TF::DEBUG),
+                    ("iovec", TF::COPY | TF::DEBUG),
+                    ("msghdr", TF::COPY | TF::DEBUG),
+                    ("off_t", TF::COPY | TF::DEBUG),
+                    ("pid_t", TF::COPY | TF::DEBUG),
+                    ("pthread_cond_t", TF::COPY | TF::DEBUG),
+                    ("pthread_mutex_t", TF::COPY | TF::DEBUG),
+                    ("sockaddr", TF::COPY | TF::DEBUG),
+                    ("sockaddr_un", TF::COPY | TF::DEBUG),
+                    ("socklen_t", TF::COPY | TF::DEBUG),
+                    ("time_t", TF::COPY | TF::DEBUG),
+                    ("tm", TF::COPY | TF::DEBUG),
+                    ("uid_t", TF::COPY | TF::DEBUG),
+                ],
+            );
+        }
+
+        if cfg!(feature = "openssl-sys") {
+            callbacks.add_external_types(
+                "openssl_sys",
+                [
+                    ("SSL", TF::empty()),
+                    ("SSL_CTX", TF::empty()),
+                    ("SSL_SESSION", TF::empty()),
+                ],
+            )
+        }
 
         bindings = callbacks.add_to_builder(bindings);
     }
