@@ -576,6 +576,7 @@ dependencies = [
  "errno",
  "nginx-src",
  "regex",
+ "shlex",
 ]
 
 [[package]]
