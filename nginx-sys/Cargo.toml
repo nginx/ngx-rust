@@ -20,12 +20,16 @@ default-target = "x86_64-unknown-linux-gnu"
 targets = []
 
 [dependencies]
+libc = { optional = true, workspace = true }
+openssl-sys = { version = "0.9.109", optional = true }
+pcre2-sys = { version = "0.2.9", optional = true }
 
 [target.'cfg(not(windows))'.dependencies]
 errno = { version = "0.3", default-features = false }
 
 [build-dependencies]
 bindgen = "0.71"
+bitflags = "2.9.1"
 cc = "1.2.0"
 dunce = "1.0.5"
 regex = "1.11.1"
@@ -33,4 +37,11 @@ nginx-src = { version = "~1.28.0", optional = true, path = "../nginx-src" }
 shlex = "1.3"
 
 [features]
+# Reexport types from "libc" instead of generating our own bindings.
+libc = ["dep:libc"]
+# Reexport types from "openssl-sys" instead of generating our own bindings.
+# Note that openssl-sys depends on "std".
+openssl-sys = ["dep:openssl-sys"]
+# Reexport types from "pcre2-sys" instead of generating our own bindings.
+pcre2-sys = ["dep:pcre2-sys"]
 vendored = ["dep:nginx-src"]

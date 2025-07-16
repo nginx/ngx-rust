@@ -37,6 +37,9 @@ lock_api = "0.4.13"
 nginx-sys = { path = "nginx-sys", default-features=false, version = "0.5.0"}
 pin-project-lite = { version = "0.2.16", optional = true }
 
+[workspace.dependencies]
+libc = { version = "0.2.174", default-features = false }
+
 [features]
 default = ["std"]
 async = [

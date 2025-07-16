@@ -6,6 +6,8 @@ use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod bindgen_callbacks;
+
 const ENV_VARS_TRIGGERING_RECOMPILE: &[&str] = &["OUT_DIR", "NGINX_BUILD_DIR", "NGINX_SOURCE_DIR"];
 
 /// The feature flags set by the nginx configuration script.
@@ -224,10 +226,29 @@ fn generate_binding(nginx: &NginxSource) {
         .parse()
         .expect("rust-version is valid and supported by bindgen");
 
-    let bindings = bindgen::Builder::default()
-        // Bindings will not compile on Linux without block listing this item
-        // It is worth investigating why this is
-        .blocklist_item("IPPORT_RESERVED")
+    // Functions that we need for macro and inline fn reimplementations in the nginx-sys itself.
+    #[cfg(windows)]
+    let macro_dependencies = [
+        "GetLastError",
+        "SetLastError",
+        "SwitchToThread",
+        "WSAGetLastError",
+        "WSASetLastError",
+        "rand",
+    ];
+    #[cfg(not(windows))]
+    let macro_dependencies = ["random", "sched_yield", "usleep"];
+
+    let mut bindings = bindgen::Builder::default()
+        // Allow all the NGINX symbols,
+        .allowlist_function("ngx_.*")
+        .allowlist_type("ngx_.*")
+        .allowlist_var("(NGX|NGINX|ngx|nginx)_.*")
+        // ...and a few symbols required for compilation,
+        .allowlist_type("bpf_.*")
+        .allowlist_type("sig_atomic_t|time_t|u_char|u_short")
+        // ...and a couple of symbols we need in nginx-sys.
+        .allowlist_function(macro_dependencies.join("|"))
         // will be restored later in build.rs
         .blocklist_item("NGX_ALIGNMENT")
         .generate_cstr(true)
@@ -236,9 +257,78 @@ fn generate_binding(nginx: &NginxSource) {
         .clang_args(clang_args)
         .layout_tests(false)
         .rust_target(rust_target)
-        .use_core()
-        .generate()
-        .expect("Unable to generate bindings");
+        .use_core();
+
+    if cfg!(any(
+        feature = "libc",
+        feature = "openssl-sys",
+        feature = "pcre2-sys"
+    )) {
+        use bindgen_callbacks::TypeFlags as TF;
+
+        let mut callbacks = bindgen_callbacks::NgxBindgenCallbacks::new();
+        if cfg!(feature = "libc") {
+            callbacks.add_external_types(
+                "libc",
+                [
+                    ("glob_t", TF::COPY),
+                    ("in6_addr", TF::COPY),
+                    ("iocb", TF::COPY),
+                    ("sem_t", TF::COPY),
+                    ("sockaddr_in", TF::COPY),
+                    ("sockaddr_in6", TF::COPY),
+                    ("stat", TF::COPY),
+                    ("DIR", TF::COPY | TF::DEBUG),
+                    ("cmsghdr", TF::COPY | TF::DEBUG),
+                    ("cpu_set_t", TF::COPY | TF::DEBUG),
+                    ("dirent", TF::COPY | TF::DEBUG),
+                    ("gid_t", TF::COPY | TF::DEBUG),
+                    ("in6_pktinfo", TF::COPY | TF::DEBUG),
+                    ("in_addr_t", TF::COPY | TF::DEBUG),
+                    ("in_pktinfo", TF::COPY | TF::DEBUG),
+                    ("in_port_t", TF::COPY | TF::DEBUG),
+                    ("ino_t", TF::COPY | TF::DEBUG),
+                    ("iovec", TF::COPY | TF::DEBUG),
+                    ("msghdr", TF::COPY | TF::DEBUG),
+                    ("off_t", TF::COPY | TF::DEBUG),
+                    ("pid_t", TF::COPY | TF::DEBUG),
+                    ("pthread_cond_t", TF::COPY | TF::DEBUG),
+                    ("pthread_mutex_t", TF::COPY | TF::DEBUG),
+                    ("sockaddr", TF::COPY | TF::DEBUG),
+                    ("sockaddr_un", TF::COPY | TF::DEBUG),
+                    ("socklen_t", TF::COPY | TF::DEBUG),
+                    ("time_t", TF::COPY | TF::DEBUG),
+                    ("tm", TF::COPY | TF::DEBUG),
+                    ("uid_t", TF::COPY | TF::DEBUG),
+                ],
+            );
+        }
+
+        if cfg!(feature = "openssl-sys") {
+            callbacks.add_external_types(
+                "openssl_sys",
+                [
+                    ("SSL", TF::empty()),
+                    ("SSL_CTX", TF::empty()),
+                    ("SSL_SESSION", TF::empty()),
+                ],
+            )
+        }
+
+        if cfg!(feature = "pcre2-sys") {
+            callbacks.add_external_types(
+                "pcre2_sys",
+                [
+                    ("pcre2_code_8", TF::COPY | TF::DEBUG),
+                    ("pcre2_real_code_8", TF::COPY | TF::DEBUG),
+                ],
+            );
+        }
+
+        bindings = callbacks.add_to_builder(bindings);
+    }
+
+    let bindings = bindings.generate().expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
     let out_dir_env =
