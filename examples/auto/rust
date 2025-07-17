@@ -67,6 +67,12 @@
 #
 # ngx_rust_make_modules
 # ```
+#
+# The following environment variables can affect the generated Makefile:
+#
+# - NGX_CARGO sets the "cargo" binary to use, e.g. NGX_CARGO=cargo-1.82
+# - NGX_RUST_TARGET passes the --target to the Rust compiler if set
+# - NGX_RUSTC_OPT passes additional options to "cargo rustc"
 
 # Prevent duplicate invocation unless it is a newer library version
 if [ "${NGX_RUST_AUTO_VER:-0}" -ge 1 ]; then
@@ -136,7 +142,7 @@ case "$NGX_PLATFORM" in
                 RUST_LIBS="$RUST_LIBS userenv.lib"  # std::env::home_dir
                 RUST_LIBS="$RUST_LIBS dbghelp.lib"  # backtrace symbolization
 
-                RUST_TARGET=$RUST_TARGET_ARCH-pc-windows-msvc
+                NGX_RUST_TARGET=${NGX_RUST_TARGET:-$RUST_TARGET_ARCH-pc-windows-msvc}
             ;;
 
             gcc | clang)
@@ -145,7 +151,7 @@ case "$NGX_PLATFORM" in
                 RUST_LIBS="$RUST_LIBS -luserenv"
                 RUST_LIBS="$RUST_LIBS -ldbghelp"
                 # gnullvm on arm64?
-                RUST_TARGET=$RUST_TARGET_ARCH-pc-windows-gnu
+                NGX_RUST_TARGET=${NGX_RUST_TARGET:-$RUST_TARGET_ARCH-pc-windows-gnu}
             ;;
 
         esac
@@ -220,7 +226,7 @@ ngx_rust_target_path () {
         ngx_rust_obj=examples/$ngx_rust_obj
     fi
 
-    echo "${RUST_TARGET:+$RUST_TARGET/}$ngx_cargo_profile/$ngx_rust_obj"
+    echo "${NGX_RUST_TARGET:+$NGX_RUST_TARGET/}$ngx_cargo_profile/$ngx_rust_obj"
 }
 
 
@@ -304,7 +310,7 @@ $ngx_rust_obj:
 		--manifest-path "$ngx_cargo_manifest" \\
 		--no-default-features \\
 		--profile $ngx_cargo_profile \\
-		${RUST_TARGET:+--target $RUST_TARGET} \\
+		${NGX_RUST_TARGET:+--target $NGX_RUST_TARGET} \\
 		--target-dir $NGX_OBJS/$ngx_addon_id \\
 		--features "$ngx_rust_features" \\
 		$ngx_rustc_module_opt $NGX_RUSTC_OPT

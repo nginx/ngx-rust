@@ -69,8 +69,10 @@ jobs:
             -fno-omit-frame-pointer
             -fsanitize=address,undefined
           LDFLAGS: -fsanitize=address,undefined
-          RUST_TARGET: x86_64-unknown-linux-gnu
           RUSTFLAGS: -Zsanitizer=address -Zexternal-clangrt
+          # Pass --target to cargo to ensure that sanitizer flags are not
+          # applied to the build scripts and proc-macros.
+          NGX_RUST_TARGET: x86_64-unknown-linux-gnu
           # Extra options passed to cargo rustc
           NGX_RUSTC_OPT: -Zbuild-std
           # Enable unstable features, such as the -Z options above,
