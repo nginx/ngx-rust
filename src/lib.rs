@@ -13,7 +13,7 @@
 //! * `NGX_VERSION` (default 1.28.0) - NGINX OSS version
 //! * `NGX_DEBUG` (default to false) -  if set to true, then will compile NGINX `--with-debug` option
 //!
-//! For example, this is how you would compile the [examples](https://github.com/nginx/ngx-rust/tree/master/examples) using a specific version of NGINX and enabling
+//! For example, this is how you would compile the [examples](https://github.com/nginx/ngx-rust/tree/main/examples) using a specific version of NGINX and enabling
 //! debugging: `NGX_DEBUG=true NGX_VERSION=1.23.0 cargo build --package=examples --examples --release`
 //!
 //! To build Linux-only modules, use the "linux" feature: `cargo build --package=examples --examples --features=linux --release`

@@ -11,5 +11,5 @@ Before creating a PR, run through this checklist and mark each as complete.
 - [ ] I have added tests (when possible) that prove my fix is effective or that my feature works
 - [ ] I have checked that all unit tests pass after adding my changes
 - [ ] I have updated necessary documentation
-- [ ] I have rebased my branch onto master
+- [ ] I have rebased my branch onto main
 - [ ] I will ensure my PR is targeting the main branch and pulling from my branch from my own fork
