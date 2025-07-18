@@ -250,21 +250,30 @@ ngx_rust_module () {
     ngx_module_libs_saved=$ngx_module_libs
     ngx_module_libs="$ngx_rust_obj $ngx_module_libs $RUST_LIBS"
 
-    # Module deps are usually added to the object file targets, but we don't have any
-    LINK_DEPS="$LINK_DEPS $ngx_rust_obj"
-
-    eval ${ngx_addon_id}_RUST_TARGETS=\"\$${ngx_addon_id}_RUST_TARGETS \
-                                        $ngx_rust_target_type:$ngx_rust_target_name\"
-
     if [ -n "$ngx_rust_target_features" ]; then
         eval ${ngx_addon_id}_RUST_FEATURES=\"\$${ngx_addon_id}_RUST_FEATURES \
                                              $ngx_rust_target_features\"
     fi
 
-   . auto/module
+    . auto/module
 
-   ngx_module_deps=$ngx_module_deps_saved
-   ngx_module_libs=$ngx_module_libs_saved
+    ngx_rust_target=$ngx_rust_target_type:$ngx_rust_target_name
+
+    # module deps are usually added to the object file targets, but we don't have any
+
+    if [ "$ngx_module_link" = DYNAMIC ]; then
+        # remember the dynamic module name and generate dependency later
+        ngx_rust_target=$ngx_rust_target:$ngx_module
+    else
+        # add dependency to the binary target
+        LINK_DEPS="$LINK_DEPS $ngx_rust_obj"
+    fi
+
+    eval ${ngx_addon_id}_RUST_TARGETS=\"\$${ngx_addon_id}_RUST_TARGETS \
+                                        $ngx_rust_target\"
+
+    ngx_module_deps=$ngx_module_deps_saved
+    ngx_module_libs=$ngx_module_libs_saved
 }
 
 
@@ -278,8 +287,9 @@ ngx_rust_make_modules () {
     eval ngx_rust_targets="\$${ngx_addon_id}_RUST_TARGETS"
 
     for target in $ngx_rust_targets; do
-        ngx_rust_target_type=${target%%:*}
-        ngx_rust_target_name=${target#*:}
+        IFS=':' read -r ngx_rust_target_type ngx_rust_target_name ngx_rust_module_name <<END
+$target
+END
 
         ngx_rust_make_module
     done
@@ -316,4 +326,14 @@ $ngx_rust_obj:
 		$ngx_rustc_module_opt $NGX_RUSTC_OPT
 
 END
+
+    # Ensure that the "auto"-generated dynamic module target depends on the
+    # static library. Normally this is achieved by attaching ADDON_DEPS to
+    # the module object files, but we don't have any suitable C sources.
+
+    if [ -n "$ngx_rust_module_name" ]; then
+        cat << END                                            >> $NGX_MAKEFILE
+$NGX_OBJS$ngx_dirsep$ngx_rust_module_name$ngx_modext:	$ngx_rust_obj
+END
+    fi
 }
