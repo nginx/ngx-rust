@@ -46,6 +46,50 @@ pub const NGX_ALIGNMENT: usize = NGX_RS_ALIGNMENT;
 // requirements.
 const _: () = assert!(core::mem::align_of::<ngx_str_t>() <= NGX_ALIGNMENT);
 
+impl ngx_array_t {
+    /// Returns the contents of this array as a slice of `T`.
+    ///
+    /// # Safety
+    ///
+    /// The array must be a valid, initialized array containing elements of type T or compatible in
+    /// layout with T (e.g. `#[repr(transparent)]` wrappers).
+    pub unsafe fn as_slice<T>(&self) -> &[T] {
+        debug_assert_eq!(
+            core::mem::size_of::<T>(),
+            self.size,
+            "ngx_array_t::as_slice(): element size mismatch"
+        );
+        if self.nelts == 0 {
+            &[]
+        } else {
+            // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
+            // elements of size `size`
+            core::slice::from_raw_parts(self.elts.cast(), self.nelts)
+        }
+    }
+
+    /// Returns the contents of this array as a mutable slice of `T`.
+    ///
+    /// # Safety
+    ///
+    /// The array must be a valid, initialized array containing elements of type T or compatible in
+    /// layout with T (e.g. `#[repr(transparent)]` wrappers).
+    pub unsafe fn as_slice_mut<T>(&mut self) -> &mut [T] {
+        debug_assert_eq!(
+            core::mem::size_of::<T>(),
+            self.size,
+            "ngx_array_t::as_slice_mut(): element size mismatch"
+        );
+        if self.nelts == 0 {
+            &mut []
+        } else {
+            // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
+            // elements of size `size`
+            core::slice::from_raw_parts_mut(self.elts.cast(), self.nelts)
+        }
+    }
+}
+
 impl ngx_command_t {
     /// Creates a new empty [`ngx_command_t`] instance.
     ///

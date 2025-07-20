@@ -117,9 +117,9 @@ extern "C" fn ngx_http_curl_commands_set_enable(
 ) -> *mut c_char {
     unsafe {
         let conf = &mut *(conf as *mut ModuleConfig);
-        let args = (*(*cf).args).elts as *mut ngx_str_t;
+        let args: &[ngx_str_t] = (*(*cf).args).as_slice();
 
-        let val = (*args.add(1)).to_str();
+        let val = args[1].to_str();
 
         // set default value optionally
         conf.enable = false;

@@ -1,6 +1,5 @@
 use std::ffi::{c_char, c_void};
 use std::ptr::{addr_of, addr_of_mut};
-use std::slice;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
@@ -205,7 +204,7 @@ extern "C" fn ngx_http_async_commands_set_enable(
 ) -> *mut c_char {
     unsafe {
         let conf = &mut *(conf as *mut ModuleConfig);
-        let args = slice::from_raw_parts((*(*cf).args).elts as *mut ngx_str_t, (*(*cf).args).nelts);
+        let args: &[ngx_str_t] = (*(*cf).args).as_slice();
         let val = args[1].to_str();
 
         // set default value optionally

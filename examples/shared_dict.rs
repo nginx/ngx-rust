@@ -1,6 +1,6 @@
 #![no_std]
 use ::core::ffi::{c_char, c_void};
-use ::core::{mem, ptr, slice};
+use ::core::{mem, ptr};
 
 use nginx_sys::{
     ngx_command_t, ngx_conf_t, ngx_http_add_variable, ngx_http_compile_complex_value_t,
@@ -127,8 +127,7 @@ extern "C" fn ngx_http_shared_dict_add_zone(
     // - `cf.args` is guaranteed to be a pointer to an array with 3 elements (NGX_CONF_TAKE2).
     // - The pointers are well-aligned by construction method (`ngx_palloc`).
     debug_assert!(!cf.args.is_null() && unsafe { (*cf.args).nelts >= 3 });
-    let args =
-        unsafe { slice::from_raw_parts_mut((*cf.args).elts as *mut ngx_str_t, (*cf.args).nelts) };
+    let args = unsafe { (*cf.args).as_slice_mut() };
 
     let name: ngx_str_t = args[1];
     let size = unsafe { ngx_parse_size(&mut args[2]) };
@@ -210,8 +209,7 @@ extern "C" fn ngx_http_shared_dict_add_variable(
     // - `cf.args` is guaranteed to be a pointer to an array with 3 elements (NGX_CONF_TAKE2).
     // - The pointers are well-aligned by construction method (`ngx_palloc`).
     debug_assert!(!cf.args.is_null() && unsafe { (*cf.args).nelts >= 3 });
-    let args =
-        unsafe { slice::from_raw_parts_mut((*cf.args).elts as *mut ngx_str_t, (*cf.args).nelts) };
+    let args = unsafe { (*cf.args).as_slice_mut() };
 
     let mut ccv: ngx_http_compile_complex_value_t = unsafe { mem::zeroed() };
     ccv.cf = cf;

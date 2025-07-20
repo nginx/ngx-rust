@@ -8,7 +8,6 @@
  */
 use std::ffi::{c_char, c_void};
 use std::mem;
-use std::slice;
 
 use ngx::core::{Pool, Status};
 use ngx::ffi::{
@@ -267,19 +266,18 @@ unsafe extern "C" fn ngx_http_upstream_commands_set_custom(
     // SAFETY: this function is called with non-NULL cf always
     let cf = &mut *cf;
     ngx_log_debug_mask!(DebugMask::Http, cf.log, "CUSTOM UPSTREAM module init");
+    let args: &[ngx_str_t] = (*cf.args).as_slice();
 
     let ccf = &mut (*(conf as *mut SrvConfig));
 
-    if (*cf.args).nelts == 2 {
-        let value: &[ngx_str_t] =
-            slice::from_raw_parts((*cf.args).elts as *const ngx_str_t, (*cf.args).nelts);
-        let n = ngx_atoi(value[1].data, value[1].len);
+    if let Some(value) = args.get(1) {
+        let n = ngx_atoi(value.data, value.len);
         if n == (NGX_ERROR as isize) || n == 0 {
             ngx_conf_log_error!(
                 NGX_LOG_EMERG,
                 cf,
                 "invalid value \"{}\" in \"{}\" directive",
-                value[1],
+                value,
                 &(*cmd).name
             );
             return ngx::core::NGX_CONF_ERROR;

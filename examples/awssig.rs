@@ -175,8 +175,8 @@ extern "C" fn ngx_http_awssigv4_commands_set_enable(
 ) -> *mut c_char {
     unsafe {
         let conf = &mut *(conf as *mut ModuleConfig);
-        let args = (*(*cf).args).elts as *mut ngx_str_t;
-        let val = (*args.add(1)).to_str();
+        let args: &[ngx_str_t] = (*(*cf).args).as_slice();
+        let val = args[1].to_str();
 
         // set default value optionally
         conf.enable = false;
@@ -198,8 +198,8 @@ extern "C" fn ngx_http_awssigv4_commands_set_access_key(
 ) -> *mut c_char {
     unsafe {
         let conf = &mut *(conf as *mut ModuleConfig);
-        let args = (*(*cf).args).elts as *mut ngx_str_t;
-        conf.access_key = (*args.add(1)).to_string();
+        let args: &[ngx_str_t] = (*(*cf).args).as_slice();
+        conf.access_key = args[1].to_string();
     };
 
     ngx::core::NGX_CONF_OK
@@ -212,8 +212,8 @@ extern "C" fn ngx_http_awssigv4_commands_set_secret_key(
 ) -> *mut c_char {
     unsafe {
         let conf = &mut *(conf as *mut ModuleConfig);
-        let args = (*(*cf).args).elts as *mut ngx_str_t;
-        conf.secret_key = (*args.add(1)).to_string();
+        let args: &[ngx_str_t] = (*(*cf).args).as_slice();
+        conf.secret_key = args[1].to_string();
     };
 
     ngx::core::NGX_CONF_OK
@@ -226,8 +226,8 @@ extern "C" fn ngx_http_awssigv4_commands_set_s3_bucket(
 ) -> *mut c_char {
     unsafe {
         let conf = &mut *(conf as *mut ModuleConfig);
-        let args = (*(*cf).args).elts as *mut ngx_str_t;
-        conf.s3_bucket = (*args.add(1)).to_string();
+        let args: &[ngx_str_t] = (*(*cf).args).as_slice();
+        conf.s3_bucket = args[1].to_string();
         if conf.s3_bucket.len() == 1 {
             println!("Validation failed");
             return ngx::core::NGX_CONF_ERROR;
