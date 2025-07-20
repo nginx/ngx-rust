@@ -93,6 +93,66 @@ impl ngx_str_t {
             len: data.len(),
         }
     }
+
+    /// Divides one `ngx_str_t` into two at an index.
+    ///
+    /// # Safety
+    ///
+    /// The results will reference the original string; be wary of the ownership and lifetime.
+    pub fn split_at(&self, mid: usize) -> Option<(ngx_str_t, ngx_str_t)> {
+        if mid > self.len {
+            return None;
+        }
+
+        Some((
+            ngx_str_t {
+                data: self.data,
+                len: mid,
+            },
+            ngx_str_t {
+                data: unsafe { self.data.add(mid) },
+                len: self.len - mid,
+            },
+        ))
+    }
+
+    /// Returns an `ngx_str_t` with the prefix removed.
+    ///
+    /// If the string starts with the byte sequence `prefix`, returns the substring after the
+    /// prefix, wrapped in `Some`. The resulting substring can be empty.
+    ///
+    /// # Safety
+    ///
+    /// The result will reference the original string; be wary of the ownership and lifetime.
+    ///
+    /// The method is not marked as `unsafe` as everything it does is possible via safe interfaces.
+    pub fn strip_prefix(&self, prefix: impl AsRef<[u8]>) -> Option<ngx_str_t> {
+        let prefix = prefix.as_ref();
+        if self.as_bytes().starts_with(prefix) {
+            self.split_at(prefix.len()).map(|x| x.1)
+        } else {
+            None
+        }
+    }
+
+    /// Returns an `ngx_str_t` with the suffix removed.
+    ///
+    /// If the string ends with the byte sequence `suffix`, returns the substring before the
+    /// suffix, wrapped in `Some`. The resulting substring can be empty.
+    ///
+    /// # Safety
+    ///
+    /// The result will reference the original string; be wary of the ownership and lifetime.
+    ///
+    /// The method is not marked as `unsafe` as everything it does is possible via safe interfaces.
+    pub fn strip_suffix(&self, suffix: impl AsRef<[u8]>) -> Option<ngx_str_t> {
+        let suffix = suffix.as_ref();
+        if self.as_bytes().ends_with(suffix) {
+            self.split_at(self.len - suffix.len()).map(|x| x.0)
+        } else {
+            None
+        }
+    }
 }
 
 impl AsRef<[u8]> for ngx_str_t {
@@ -160,5 +220,33 @@ impl TryFrom<ngx_str_t> for &str {
 
     fn try_from(s: ngx_str_t) -> Result<Self, Self::Error> {
         str::from_utf8(s.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ngx_str_prefix() {
+        let s = "key=value";
+        let s = ngx_str_t {
+            data: s.as_ptr().cast_mut(),
+            len: s.len(),
+        };
+
+        assert_eq!(
+            s.strip_prefix("key=").as_ref().map(ngx_str_t::as_bytes),
+            Some("value".as_bytes())
+        );
+
+        assert_eq!(s.strip_prefix("test"), None);
+
+        assert_eq!(
+            s.strip_suffix("value").as_ref().map(ngx_str_t::as_bytes),
+            Some("key=".as_bytes())
+        );
+
+        assert_eq!(s.strip_suffix("test"), None);
     }
 }
