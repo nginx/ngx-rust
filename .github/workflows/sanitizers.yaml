@@ -12,7 +12,7 @@ env:
   BUILDREQUIRES: >-
     openssl-devel pcre2-devel zlib-devel
     cargo rust-src rustfmt
-    clang compiler-rt
+    clang compiler-rt llvm
     git-core
     make patch
     perl-FindBin
