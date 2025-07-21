@@ -27,7 +27,7 @@ unsafe impl Sync for Scheduler {}
 
 impl Scheduler {
     const fn new() -> Self {
-        Self(UnsafeCell::new(SchedulerInner::new()))
+        Self(SchedulerInner::new())
     }
 
     pub fn schedule(&self, runnable: Runnable) {
@@ -46,17 +46,17 @@ struct SchedulerInner {
 }
 
 impl SchedulerInner {
-    const fn new() -> Self {
+    const fn new() -> UnsafeCell<Self> {
         let mut event: ngx_event_t = unsafe { mem::zeroed() };
         event.handler = Some(Self::scheduler_event_handler);
 
-        Self {
+        UnsafeCell::new(Self {
             _ident: [
                 0, 0, 0, 0x4153594e, // ASYN
             ],
             event,
             queue: VecDeque::new(),
-        }
+        })
     }
 
     pub fn send(&mut self, runnable: Runnable) {
@@ -82,12 +82,15 @@ impl SchedulerInner {
         let mut runnables = {
             // SAFETY:
             // This handler always receives a non-null pointer to an event embedded into a
-            // SchedulerInner instance.
-            // We modify the contents of `UnsafeCell`, but we ensured that the access is unique due
-            // to being single-threaded and dropping the reference before we start processing queued
-            // runnables.
-            let this =
-                unsafe { ngx_container_of!(NonNull::new_unchecked(ev), Self, event).as_mut() };
+            // UnsafeCell<SchedulerInner> instance. We modify the contents of the `UnsafeCell`,
+            // but we ensured that:
+            //  - we access the cell correctly, as documented in
+            //    https://doc.rust-lang.org/stable/std/cell/struct.UnsafeCell.html#memory-layout
+            //  - the access is unique due to being single-threaded
+            //  - the reference is dropped before we start processing queued runnables.
+            let cell: NonNull<UnsafeCell<Self>> =
+                unsafe { ngx_container_of!(NonNull::new_unchecked(ev), Self, event).cast() };
+            let this = unsafe { &mut *UnsafeCell::raw_get(cell.as_ptr()) };
 
             ngx_log_debug!(
                 this.event.log,
