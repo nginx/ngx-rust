@@ -68,7 +68,7 @@ impl NgxStr {
     }
 
     /// Yields a `&str` slice if the [`NgxStr`] contains valid UTF-8.
-    pub fn to_str(&self) -> Result<&str, Utf8Error> {
+    pub fn as_str(&self) -> Result<&str, Utf8Error> {
         str::from_utf8(self.as_bytes())
     }
 

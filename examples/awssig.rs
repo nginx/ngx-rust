@@ -282,7 +282,7 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
     }
 
     let datetime = chrono::Utc::now();
-    let uri = match request.unparsed_uri().to_str() {
+    let uri = match request.unparsed_uri().as_str() {
         Ok(v) => format!("https://{}.{}{}", conf.s3_bucket, conf.s3_endpoint, v),
         Err(_) => return core::Status::NGX_DECLINED,
     };
