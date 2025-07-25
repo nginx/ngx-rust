@@ -286,8 +286,16 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
         // Copy only headers that will be used to sign the request
         let mut headers = HeaderMap::new();
         for (name, value) in request.headers_in_iterator() {
-            if name.to_lowercase() == "host" {
-                headers.insert(http::header::HOST, value.parse().unwrap());
+            if let Ok(name) = std::str::from_utf8(name) {
+                if name.to_lowercase() == "host" {
+                    if let Ok(value) = std::str::from_utf8(value) {
+                        headers.insert(http::header::HOST, value.parse().unwrap());
+                    } else {
+                        return core::Status::NGX_DECLINED;
+                    }
+                }
+            } else {
+                return core::Status::NGX_DECLINED;
             }
         }
         headers.insert("X-Amz-Date", datetime_now.parse().unwrap());
@@ -314,11 +322,27 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
     request.add_header_in("X-Amz-Date", datetime_now.as_str());
 
     // done signing, let's print values we have in request.headers_out, request.headers_in
+    fn dbg_bytes(val: &[u8]) -> String {
+        match std::str::from_utf8(val) {
+            Ok(val) => format!("{val:?}"),
+            Err(_) => format!("{val:?}"),
+        }
+    }
     for (name, value) in request.headers_out_iterator() {
-        ngx_log_debug_http!(request, "headers_out {}: {}", name, value);
+        ngx_log_debug_http!(
+            request,
+            "headers_out {}: {}",
+            dbg_bytes(name),
+            dbg_bytes(value)
+        );
     }
     for (name, value) in request.headers_in_iterator() {
-        ngx_log_debug_http!(request, "headers_in  {}: {}", name, value);
+        ngx_log_debug_http!(
+            request,
+            "headers_in  {}: {}",
+            dbg_bytes(name),
+            dbg_bytes(value)
+        );
     }
 
     core::Status::NGX_OK
