@@ -462,7 +462,7 @@ impl<'a> Iterator for NgxListIterator<'a> {
     // something like pub struct Header(ngx_table_elt_t);
     // then header would have key and value
 
-    type Item = (&'a str, &'a str);
+    type Item = (&'a [u8], &'a [u8]);
 
     fn next(&mut self) -> Option<Self::Item> {
         let part = self.part.as_mut()?;
@@ -478,7 +478,7 @@ impl<'a> Iterator for NgxListIterator<'a> {
         }
         let header = &part.arr[self.i];
         self.i += 1;
-        Some((header.key.to_str(), header.value.to_str()))
+        Some((header.key.as_bytes(), header.value.as_bytes()))
     }
 }
 
