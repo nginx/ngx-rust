@@ -465,20 +465,36 @@ impl<'a> Iterator for NgxListIterator<'a> {
     type Item = (&'a str, &'a str);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let part = self.part.as_mut()?;
-        if self.i >= part.arr.len() {
-            if let Some(next_part_raw) = unsafe { part.raw.next.as_ref() } {
-                // loop back
-                *part = next_part_raw.into();
-                self.i = 0;
-            } else {
-                self.part = None;
-                return None;
+        loop {
+            let part = self.part.as_mut()?;
+            if self.i >= part.arr.len() {
+                if let Some(next_part_raw) = unsafe { part.raw.next.as_ref() } {
+                    // loop back
+                    *part = next_part_raw.into();
+                    self.i = 0;
+                } else {
+                    self.part = None;
+                    return None;
+                }
+            }
+            let header = &part.arr[self.i];
+            self.i += 1;
+
+            let key_bytes = header.key.as_ref();
+            let value_bytes = header.value.as_ref();
+
+            match (
+                std::str::from_utf8(key_bytes),
+                std::str::from_utf8(value_bytes),
+            ) {
+                (Ok(key), Ok(value)) => {
+                    return Some((key, value));
+                }
+                _ => {
+                    continue;
+                }
             }
         }
-        let header = &part.arr[self.i];
-        self.i += 1;
-        Some((header.key.to_str(), header.value.to_str()))
     }
 }
 
