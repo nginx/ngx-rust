@@ -40,15 +40,14 @@ impl ngx_str_t {
         self.len == 0
     }
 
-    /// Convert the nginx string to a string slice (`&str`).
-    ///
-    /// # Panics
-    /// This function panics if the `ngx_str_t` is not valid UTF-8.
+    /// Returns the contents of this `ngx_str_t` a string slice (`&str`) if
+    /// the contents are utf-8 encoded.
     ///
     /// # Returns
-    /// A string slice (`&str`) representing the nginx string.
-    pub fn to_str(&self) -> &str {
-        str::from_utf8(self.as_bytes()).unwrap()
+    /// A string slice (`&str`) representing the nginx string, or else a
+    /// Utf8Error.
+    pub fn to_str(&self) -> Result<&str, str::Utf8Error> {
+        str::from_utf8(self.as_bytes())
     }
 
     /// Creates an empty `ngx_str_t` instance.

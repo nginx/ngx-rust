@@ -6,10 +6,10 @@ use ngx::ffi::{
     ngx_array_push, ngx_command_t, ngx_conf_t, ngx_http_handler_pt, ngx_http_module_t,
     ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t,
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE,
-    NGX_HTTP_SRV_CONF,
+    NGX_HTTP_SRV_CONF, NGX_LOG_EMERG,
 };
 use ngx::http::*;
-use ngx::{http_request_handler, ngx_log_debug_http, ngx_string};
+use ngx::{http_request_handler, ngx_conf_log_error, ngx_log_debug_http, ngx_string};
 
 struct Module;
 
@@ -176,7 +176,17 @@ extern "C" fn ngx_http_awssigv4_commands_set_enable(
     unsafe {
         let conf = &mut *(conf as *mut ModuleConfig);
         let args: &[ngx_str_t] = (*(*cf).args).as_slice();
-        let val = args[1].to_str();
+        let val = match args[1].to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                ngx_conf_log_error!(
+                    NGX_LOG_EMERG,
+                    cf,
+                    "`awssigv4` argument is not utf-8 encoded"
+                );
+                return ngx::core::NGX_CONF_ERROR;
+            }
+        };
 
         // set default value optionally
         conf.enable = false;
