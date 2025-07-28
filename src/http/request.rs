@@ -462,7 +462,7 @@ impl<'a> Iterator for NgxListIterator<'a> {
     // something like pub struct Header(ngx_table_elt_t);
     // then header would have key and value
 
-    type Item = (&'a str, &'a str);
+    type Item = (&'a NgxStr, &'a NgxStr);
 
     fn next(&mut self) -> Option<Self::Item> {
         let part = self.part.as_mut()?;
@@ -478,7 +478,12 @@ impl<'a> Iterator for NgxListIterator<'a> {
         }
         let header = &part.arr[self.i];
         self.i += 1;
-        Some((header.key.to_str(), header.value.to_str()))
+        unsafe {
+            Some((
+                NgxStr::from_ngx_str(header.key),
+                NgxStr::from_ngx_str(header.value),
+            ))
+        }
     }
 }
 
