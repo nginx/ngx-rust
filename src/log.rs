@@ -5,6 +5,9 @@ use core::ptr::NonNull;
 
 use crate::ffi::{self, ngx_err_t, ngx_log_t, ngx_uint_t, NGX_MAX_ERROR_STR};
 
+/// This constant is set to `true` if NGINX is compiled with debug logging (`--with-debug`).
+pub const DEBUG: bool = cfg!(ngx_feature = "debug");
+
 /// Size of the static buffer used to format log messages.
 ///
 /// Approximates the remaining space in `u_char[NGX_MAX_ERROR_STR]` after writing the standard
@@ -132,7 +135,7 @@ macro_rules! ngx_conf_log_error {
 macro_rules! ngx_log_debug {
     ( mask: $mask:expr, $log:expr, $($arg:tt)+ ) => {
         let log = $log;
-        if $crate::log::check_mask($mask, unsafe { (*log).log_level }) {
+        if $crate::log::DEBUG && $crate::log::check_mask($mask, unsafe { (*log).log_level }) {
             let mut buf =
                 [const { ::core::mem::MaybeUninit::<u8>::uninit() }; $crate::log::LOG_BUFFER_SIZE];
             let message = $crate::log::write_fmt(&mut buf, format_args!($($arg)+));
