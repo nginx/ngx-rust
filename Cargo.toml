@@ -18,6 +18,12 @@ version = "0.5.0"
 autoexamples = false
 categories = ["api-bindings", "network-programming"]
 description = "FFI bindings to NGINX"
+include = [
+    "/build.rs",
+    "/src",
+    "/*.md",
+    "LICENSE",
+]
 keywords = ["nginx", "module", "sys"]
 edition.workspace = true
 license.workspace = true
