@@ -3,10 +3,6 @@
 [![Project Status: Concept – Minimal or no implementation has been done yet, or the repository is only intended to be a limited example, demo, or proof-of-concept.](https://www.repostatus.org/badges/latest/concept.svg)](https://www.repostatus.org/#concept)
 [![Community Support](https://badgen.net/badge/support/community/cyan?icon=awesome)](https://github.com/nginx/ngx-rust/discussions)
 
-
-## Project status
-This project is still a work in progress and not production ready.
-
 # Description
 
 This project provides Rust SDK interfaces to the [NGINX](https://nginx.com) proxy allowing the creation of NGINX
