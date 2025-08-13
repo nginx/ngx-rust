@@ -1,11 +1,13 @@
 [![Rust](https://github.com/nginx/ngx-rust/actions/workflows/ci.yaml/badge.svg)](https://github.com/nginx/ngx-rust/actions/workflows/ci.yaml)
 [![crates.io](https://img.shields.io/crates/v/ngx.svg)](https://crates.io/crates/ngx)
-[![Project Status: Concept – Minimal or no implementation has been done yet, or the repository is only intended to be a limited example, demo, or proof-of-concept.](https://www.repostatus.org/badges/latest/concept.svg)](https://www.repostatus.org/#concept)
+[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 [![Community Support](https://badgen.net/badge/support/community/cyan?icon=awesome)](https://github.com/nginx/ngx-rust/discussions)
 
 
 ## Project status
-This project is still a work in progress and not production ready.
+
+This project is in active development. It is stable enough to be used in our
+own products, but the APIs are not stabilized and breaking changes are expected.
 
 # Description
 
