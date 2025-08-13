@@ -167,7 +167,8 @@ This project uses some great work from [dcoles/nginx-rs](https://github.com/dcol
 
 ## Projects using the SDK
 
-[ngx-strict-sni](https://github.com/JyJyJcr/ngx-strict-sni) - Strict SNI validator for Nginx
+- [ngx-strict-sni](https://github.com/JyJyJcr/ngx-strict-sni) - Strict SNI validator for Nginx
+- [nginx-acme](https://github.com/nginx/nginx-acme) - ACMEv2 client implementation
 
 ## License
 
