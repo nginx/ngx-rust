@@ -1,6 +1,6 @@
 [package]
 name = "nginx-sys"
-version = "0.5.0"
+version = "0.5.0-beta"
 categories = ["external-ffi-bindings"]
 description = "FFI bindings to NGINX"
 keywords = ["nginx", "ffi", "sys"]

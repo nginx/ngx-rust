@@ -14,7 +14,7 @@ rust-version = "1.81.0"
 
 [package]
 name = "ngx"
-version = "0.5.0"
+version = "0.5.0-beta"
 autoexamples = false
 categories = ["api-bindings", "network-programming"]
 description = "FFI bindings to NGINX"
@@ -40,7 +40,7 @@ targets = []
 allocator-api2 = { version = "0.2.21", default-features = false }
 async-task = { version = "4.7.1", optional = true }
 lock_api = "0.4.13"
-nginx-sys = { path = "nginx-sys", default-features=false, version = "0.5.0"}
+nginx-sys = { path = "nginx-sys", version = "0.5.0-beta"}
 pin-project-lite = { version = "0.2.16", optional = true }
 
 [features]

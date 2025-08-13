@@ -2,6 +2,96 @@
 
 All notable changes to this project will be documented in this file.
 
+## Release v0.5.0-beta
+
+### Build experience
+
+In this release, we shifted the focus to an integration into the NGINX build
+process. 
+
+The default set of features now requires providing a preconfigured NGINX source
+tree with `NGINX_SOURCE_DIR` and `NGINX_BUILD_DIR` variables ([#67], [#124]).
+
+The option to build a copy of NGINX as a part of the module process was
+preserved as a feature flag `vendored` and no longer requires downloading
+sources from the network ([#160]).
+We encourage you to limit use of this feature to testing only.
+
+The [`examples`](./examples/) directory provides `config`, `config.make` and
+`auto/rust` scripts to add a Rust-based module to the nginx build, linked
+statically with `--add-module=` or dynamically with `--add-dynamic-module=`.
+[nginx-acme] offers another, more complete example ([#67], [#95], [#124],
+[#154], [#176]).
+
+In addition, we now have a proper detection of the features available in the
+build of NGINX ([#97]). See [build.rs](./build.rs) for the necessary setup for
+your project.
+
+[nginx-acme]: https://github.com/nginx/nginx-acme
+[#67]:  https://github.com/nginx/ngx-rust/pull/67
+[#95]:  https://github.com/nginx/ngx-rust/pull/95
+[#97]:  https://github.com/nginx/ngx-rust/pull/97
+[#124]: https://github.com/nginx/ngx-rust/pull/124
+[#154]: https://github.com/nginx/ngx-rust/pull/154
+[#160]: https://github.com/nginx/ngx-rust/pull/160
+[#176]: https://github.com/nginx/ngx-rust/pull/176
+
+### Allocators
+
+`ngx` now offers custom allocator support based on the [allocator-api2] crate.
+The `ngx::core::Pool` and `ngx::core::SlabPool` can be used for failible
+allocations within the NGINX pools and shared zones correspondingly
+([#164], [#171]).
+
+Most of the crates with [allocator-api2 support] are compatible with this
+implementation. We also provide wrappers for common data structures implemented
+in NGINX in [`ngx::collections`](./src/collections/) ([#164], [#181]).
+
+[allocator-api2]: https://crates.io/crates/allocator_api2
+[allocator-api2 support]: https://crates.io/crates/allocator_api2/reverse_dependencies
+[#164]: https://github.com/nginx/ngx-rust/pull/164
+[#171]: https://github.com/nginx/ngx-rust/pull/171
+[#181]: https://github.com/nginx/ngx-rust/pull/181
+
+
+### Other
+
+* We audited the code and fixed or removed most of the methods that made wrong
+  assumptions and could panic or crash ([#91], [#152], [#183]).
+* `no_std` build support ([#111]).
+* Logging API improvements ([#113], [#187])
+* The SDK and the example modules can be built and are tested in CI on Windows
+  ([#124], [#161]). No further porting or testing work was done.
+* Reimplementations for `nginx-sys` methods and macros that cannot be translated
+  with bindgen ([#131], [#162], [#167])
+* Improved API for module configuration access ([#142]).
+* Initial work on the NGINX async runtime ([#170])
+* The default branch was renamed to `main`.
+
+[#91]:  https://github.com/nginx/ngx-rust/pull/91
+[#111]: https://github.com/nginx/ngx-rust/pull/111
+[#113]: https://github.com/nginx/ngx-rust/pull/113
+[#131]: https://github.com/nginx/ngx-rust/pull/131
+[#142]: https://github.com/nginx/ngx-rust/pull/142
+[#152]: https://github.com/nginx/ngx-rust/pull/152
+[#161]: https://github.com/nginx/ngx-rust/pull/161
+[#162]: https://github.com/nginx/ngx-rust/pull/162
+[#167]: https://github.com/nginx/ngx-rust/pull/167
+[#170]: https://github.com/nginx/ngx-rust/pull/170
+[#183]: https://github.com/nginx/ngx-rust/pull/183
+[#187]: https://github.com/nginx/ngx-rust/pull/187
+
+### Supported versions
+
+The minimum supported Rust version is 1.81.0. The version was chosen to support
+the packaged Rust toolchain in the recent versions of popular Linux and BSD
+distributions.
+
+The minimum supported NGINX version is 1.22. The bindings may compile with an
+older version of NGINX, but we do not test that regularly.
+
+Full changelog: [v0.4.1..v0.5.0-beta](https://github.com/nginx/ngx-rust/compare/v0.4.1...v0.5.0-beta)
+
 ## Release v0.4.1
  * release:     ngx 0.4.1                                                       (9d2ce0d)
  * release:     nginx-sys 0.2.1                                                 (89eb277)
