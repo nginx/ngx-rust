@@ -60,7 +60,7 @@ By default, this will use the latest stable release of NGINX and require
 system-wide installation of build dependencies (OpenSSL, PCRE2, Zlib).
 
 The behavior of vendored builds can be customized with environment variables,
-as documented in the [nginx-src](./nginx-src/) crate README.
+as documented in the [nginx-src] crate README.
 
 **NOTE**: We recommend to build the module binaries against the exact source and
 configuration of the NGINX build that you are planning to use in production,
@@ -70,7 +70,21 @@ and that is unlikely to be possible with the vendored source.
 and some OS distributions are known to ship nginx packages with API-breaking
 patches applied.
 
-### Dependencies
+[nginx-src]: https://docs.rs/nginx-src/
+
+## Cargo features
+
+- `alloc` - **Enabled** by default. This provides APIs that require allocations
+  via the `alloc` crate.
+- `async` - Enables a minimal async runtime built on top of the NGINX event loop.
+- `serde` - Enables serialization support for some of the provided and
+  re-exported types.
+- `std` - **Enabled** by default. This provides APIs that require the standard
+  library.
+- `vendored`: Enables the build scripts to build a copy of nginx source and link
+  against it. See the [nginx-src] crate documentation for additional details.
+
+## Dependencies
 
 The following dependencies are required to build a Rust NGINX module on Linux
 or BSD platform:

@@ -45,24 +45,24 @@ pin-project-lite = { version = "0.2.16", optional = true }
 
 [features]
 default = ["std"]
+# Enables a minimal async runtime built on top of the NGINX event loop.
 async = [
     "alloc",
     "dep:async-task",
     "dep:pin-project-lite",
 ]
-# Enables the components using memory allocation.
-# If no `std` flag, `alloc` crate is internally used instead. This flag is mainly for `no_std` build.
+# Provides APIs that require allocations via the `alloc` crate.
 alloc = ["allocator-api2/alloc"]
-# Enables serde support for some of the provided types.
+# Enables serialization support for some of the provided and re-exported types.
 serde = [
     "allocator-api2/serde",
 ]
-# Enables the components using `std` crate.
+# Provides APIs that require the standard library.
 std = [
     "alloc",
     "allocator-api2/std"
 ]
-# Build our own copy of the NGINX from `nginx-src` crate.
+# Enables the build scripts to build a copy of nginx source and link against it.
 vendored = ["nginx-sys/vendored"]
 
 [badges]
