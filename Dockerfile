@@ -1,10 +1,13 @@
 ARG NGX_VERSION=1.28.0
-ARG NGX_DEBUG=false
+# NGINX official images are available for one specific release of Debian,
+# e.g `nginx:1.28.0-bookworm`. Please see the list of tags on docker hub
+# if you need to change NGX_VERSION.
+ARG DEBIAN_RELEASE=bookworm
 
 # --- builder: build all examples
-FROM rust:slim-bullseye AS build
+FROM rust:slim-${DEBIAN_RELEASE} AS build
 ARG NGX_VERSION
-ARG NGX_DEBUG
+ARG NGX_CONFIGURE_ARGS=
 WORKDIR /project
 RUN --mount=type=cache,target=/var/cache/apt <<EOF
     set -eux
@@ -12,7 +15,9 @@ RUN --mount=type=cache,target=/var/cache/apt <<EOF
     apt-get -qq update
     apt-get -qq install --yes --no-install-recommends --no-install-suggests \
         libclang-dev \
+        libpcre2-dev \
         libssl-dev \
+        zlib1g-dev \
         pkg-config \
         git \
         grep \
@@ -36,8 +41,7 @@ RUN --mount=type=cache,id=target,target=target \
     mv /project/target/release/examples/*.so /out
 
 # --- copy dynamic modules into official nginx image from builderclear
-FROM nginx:${NGX_VERSION}
-ARG NGX_VERSION
+FROM nginx:${NGX_VERSION}-${DEBIAN_RELEASE}
 
 RUN mkdir -p /etc/nginx/examples
 
