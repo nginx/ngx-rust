@@ -67,6 +67,54 @@ unsafe impl Allocator for Pool {
             ngx_pfree(self.0.as_ptr(), ptr.as_ptr().cast());
         }
     }
+
+    unsafe fn grow(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        debug_assert!(
+            new_layout.size() >= old_layout.size(),
+            "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
+        );
+        self.resize_in_place(ptr, old_layout, new_layout)
+    }
+
+    unsafe fn grow_zeroed(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        debug_assert!(
+            new_layout.size() >= old_layout.size(),
+            "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
+        );
+        self.resize_in_place(ptr, old_layout, new_layout)
+            .inspect(|new_ptr| {
+                unsafe {
+                    ptr::write_bytes(
+                        new_ptr.as_ptr().cast::<u8>().byte_add(new_layout.size()),
+                        0,
+                        old_layout.size() - new_layout.size(),
+                    )
+                };
+            })
+    }
+
+    unsafe fn shrink(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        debug_assert!(
+            new_layout.size() <= old_layout.size(),
+            "`new_layout.size()` must be smaller than or equal to `old_layout.size()`"
+        );
+        self.resize_in_place(ptr, old_layout, new_layout)
+    }
 }
 
 impl AsRef<ngx_pool_t> for Pool {
@@ -227,6 +275,42 @@ impl Pool {
                 return ptr::null_mut();
             };
             p
+        }
+    }
+
+    /// Resizes a memory allocation in place if possible.
+    ///
+    /// If resizing is requested for the last allocation in the pool, it may be
+    /// possible to adjust pool data and avoid any real allocations.
+    ///
+    /// # Safety
+    /// This function is marked as unsafe because it involves raw pointer manipulation.
+    unsafe fn resize_in_place(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        if ptr.byte_add(old_layout.size()).as_ptr() == self.as_ref().d.last
+            && ptr.byte_add(new_layout.size()).as_ptr() <= self.as_ref().d.end
+            && ptr.align_offset(new_layout.align()) == 0
+        {
+            let pool = self.0.as_ptr();
+            unsafe {
+                (*pool).d.last = (*pool)
+                    .d
+                    .last
+                    .byte_offset(new_layout.size() as isize - old_layout.size() as isize)
+            };
+            Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
+        } else {
+            let size = core::cmp::min(old_layout.size(), new_layout.size());
+            let new_ptr = self.allocate(new_layout)?;
+            unsafe {
+                ptr::copy_nonoverlapping(ptr.as_ptr(), new_ptr.as_ptr().cast(), size);
+                self.deallocate(ptr, old_layout);
+            }
+            Ok(new_ptr)
         }
     }
 }
