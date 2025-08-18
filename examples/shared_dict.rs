@@ -198,7 +198,7 @@ extern "C" fn ngx_http_shared_dict_add_variable(
 ) -> *mut c_char {
     // SAFETY: configuration handlers always receive a valid `cf` pointer.
     let cf = unsafe { cf.as_mut().unwrap() };
-    let mut pool = unsafe { Pool::from_ngx_pool(cf.pool) };
+    let pool = unsafe { Pool::from_ngx_pool(cf.pool) };
 
     let key = pool.calloc_type::<ngx_http_complex_value_t>();
     if key.is_null() {

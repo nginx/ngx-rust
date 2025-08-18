@@ -101,8 +101,8 @@ impl Pool {
     ///
     /// Returns `Some(TemporaryBuffer)` if the buffer is successfully created, or `None` if
     /// allocation fails.
-    pub fn create_buffer(&mut self, size: usize) -> Option<TemporaryBuffer> {
-        let buf = unsafe { ngx_create_temp_buf(self.as_mut(), size) };
+    pub fn create_buffer(&self, size: usize) -> Option<TemporaryBuffer> {
+        let buf = unsafe { ngx_create_temp_buf(self.0.as_ptr(), size) };
         if buf.is_null() {
             return None;
         }
@@ -114,7 +114,7 @@ impl Pool {
     ///
     /// Returns `Some(TemporaryBuffer)` if the buffer is successfully created, or `None` if
     /// allocation fails.
-    pub fn create_buffer_from_str(&mut self, str: &str) -> Option<TemporaryBuffer> {
+    pub fn create_buffer_from_str(&self, str: &str) -> Option<TemporaryBuffer> {
         let mut buffer = self.create_buffer(str.len())?;
         unsafe {
             let buf = buffer.as_ngx_buf_mut();
@@ -128,7 +128,7 @@ impl Pool {
     ///
     /// Returns `Some(MemoryBuffer)` if the buffer is successfully created, or `None` if allocation
     /// fails.
-    pub fn create_buffer_from_static_str(&mut self, str: &'static str) -> Option<MemoryBuffer> {
+    pub fn create_buffer_from_static_str(&self, str: &'static str) -> Option<MemoryBuffer> {
         let buf = self.calloc_type::<ngx_buf_t>();
         if buf.is_null() {
             return None;
@@ -156,7 +156,7 @@ impl Pool {
     ///
     /// # Safety
     /// This function is marked as unsafe because it involves raw pointer manipulation.
-    unsafe fn add_cleanup_for_value<T>(&mut self, value: *mut T) -> Result<(), ()> {
+    unsafe fn add_cleanup_for_value<T>(&self, value: *mut T) -> Result<(), ()> {
         let cln = ngx_pool_cleanup_add(self.0.as_ptr(), 0);
         if cln.is_null() {
             return Err(());
@@ -171,7 +171,7 @@ impl Pool {
     /// The resulting pointer is aligned to a platform word size.
     ///
     /// Returns a raw pointer to the allocated memory.
-    pub fn alloc(&mut self, size: usize) -> *mut c_void {
+    pub fn alloc(&self, size: usize) -> *mut c_void {
         unsafe { ngx_palloc(self.0.as_ptr(), size) }
     }
 
@@ -179,7 +179,7 @@ impl Pool {
     /// The resulting pointer is aligned to a platform word size.
     ///
     /// Returns a typed pointer to the allocated memory.
-    pub fn alloc_type<T: Copy>(&mut self) -> *mut T {
+    pub fn alloc_type<T: Copy>(&self) -> *mut T {
         self.alloc(mem::size_of::<T>()) as *mut T
     }
 
@@ -187,7 +187,7 @@ impl Pool {
     /// The resulting pointer is aligned to a platform word size.
     ///
     /// Returns a raw pointer to the allocated memory.
-    pub fn calloc(&mut self, size: usize) -> *mut c_void {
+    pub fn calloc(&self, size: usize) -> *mut c_void {
         unsafe { ngx_pcalloc(self.0.as_ptr(), size) }
     }
 
@@ -195,21 +195,21 @@ impl Pool {
     /// The resulting pointer is aligned to a platform word size.
     ///
     /// Returns a typed pointer to the allocated memory.
-    pub fn calloc_type<T: Copy>(&mut self) -> *mut T {
+    pub fn calloc_type<T: Copy>(&self) -> *mut T {
         self.calloc(mem::size_of::<T>()) as *mut T
     }
 
     /// Allocates unaligned memory from the pool of the specified size.
     ///
     /// Returns a raw pointer to the allocated memory.
-    pub fn alloc_unaligned(&mut self, size: usize) -> *mut c_void {
+    pub fn alloc_unaligned(&self, size: usize) -> *mut c_void {
         unsafe { ngx_pnalloc(self.0.as_ptr(), size) }
     }
 
     /// Allocates unaligned memory for a type from the pool.
     ///
     /// Returns a typed pointer to the allocated memory.
-    pub fn alloc_type_unaligned<T: Copy>(&mut self) -> *mut T {
+    pub fn alloc_type_unaligned<T: Copy>(&self) -> *mut T {
         self.alloc_unaligned(mem::size_of::<T>()) as *mut T
     }
 
@@ -218,7 +218,7 @@ impl Pool {
     ///
     /// Returns a typed pointer to the allocated memory if successful, or a null pointer if
     /// allocation or cleanup handler addition fails.
-    pub fn allocate<T>(&mut self, value: T) -> *mut T {
+    pub fn allocate<T>(&self, value: T) -> *mut T {
         unsafe {
             let p = self.alloc(mem::size_of::<T>()) as *mut T;
             ptr::write(p, value);

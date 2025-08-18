@@ -77,7 +77,7 @@ pub trait HttpModule {
         Self: super::HttpModuleMainConf,
         Self::MainConf: Default,
     {
-        let mut pool = Pool::from_ngx_pool((*cf).pool);
+        let pool = Pool::from_ngx_pool((*cf).pool);
         pool.allocate::<Self::MainConf>(Default::default()) as *mut c_void
     }
 
@@ -102,7 +102,7 @@ pub trait HttpModule {
         Self: super::HttpModuleServerConf,
         Self::ServerConf: Default,
     {
-        let mut pool = Pool::from_ngx_pool((*cf).pool);
+        let pool = Pool::from_ngx_pool((*cf).pool);
         pool.allocate::<Self::ServerConf>(Default::default()) as *mut c_void
     }
 
@@ -136,7 +136,7 @@ pub trait HttpModule {
         Self: super::HttpModuleLocationConf,
         Self::LocationConf: Default,
     {
-        let mut pool = Pool::from_ngx_pool((*cf).pool);
+        let pool = Pool::from_ngx_pool((*cf).pool);
         pool.allocate::<Self::LocationConf>(Default::default()) as *mut c_void
     }
 

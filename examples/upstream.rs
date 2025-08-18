@@ -311,7 +311,7 @@ impl HttpModule for Module {
     }
 
     unsafe extern "C" fn create_srv_conf(cf: *mut ngx_conf_t) -> *mut c_void {
-        let mut pool = Pool::from_ngx_pool((*cf).pool);
+        let pool = Pool::from_ngx_pool((*cf).pool);
         let conf = pool.alloc_type::<SrvConfig>();
         if conf.is_null() {
             ngx_conf_log_error!(
