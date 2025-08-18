@@ -145,6 +145,12 @@ impl Pool {
         Pool(NonNull::new_unchecked(pool))
     }
 
+    /// Expose the underlying `ngx_pool_t` pointer, for use with `ngx::ffi`
+    /// functions.
+    pub fn as_ptr(&self) -> *mut ngx_pool_t {
+        self.0.as_ptr()
+    }
+
     /// Creates a buffer of the specified size in the memory pool.
     ///
     /// Returns `Some(TemporaryBuffer)` if the buffer is successfully created, or `None` if

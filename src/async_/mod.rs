@@ -2,5 +2,7 @@
 pub use self::sleep::{sleep, Sleep};
 pub use self::spawn::{spawn, Task};
 
+pub mod resolver;
+
 mod sleep;
 mod spawn;
