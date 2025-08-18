@@ -39,7 +39,7 @@ http {
         server_name  localhost;
 
         location / {
-            async on;
+            tokio on;
         }
     }
 }
@@ -51,6 +51,6 @@ $t->run();
 
 ###############################################################################
 
-like(http_get('/index.html'), qr/X-Async-Time:/, 'async handler');
+like(http_get('/index.html'), qr/X-Tokio-Time:/, 'tokio handler');
 
 ###############################################################################

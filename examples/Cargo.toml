@@ -47,8 +47,8 @@ path = "upstream.rs"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "async"
-path = "async.rs"
+name = "tokio"
+path = "tokio.rs"
 crate-type = ["cdylib"]
 
 [[example]]

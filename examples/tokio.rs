@@ -20,7 +20,7 @@ struct Module;
 
 impl http::HttpModule for Module {
     fn module() -> &'static ngx_module_t {
-        unsafe { &*::core::ptr::addr_of!(ngx_http_async_module) }
+        unsafe { &*::core::ptr::addr_of!(ngx_http_tokio_module) }
     }
 
     unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
@@ -35,7 +35,7 @@ impl http::HttpModule for Module {
             return core::Status::NGX_ERROR.into();
         }
         // set an Access phase handler
-        *h = Some(async_access_handler);
+        *h = Some(tokio_access_handler);
         core::Status::NGX_OK.into()
     }
 }
@@ -49,11 +49,11 @@ unsafe impl HttpModuleLocationConf for Module {
     type LocationConf = ModuleConfig;
 }
 
-static mut NGX_HTTP_ASYNC_COMMANDS: [ngx_command_t; 2] = [
+static mut NGX_HTTP_TOKIO_COMMANDS: [ngx_command_t; 2] = [
     ngx_command_t {
-        name: ngx_string!("async"),
+        name: ngx_string!("tokio"),
         type_: (NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1) as ngx_uint_t,
-        set: Some(ngx_http_async_commands_set_enable),
+        set: Some(ngx_http_tokio_commands_set_enable),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
         post: std::ptr::null_mut(),
@@ -61,7 +61,7 @@ static mut NGX_HTTP_ASYNC_COMMANDS: [ngx_command_t; 2] = [
     ngx_command_t::empty(),
 ];
 
-static NGX_HTTP_ASYNC_MODULE_CTX: ngx_http_module_t = ngx_http_module_t {
+static NGX_HTTP_TOKIO_MODULE_CTX: ngx_http_module_t = ngx_http_module_t {
     preconfiguration: Some(Module::preconfiguration),
     postconfiguration: Some(Module::postconfiguration),
     create_main_conf: None,
@@ -75,14 +75,14 @@ static NGX_HTTP_ASYNC_MODULE_CTX: ngx_http_module_t = ngx_http_module_t {
 // Generate the `ngx_modules` table with exported modules.
 // This feature is required to build a 'cdylib' dynamic module outside of the NGINX buildsystem.
 #[cfg(feature = "export-modules")]
-ngx::ngx_modules!(ngx_http_async_module);
+ngx::ngx_modules!(ngx_http_tokio_module);
 
 #[used]
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), no_mangle)]
-pub static mut ngx_http_async_module: ngx_module_t = ngx_module_t {
-    ctx: std::ptr::addr_of!(NGX_HTTP_ASYNC_MODULE_CTX) as _,
-    commands: unsafe { &NGX_HTTP_ASYNC_COMMANDS[0] as *const _ as *mut _ },
+pub static mut ngx_http_tokio_module: ngx_module_t = ngx_module_t {
+    ctx: std::ptr::addr_of!(NGX_HTTP_TOKIO_MODULE_CTX) as _,
+    commands: unsafe { &NGX_HTTP_TOKIO_COMMANDS[0] as *const _ as *mut _ },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
 };
@@ -96,12 +96,12 @@ impl http::Merge for ModuleConfig {
     }
 }
 
-unsafe extern "C" fn check_async_work_done(event: *mut ngx_event_t) {
+unsafe extern "C" fn check_tokio_work_done(event: *mut ngx_event_t) {
     let ctx = ngx::ngx_container_of!(event, RequestCTX, event);
     let c: *mut ngx_connection_t = (*event).data.cast();
 
     if (*ctx).done.load(Ordering::Relaxed) {
-        // Triggering async_access_handler again
+        // Triggering tokio_access_handler again
         ngx_post_event((*c).write, addr_of_mut!(ngx_posted_events));
     } else {
         // this doesn't have have good performance but works as a simple thread-safe example and
@@ -139,17 +139,17 @@ impl Drop for RequestCTX {
     }
 }
 
-http_request_handler!(async_access_handler, |request: &mut http::Request| {
+http_request_handler!(tokio_access_handler, |request: &mut http::Request| {
     let co = Module::location_conf(request).expect("module config is none");
 
-    ngx_log_debug_http!(request, "async module enabled: {}", co.enable);
+    ngx_log_debug_http!(request, "tokio module enabled: {}", co.enable);
 
     if !co.enable {
         return core::Status::NGX_DECLINED;
     }
 
     if let Some(ctx) =
-        unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_async_module)) }
+        unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_tokio_module)) }
     {
         if !ctx.done.load(Ordering::Relaxed) {
             return core::Status::NGX_AGAIN;
@@ -162,10 +162,10 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
     if ctx.is_null() {
         return core::Status::NGX_ERROR;
     }
-    request.set_module_ctx(ctx.cast(), unsafe { &*addr_of!(ngx_http_async_module) });
+    request.set_module_ctx(ctx.cast(), unsafe { &*addr_of!(ngx_http_tokio_module) });
 
     let ctx = unsafe { &mut *ctx };
-    ctx.event.handler = Some(check_async_work_done);
+    ctx.event.handler = Some(check_tokio_work_done);
     ctx.event.data = request.connection().cast();
     ctx.event.log = unsafe { (*request.connection()).log };
     unsafe { ngx_post_event(&mut ctx.event, addr_of_mut!(ngx_posted_next_events)) };
@@ -174,7 +174,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
     let req = AtomicPtr::new(request.into());
     let done_flag = ctx.done.clone();
 
-    let rt = ngx_http_async_runtime();
+    let rt = ngx_http_tokio_runtime();
     ctx.task = Some(rt.spawn(async move {
         let start = Instant::now();
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -183,7 +183,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
         // but this is just an example. proper way would be storing these headers in the request ctx
         // and apply them when we get back to the nginx thread.
         req.add_header_out(
-            "X-Async-Time",
+            "X-Tokio-Time",
             start.elapsed().as_millis().to_string().as_str(),
         );
 
@@ -197,7 +197,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
     core::Status::NGX_AGAIN
 });
 
-extern "C" fn ngx_http_async_commands_set_enable(
+extern "C" fn ngx_http_tokio_commands_set_enable(
     cf: *mut ngx_conf_t,
     _cmd: *mut ngx_command_t,
     conf: *mut c_void,
@@ -208,7 +208,7 @@ extern "C" fn ngx_http_async_commands_set_enable(
         let val = match args[1].to_str() {
             Ok(s) => s,
             Err(_) => {
-                ngx_conf_log_error!(NGX_LOG_EMERG, cf, "`async` argument is not utf-8 encoded");
+                ngx_conf_log_error!(NGX_LOG_EMERG, cf, "`tokio` argument is not utf-8 encoded");
                 return ngx::core::NGX_CONF_ERROR;
             }
         };
@@ -226,7 +226,7 @@ extern "C" fn ngx_http_async_commands_set_enable(
     ngx::core::NGX_CONF_OK
 }
 
-fn ngx_http_async_runtime() -> &'static Runtime {
+fn ngx_http_tokio_runtime() -> &'static Runtime {
     // Should not be called from the master process
     assert_ne!(
         unsafe { ngx::ffi::ngx_process },
