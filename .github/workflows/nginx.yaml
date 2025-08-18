@@ -185,9 +185,8 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            nginx/objs/**/CACHEDIR.TAG
-            nginx/objs/**/ngx-debug
-            nginx/objs/**/ngx-release
+            # Windows nmake implementation doesn't support .PHONY. Don't cache
+            # anything make creates because it might not rebuild correctly
           key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-nginx-
 
