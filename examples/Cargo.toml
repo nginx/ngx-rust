@@ -25,6 +25,13 @@ idna_adapter = "=1.1.0"
 libc = "0.2.140"
 tokio = { version = "1.33.0", features = ["full"] }
 
+
+[[example]]
+name = "async"
+path = "async.rs"
+crate-type = ["cdylib"]
+required-features = [ "async" ]
+
 [[example]]
 name = "curl"
 path = "curl.rs"
@@ -47,8 +54,8 @@ path = "upstream.rs"
 crate-type = ["cdylib"]
 
 [[example]]
-name = "async"
-path = "async.rs"
+name = "tokio"
+path = "tokio.rs"
 crate-type = ["cdylib"]
 
 [[example]]
@@ -65,3 +72,4 @@ default = ["export-modules", "ngx/vendored"]
 # See https://github.com/rust-lang/rust/issues/20267
 export-modules = []
 linux = []
+async = [ "ngx/async" ]
