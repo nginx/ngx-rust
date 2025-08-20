@@ -25,3 +25,6 @@ duct = "1"
 flate2 = "1"
 tar = "0.4"
 ureq = "3.0.10"
+
+[lints]
+workspace = true

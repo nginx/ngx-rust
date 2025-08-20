@@ -295,11 +295,11 @@ impl HttpRequestHandler for AwsSigV4HeaderHandler {
             for (name, value) in request.headers_in_iterator() {
                 if let Ok(name) = name.to_str() {
                     if name.to_lowercase() == "host" {
-                        if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
-                            headers.insert(http::header::HOST, value);
-                        } else {
+                        let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) else {
                             return core::Status::NGX_DECLINED;
-                        }
+                        };
+
+                        headers.insert(http::header::HOST, value);
                     }
                 } else {
                     return core::Status::NGX_DECLINED;

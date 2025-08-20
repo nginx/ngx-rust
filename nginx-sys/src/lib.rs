@@ -64,7 +64,7 @@ impl ngx_array_t {
         } else {
             // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
             // elements of size `size`
-            core::slice::from_raw_parts(self.elts.cast(), self.nelts)
+            unsafe { core::slice::from_raw_parts(self.elts.cast(), self.nelts) }
         }
     }
 
@@ -85,7 +85,7 @@ impl ngx_array_t {
         } else {
             // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
             // elements of size `size`
-            core::slice::from_raw_parts_mut(self.elts.cast(), self.nelts)
+            unsafe { core::slice::from_raw_parts_mut(self.elts.cast(), self.nelts) }
         }
     }
 }
@@ -326,15 +326,15 @@ pub unsafe fn add_to_ngx_table(
     key: impl AsRef<[u8]>,
     value: impl AsRef<[u8]>,
 ) -> Option<()> {
-    if let Some(table) = table.as_mut() {
+    if let Some(table) = unsafe { table.as_mut() } {
         let key = key.as_ref();
-        table.key = ngx_str_t::from_bytes(pool, key)?;
-        table.value = ngx_str_t::from_bytes(pool, value.as_ref())?;
-        table.lowcase_key = ngx_pnalloc(pool, table.key.len).cast();
+        table.key = unsafe { ngx_str_t::from_bytes(pool, key)? };
+        table.value = unsafe { ngx_str_t::from_bytes(pool, value.as_ref())? };
+        table.lowcase_key = unsafe { ngx_pnalloc(pool, table.key.len).cast() };
         if table.lowcase_key.is_null() {
             return None;
         }
-        table.hash = ngx_hash_strlow(table.lowcase_key, table.key.data, table.key.len);
+        table.hash = unsafe { ngx_hash_strlow(table.lowcase_key, table.key.data, table.key.len) };
         return Some(());
     }
     None

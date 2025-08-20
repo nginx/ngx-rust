@@ -17,8 +17,8 @@ use crate::http::HttpPhase;
 macro_rules! http_request_handler {
     ( $name: ident, $handler: expr ) => {
         extern "C" fn $name(r: *mut $crate::ffi::ngx_http_request_t) -> $crate::ffi::ngx_int_t {
-            let status: $crate::core::Status =
-                $handler(unsafe { &mut $crate::http::Request::from_ngx_http_request(r) });
+            let request = unsafe { $crate::http::Request::from_ngx_http_request(r) };
+            let status: $crate::core::Status = $handler(request);
             status.0
         }
     };
@@ -53,11 +53,8 @@ macro_rules! http_variable_set {
             v: *mut $crate::ffi::ngx_variable_value_t,
             data: usize,
         ) {
-            $handler(
-                unsafe { &mut $crate::http::Request::from_ngx_http_request(r) },
-                v,
-                data,
-            );
+            let request = unsafe { $crate::http::Request::from_ngx_http_request(r) };
+            $handler(request, v, data);
         }
     };
 }
@@ -76,11 +73,8 @@ macro_rules! http_variable_get {
             v: *mut $crate::ffi::ngx_variable_value_t,
             data: usize,
         ) -> $crate::ffi::ngx_int_t {
-            let status: $crate::core::Status = $handler(
-                unsafe { &mut $crate::http::Request::from_ngx_http_request(r) },
-                v,
-                data,
-            );
+            let request = unsafe { $crate::http::Request::from_ngx_http_request(r) };
+            let status: $crate::core::Status = $handler(request, v, data);
             status.0
         }
     };
@@ -199,7 +193,7 @@ impl Request {
     /// The caller has provided a valid non-null pointer to a valid `ngx_http_request_t`
     /// which shares the same representation as `Request`.
     pub unsafe fn from_ngx_http_request<'a>(r: *mut ngx_http_request_t) -> &'a mut Request {
-        &mut *r.cast::<Request>()
+        unsafe { &mut *r.cast::<Request>() }
     }
 
     /// Is this the main request (as opposed to a subrequest)?
@@ -465,23 +459,29 @@ impl Request {
 impl crate::http::HttpModuleConfExt for Request {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        // SAFETY: main_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
-        // explicitly initialized by the module
-        NonNull::new((*self.0.main_conf.add(module.ctx_index)).cast())
+        unsafe {
+            // SAFETY: main_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+            // explicitly initialized by the module
+            NonNull::new((*self.0.main_conf.add(module.ctx_index)).cast())
+        }
     }
 
     #[inline]
     unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        // SAFETY: srv_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
-        // explicitly initialized by the module
-        NonNull::new((*self.0.srv_conf.add(module.ctx_index)).cast())
+        unsafe {
+            // SAFETY: srv_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+            // explicitly initialized by the module
+            NonNull::new((*self.0.srv_conf.add(module.ctx_index)).cast())
+        }
     }
 
     #[inline]
     unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        // SAFETY: loc_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
-        // explicitly initialized by the module
-        NonNull::new((*self.0.loc_conf.add(module.ctx_index)).cast())
+        unsafe {
+            // SAFETY: loc_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
+            // explicitly initialized by the module
+            NonNull::new((*self.0.loc_conf.add(module.ctx_index)).cast())
+        }
     }
 }
 
