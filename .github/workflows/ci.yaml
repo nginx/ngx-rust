@@ -67,16 +67,28 @@ jobs:
           components: rustfmt, clippy
           toolchain: ${{ matrix.rust-version }}
 
-      - name: build
+      - name: build (all targets, all features)
         id: build
         run: cargo build --workspace --all-targets --all-features
 
-      - name: run clippy
+      - name: check ngx, no default features (no_std)
+        run: cargo check -p ngx --no-default-features --features vendored
+
+      - name: check ngx, alloc
+        run: cargo check -p ngx --no-default-features --features vendored,alloc
+
+      - name: check ngx, std
+        run: cargo check -p ngx --no-default-features --features vendored,std
+
+      - name: check ngx, alloc + serde
+        run: cargo check -p ngx --no-default-features --features vendored,alloc,serde
+
+      - name: clippy
         # always run if build succeeds
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: cargo clippy --workspace --all-targets --all-features -- -Dwarnings
 
-      - name: run tests
+      - name: test
         # always run if build succeeds
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: cargo test --workspace --all-features
