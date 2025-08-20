@@ -117,12 +117,9 @@
 //! brew install --with-toolchain llvm
 //! ```
 #![warn(missing_docs)]
-// support both std and no_std
 #![no_std]
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 extern crate alloc;
-#[cfg(feature = "std")]
-extern crate std;
 
 pub mod allocator;
 #[cfg(feature = "async")]

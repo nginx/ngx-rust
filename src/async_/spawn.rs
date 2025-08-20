@@ -1,12 +1,8 @@
+use alloc::collections::vec_deque::VecDeque;
 use core::cell::UnsafeCell;
 use core::future::Future;
 use core::mem;
 use core::ptr::{self, NonNull};
-
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::collections::vec_deque::VecDeque;
-#[cfg(feature = "std")]
-use std::collections::vec_deque::VecDeque;
 
 pub use async_task::Task;
 use async_task::{Runnable, ScheduleInfo, WithInfo};

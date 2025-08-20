@@ -1,10 +1,9 @@
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::{borrow::Cow, string::String};
 use core::cmp;
 use core::fmt;
 use core::str::{self, Utf8Error};
-#[cfg(feature = "std")]
-use std::{borrow::Cow, string::String};
+
+#[cfg(feature = "alloc")]
+use alloc::{borrow::Cow, string::String};
 
 use crate::ffi::{ngx_str_t, u_char};
 
