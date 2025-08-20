@@ -34,3 +34,8 @@ shlex = "1.3"
 
 [features]
 vendored = ["dep:nginx-src"]
+
+[lints]
+# MSRV prevents configuring bindgen to emit Edition2024 for the moment, and
+# workspace lints require 2024. Do not inherit workspace lints until MSRV
+# above 1.85.0

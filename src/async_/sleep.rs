@@ -123,7 +123,7 @@ impl TimerEvent {
     unsafe extern "C" fn timer_handler(ev: *mut ngx_event_t) {
         let timer = ngx_container_of!(ev, Self, event);
 
-        if let Some(waker) = (*timer).waker.take() {
+        if let Some(waker) = unsafe { (*timer).waker.take() } {
             waker.wake();
         }
     }
