@@ -23,8 +23,10 @@ macro_rules! ngx_queue_data {
 /// `q` must be a valid pointer to [ngx_queue_t].
 #[inline]
 pub unsafe fn ngx_queue_init(q: *mut ngx_queue_t) {
-    (*q).prev = q;
-    (*q).next = q;
+    unsafe {
+        (*q).prev = q;
+        (*q).next = q;
+    }
 }
 
 /// Returns `true` if the queue contains no elements.
@@ -34,7 +36,7 @@ pub unsafe fn ngx_queue_init(q: *mut ngx_queue_t) {
 /// `q` must be a valid pointer to [ngx_queue_t], initialized with [ngx_queue_init].
 #[inline]
 pub unsafe fn ngx_queue_empty(q: *const ngx_queue_t) -> bool {
-    ptr::eq(q, (*q).prev)
+    unsafe { ptr::eq(q, (*q).prev) }
 }
 
 /// Inserts a new node after the current.
@@ -44,10 +46,12 @@ pub unsafe fn ngx_queue_empty(q: *const ngx_queue_t) -> bool {
 /// Both `q` and `x` must be valid pointers to [ngx_queue_t]
 #[inline]
 pub unsafe fn ngx_queue_insert_after(q: *mut ngx_queue_t, x: *mut ngx_queue_t) {
-    (*x).next = (*q).next;
-    (*(*x).next).prev = x;
-    (*x).prev = q;
-    (*q).next = x;
+    unsafe {
+        (*x).next = (*q).next;
+        (*(*x).next).prev = x;
+        (*x).prev = q;
+        (*q).next = x;
+    }
 }
 
 /// Inserts a new node before the current.
@@ -57,10 +61,12 @@ pub unsafe fn ngx_queue_insert_after(q: *mut ngx_queue_t, x: *mut ngx_queue_t) {
 /// Both `q` and `x` must be valid pointers to [ngx_queue_t].
 #[inline]
 pub unsafe fn ngx_queue_insert_before(q: *mut ngx_queue_t, x: *mut ngx_queue_t) {
-    (*x).prev = (*q).prev;
-    (*(*x).prev).next = x;
-    (*x).next = q;
-    (*q).prev = x;
+    unsafe {
+        (*x).prev = (*q).prev;
+        (*(*x).prev).next = x;
+        (*x).next = q;
+        (*q).prev = x;
+    }
 }
 
 /// Removes a node from the queue.
@@ -70,10 +76,12 @@ pub unsafe fn ngx_queue_insert_before(q: *mut ngx_queue_t, x: *mut ngx_queue_t) 
 /// `q` must be a valid pointer to an [ngx_queue_t] node.
 #[inline]
 pub unsafe fn ngx_queue_remove(q: *mut ngx_queue_t) {
-    (*(*q).next).prev = (*q).prev;
-    (*(*q).prev).next = (*q).next;
-    (*q).prev = ptr::null_mut();
-    (*q).next = ptr::null_mut();
+    unsafe {
+        (*(*q).next).prev = (*q).prev;
+        (*(*q).prev).next = (*q).next;
+        (*q).prev = ptr::null_mut();
+        (*q).next = ptr::null_mut();
+    }
 }
 
 /// Splits a queue at a node, returning the queue tail in a separate queue.
@@ -85,12 +93,14 @@ pub unsafe fn ngx_queue_remove(q: *mut ngx_queue_t) {
 /// `n` must be a valid pointer to [ngx_queue_t].
 #[inline]
 pub unsafe fn ngx_queue_split(h: *mut ngx_queue_t, q: *mut ngx_queue_t, n: *mut ngx_queue_t) {
-    (*n).prev = (*h).prev;
-    (*(*n).prev).next = n;
-    (*n).next = q;
-    (*h).prev = (*q).prev;
-    (*(*h).prev).next = h;
-    (*q).prev = n;
+    unsafe {
+        (*n).prev = (*h).prev;
+        (*(*n).prev).next = n;
+        (*n).next = q;
+        (*h).prev = (*q).prev;
+        (*(*h).prev).next = h;
+        (*q).prev = n;
+    }
 }
 
 /// Adds a second queue to the first queue.
@@ -101,10 +111,12 @@ pub unsafe fn ngx_queue_split(h: *mut ngx_queue_t, q: *mut ngx_queue_t, n: *mut 
 /// `n` will be left in invalid state, pointing to the subrange of `h` without back references.
 #[inline]
 pub unsafe fn ngx_queue_add(h: *mut ngx_queue_t, n: *mut ngx_queue_t) {
-    (*(*h).prev).next = (*n).next;
-    (*(*n).next).prev = (*h).prev;
-    (*h).prev = (*n).prev;
-    (*(*h).prev).next = h;
+    unsafe {
+        (*(*h).prev).next = (*n).next;
+        (*(*n).next).prev = (*h).prev;
+        (*h).prev = (*n).prev;
+        (*(*h).prev).next = h;
+    }
 }
 
 impl ngx_queue_t {
@@ -148,7 +160,9 @@ mod tests {
         }
 
         pub unsafe fn free(x: *mut Self) {
-            let _ = Box::from_raw(x);
+            unsafe {
+                let _ = Box::from_raw(x);
+            }
         }
     }
 

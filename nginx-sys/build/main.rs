@@ -236,6 +236,8 @@ fn generate_binding(nginx: &NginxSource) {
         .clang_args(clang_args)
         .layout_tests(false)
         .rust_target(rust_target)
+        .rust_edition(bindgen::RustEdition::Edition2021)
+        .wrap_unsafe_ops(true)
         .use_core()
         .generate()
         .expect("Unable to generate bindings");

@@ -29,10 +29,12 @@ pub unsafe fn ngx_rbtree_init(
     sentinel: *mut ngx_rbtree_node_t,
     insert: ngx_rbtree_insert_pt,
 ) {
-    ngx_rbtree_sentinel_init(sentinel);
-    (*tree).root = sentinel;
-    (*tree).sentinel = sentinel;
-    (*tree).insert = insert;
+    unsafe {
+        ngx_rbtree_sentinel_init(sentinel);
+        (*tree).root = sentinel;
+        (*tree).sentinel = sentinel;
+        (*tree).insert = insert;
+    }
 }
 
 /// Marks the tree node as red.
@@ -42,7 +44,7 @@ pub unsafe fn ngx_rbtree_init(
 /// `node` must be a valid pointer to a [ngx_rbtree_node_t].
 #[inline]
 pub unsafe fn ngx_rbt_red(node: *mut ngx_rbtree_node_t) {
-    (*node).color = 1
+    unsafe { (*node).color = 1 }
 }
 
 /// Marks the tree node as black.
@@ -52,7 +54,7 @@ pub unsafe fn ngx_rbt_red(node: *mut ngx_rbtree_node_t) {
 /// `node` must be a valid pointer to a [ngx_rbtree_node_t].
 #[inline]
 pub unsafe fn ngx_rbt_black(node: *mut ngx_rbtree_node_t) {
-    (*node).color = 0
+    unsafe { (*node).color = 0 }
 }
 
 /// Initializes the sentinel node.
@@ -62,7 +64,7 @@ pub unsafe fn ngx_rbt_black(node: *mut ngx_rbtree_node_t) {
 /// `node` must be a valid pointer to a [ngx_rbtree_node_t].
 #[inline]
 pub unsafe fn ngx_rbtree_sentinel_init(node: *mut ngx_rbtree_node_t) {
-    ngx_rbt_black(node)
+    unsafe { ngx_rbt_black(node) }
 }
 
 /// Returns the least (leftmost) node of the tree.
@@ -76,9 +78,11 @@ pub unsafe fn ngx_rbtree_min(
     mut node: *mut ngx_rbtree_node_t,
     sentinel: *mut ngx_rbtree_node_t,
 ) -> *mut ngx_rbtree_node_t {
-    while !ptr::addr_eq((*node).left, sentinel) {
-        node = (*node).left;
-    }
+    unsafe {
+        while !ptr::addr_eq((*node).left, sentinel) {
+            node = (*node).left;
+        }
 
-    node
+        node
+    }
 }

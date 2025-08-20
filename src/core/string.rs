@@ -43,8 +43,10 @@ impl NgxStr {
     /// to range of bytes of at least `len` bytes, whose content remains valid and doesn't
     /// change for the lifetime of the returned `NgxStr`.
     pub unsafe fn from_ngx_str<'a>(str: ngx_str_t) -> &'a NgxStr {
-        let bytes: &[u8] = str.as_bytes();
-        &*(bytes as *const [u8] as *const NgxStr)
+        unsafe {
+            let bytes: &[u8] = str.as_bytes();
+            &*(bytes as *const [u8] as *const NgxStr)
+        }
     }
 
     /// Create an [NgxStr] from a borrowed byte slice.
@@ -351,7 +353,7 @@ mod _alloc {
             capacity: usize,
             alloc: A,
         ) -> Self {
-            Self(Vec::from_raw_parts_in(ptr, length, capacity, alloc))
+            unsafe { Self(Vec::from_raw_parts_in(ptr, length, capacity, alloc)) }
         }
 
         /// Splits the NgxString into its raw components.

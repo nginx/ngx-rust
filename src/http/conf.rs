@@ -78,7 +78,10 @@ impl HttpModuleConfExt for crate::ffi::ngx_conf_t {
     #[inline]
     unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         let conf_ctx = self.ctx.cast::<ngx_http_conf_ctx_t>();
-        unsafe { conf_ctx.as_ref()?.http_server_conf_unchecked(module) }
+        unsafe {
+            let conf_ctx = conf_ctx.as_ref()?;
+            NonNull::new((*conf_ctx.srv_conf.add(module.ctx_index)).cast())
+        }
     }
 
     #[inline]

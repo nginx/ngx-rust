@@ -85,7 +85,7 @@ impl SchedulerInner {
             //  - the access is unique due to being single-threaded
             //  - the reference is dropped before we start processing queued runnables.
             let cell: NonNull<UnsafeCell<Self>> =
-                unsafe { ngx_container_of!(NonNull::new_unchecked(ev), Self, event).cast() };
+                ngx_container_of!(unsafe { NonNull::new_unchecked(ev) }, Self, event).cast();
             let this = unsafe { &mut *UnsafeCell::raw_get(cell.as_ptr()) };
 
             ngx_log_debug!(

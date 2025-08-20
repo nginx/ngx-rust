@@ -95,7 +95,7 @@ where
     /// `head` is a valid pointer to a list head, and `T::from_queue` on the list entries results in
     /// valid pointers to `T`.
     pub unsafe fn from_ptr<'a>(head: *const ngx_queue_t) -> &'a Self {
-        &*head.cast()
+        unsafe { &*head.cast() }
     }
 
     /// Creates a mutable queue reference from a pointer to [ngx_queue_t].
@@ -105,7 +105,7 @@ where
     /// `head` is a valid pointer to a list head, and `T::from_queue` on the list entries results in
     /// valid pointers to `T`.
     pub unsafe fn from_ptr_mut<'a>(head: *mut ngx_queue_t) -> &'a mut Self {
-        &mut *head.cast()
+        unsafe { &mut *head.cast() }
     }
 
     /// Returns `true` if the queue contains no elements.
@@ -351,14 +351,16 @@ impl<T, A: Allocator> Queue<T, A> {
     ///
     /// `node` must be an element of this list.
     unsafe fn remove(&mut self, node: NonNull<ngx_queue_t>) -> T {
-        ngx_queue_remove(node.as_ptr());
+        unsafe { ngx_queue_remove(node.as_ptr()) };
         self.len -= 1;
 
         let entry = QueueEntry::<T>::from_queue(node);
-        let copy = entry.read();
+        let copy = unsafe { entry.read() };
         // Skip drop as QueueEntry is already copied to `x`.
-        self.allocator()
-            .deallocate(entry.cast(), Layout::for_value(entry.as_ref()));
+        unsafe {
+            self.allocator()
+                .deallocate(entry.cast(), Layout::for_value(entry.as_ref()))
+        };
         copy.item
     }
 }
