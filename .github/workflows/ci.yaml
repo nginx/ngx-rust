@@ -5,6 +5,7 @@ on: [ push, pull_request ]
 env:
   CARGO_TERM_COLOR: 'always'
   CARGO_TERM_VERBOSE: 'true'
+  RUSTFLAGS: '--deny warnings'
   RUSTDOCFLAGS: '-Dwarnings'
 
 jobs:
