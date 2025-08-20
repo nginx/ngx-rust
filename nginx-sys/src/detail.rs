@@ -12,12 +12,14 @@ use crate::bindings::{ngx_pnalloc, ngx_pool_t, u_char};
 ///
 /// The caller must provide a valid pointer to the memory pool.
 pub unsafe fn bytes_to_uchar(pool: *mut ngx_pool_t, data: &[u8]) -> Option<*mut u_char> {
-    let ptr: *mut u_char = ngx_pnalloc(pool, data.len()) as _;
-    if ptr.is_null() {
-        return None;
+    unsafe {
+        let ptr: *mut u_char = ngx_pnalloc(pool, data.len()) as _;
+        if ptr.is_null() {
+            return None;
+        }
+        copy_nonoverlapping(data.as_ptr(), ptr, data.len());
+        Some(ptr)
     }
-    copy_nonoverlapping(data.as_ptr(), ptr, data.len());
-    Some(ptr)
 }
 
 /// Convert a string slice (`&str`) to a raw pointer (`*mut u_char`) allocated in the given nginx
@@ -42,10 +44,12 @@ pub unsafe fn bytes_to_uchar(pool: *mut ngx_pool_t, data: &[u8]) -> Option<*mut 
 /// let ptr = str_to_uchar(pool, data);
 /// ```
 pub unsafe fn str_to_uchar(pool: *mut ngx_pool_t, data: &str) -> *mut u_char {
-    let ptr: *mut u_char = ngx_pnalloc(pool, data.len()) as _;
-    debug_assert!(!ptr.is_null());
-    copy_nonoverlapping(data.as_ptr(), ptr, data.len());
-    ptr
+    unsafe {
+        let ptr: *mut u_char = ngx_pnalloc(pool, data.len()) as _;
+        debug_assert!(!ptr.is_null());
+        copy_nonoverlapping(data.as_ptr(), ptr, data.len());
+        ptr
+    }
 }
 
 #[inline]
