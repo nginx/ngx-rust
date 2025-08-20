@@ -67,6 +67,54 @@ unsafe impl Allocator for Pool {
             ngx_pfree(self.0.as_ptr(), ptr.as_ptr().cast());
         }
     }
+
+    unsafe fn grow(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        debug_assert!(
+            new_layout.size() >= old_layout.size(),
+            "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
+        );
+        self.resize(ptr, old_layout, new_layout)
+    }
+
+    unsafe fn grow_zeroed(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        debug_assert!(
+            new_layout.size() >= old_layout.size(),
+            "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
+        );
+        #[allow(clippy::manual_inspect)]
+        self.resize(ptr, old_layout, new_layout).map(|new_ptr| {
+            unsafe {
+                new_ptr
+                    .cast::<u8>()
+                    .byte_add(old_layout.size())
+                    .write_bytes(0, new_layout.size() - old_layout.size())
+            };
+            new_ptr
+        })
+    }
+
+    unsafe fn shrink(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        debug_assert!(
+            new_layout.size() <= old_layout.size(),
+            "`new_layout.size()` must be smaller than or equal to `old_layout.size()`"
+        );
+        self.resize(ptr, old_layout, new_layout)
+    }
 }
 
 impl AsRef<ngx_pool_t> for Pool {
@@ -227,6 +275,39 @@ impl Pool {
                 return ptr::null_mut();
             };
             p
+        }
+    }
+
+    /// Resizes a memory allocation in place if possible.
+    ///
+    /// If resizing is requested for the last allocation in the pool, it may be
+    /// possible to adjust pool data and avoid any real allocations.
+    ///
+    /// # Safety
+    /// `ptr` must point to allocated address and `old_layout` must match the current layout
+    /// of the allocation.
+    #[inline(always)]
+    unsafe fn resize(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        if ptr.byte_add(old_layout.size()).as_ptr() == self.as_ref().d.last
+            && ptr.byte_add(new_layout.size()).as_ptr() <= self.as_ref().d.end
+            && ptr.align_offset(new_layout.align()) == 0
+        {
+            let pool = self.0.as_ptr();
+            unsafe { (*pool).d.last = ptr.byte_add(new_layout.size()).as_ptr() };
+            Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
+        } else {
+            let size = core::cmp::min(old_layout.size(), new_layout.size());
+            let new_ptr = <Self as Allocator>::allocate(self, new_layout)?;
+            unsafe {
+                ptr.copy_to_nonoverlapping(new_ptr.cast(), size);
+                self.deallocate(ptr, old_layout);
+            }
+            Ok(new_ptr)
         }
     }
 }
