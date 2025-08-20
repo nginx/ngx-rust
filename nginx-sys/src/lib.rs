@@ -54,17 +54,19 @@ impl ngx_array_t {
     /// The array must be a valid, initialized array containing elements of type T or compatible in
     /// layout with T (e.g. `#[repr(transparent)]` wrappers).
     pub unsafe fn as_slice<T>(&self) -> &[T] {
-        debug_assert_eq!(
-            core::mem::size_of::<T>(),
-            self.size,
-            "ngx_array_t::as_slice(): element size mismatch"
-        );
-        if self.nelts == 0 {
-            &[]
-        } else {
-            // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
-            // elements of size `size`
-            core::slice::from_raw_parts(self.elts.cast(), self.nelts)
+        unsafe {
+            debug_assert_eq!(
+                core::mem::size_of::<T>(),
+                self.size,
+                "ngx_array_t::as_slice(): element size mismatch"
+            );
+            if self.nelts == 0 {
+                &[]
+            } else {
+                // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
+                // elements of size `size`
+                core::slice::from_raw_parts(self.elts.cast(), self.nelts)
+            }
         }
     }
 
@@ -75,17 +77,19 @@ impl ngx_array_t {
     /// The array must be a valid, initialized array containing elements of type T or compatible in
     /// layout with T (e.g. `#[repr(transparent)]` wrappers).
     pub unsafe fn as_slice_mut<T>(&mut self) -> &mut [T] {
-        debug_assert_eq!(
-            core::mem::size_of::<T>(),
-            self.size,
-            "ngx_array_t::as_slice_mut(): element size mismatch"
-        );
-        if self.nelts == 0 {
-            &mut []
-        } else {
-            // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
-            // elements of size `size`
-            core::slice::from_raw_parts_mut(self.elts.cast(), self.nelts)
+        unsafe {
+            debug_assert_eq!(
+                core::mem::size_of::<T>(),
+                self.size,
+                "ngx_array_t::as_slice_mut(): element size mismatch"
+            );
+            if self.nelts == 0 {
+                &mut []
+            } else {
+                // SAFETY: in a valid array, `elts` is a valid well-aligned pointer to at least `nelts`
+                // elements of size `size`
+                core::slice::from_raw_parts_mut(self.elts.cast(), self.nelts)
+            }
         }
     }
 }
@@ -326,16 +330,18 @@ pub unsafe fn add_to_ngx_table(
     key: impl AsRef<[u8]>,
     value: impl AsRef<[u8]>,
 ) -> Option<()> {
-    if let Some(table) = table.as_mut() {
-        let key = key.as_ref();
-        table.key = ngx_str_t::from_bytes(pool, key)?;
-        table.value = ngx_str_t::from_bytes(pool, value.as_ref())?;
-        table.lowcase_key = ngx_pnalloc(pool, table.key.len).cast();
-        if table.lowcase_key.is_null() {
-            return None;
+    unsafe {
+        if let Some(table) = table.as_mut() {
+            let key = key.as_ref();
+            table.key = ngx_str_t::from_bytes(pool, key)?;
+            table.value = ngx_str_t::from_bytes(pool, value.as_ref())?;
+            table.lowcase_key = ngx_pnalloc(pool, table.key.len).cast();
+            if table.lowcase_key.is_null() {
+                return None;
+            }
+            table.hash = ngx_hash_strlow(table.lowcase_key, table.key.data, table.key.len);
+            return Some(());
         }
-        table.hash = ngx_hash_strlow(table.lowcase_key, table.key.data, table.key.len);
-        return Some(());
+        None
     }
-    None
 }
