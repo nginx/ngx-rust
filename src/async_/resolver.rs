@@ -125,23 +125,27 @@ impl Resolver {
     /// The set of addresses may not be deterministic, because the
     /// implementation of the resolver may race multiple DNS requests.
     pub async fn resolve(&self, name: &ngx_str_t, pool: &Pool) -> Res {
-        let ctx = unsafe {
-            NonNull::new(ngx_resolve_start(
-                self.resolver.as_ptr(),
-                core::ptr::null_mut(),
-            ))
-            .ok_or(Error::AllocationFailed)?
-        };
-
-        let mut resolver = Resolution::new(name, pool, self.timeout, ctx)?;
+        let mut resolver = Resolution::new(name, pool, self.resolver, self.timeout)?;
         resolver.as_mut().await
     }
 }
 
 struct Resolution<'a> {
+    // Storage for the result of the resolution `Res`. Populated by the
+    // callback handler, and taken by the Future::poll impl.
     complete: Option<Res>,
+    // Storage for a pending Waker. Populated by the Future::poll impl,
+    // and taken by the callback handler.
     waker: Option<Waker>,
+    // Pool used for allocating `Vec<ngx_addr_t>` contents in `Res`. Read by
+    // the callback handler.
     pool: &'a Pool,
+    // Pointer to the ngx_resolver_ctx_t. Resolution constructs this with
+    // ngx_resolver_name_start in the constructor, and is responsible for
+    // freeing it, with ngx_resolver_name_done, once it is no longer needed -
+    // this happens in either the callback handler, or the drop impl. Calling
+    // ngx_resolver_name_done before the callback fires ensure nginx does not
+    // ever call the callback.
     ctx: Option<NonNull<ngx_resolver_ctx_t>>,
 }
 
@@ -149,9 +153,21 @@ impl<'a> Resolution<'a> {
     fn new(
         name: &ngx_str_t,
         pool: &'a Pool,
+        resolver: NonNull<ngx_resolver_t>,
         timeout: ngx_msec_t,
-        mut ctx: NonNull<ngx_resolver_ctx_t>,
     ) -> Result<Pin<Box<Self>>, Error> {
+        let mut ctx = unsafe {
+            // Start a new resolver context. This implementation currently
+            // passes a null for the second argument `temp`. A non-null `temp`
+            // provides a fast, non-callback-based path for immediately
+            // returning an addr iff `temp` contains a name which is textual
+            // form of an addr.
+            let ctx = ngx_resolve_start(resolver.as_ptr(), core::ptr::null_mut());
+            NonNull::new(ctx).ok_or(Error::AllocationFailed)?
+        };
+
+        // Create a pinned Resolution on the heap, so that we can make
+        // a stable pointer to the Resolution struct.
         let mut this = Pin::new(Box::new(Resolution {
             complete: None,
             waker: None,
@@ -160,15 +176,26 @@ impl<'a> Resolution<'a> {
         }));
 
         {
+            // Set up the ctx with everything the resolver needs to resolve a
+            // name, and the handler callback which is called on completion.
             let ctx: &mut ngx_resolver_ctx_t = unsafe { ctx.as_mut() };
             ctx.name = *name;
             ctx.timeout = timeout;
             ctx.set_cancelable(1);
             ctx.handler = Some(Self::handler);
+            // Safety: Self::handler, Future::poll, and Drop::drop will have
+            // access to &mut Resolution. Nginx is single-threaded and we are
+            // assured only one of those is on the stack at a time, except if
+            // Self::handler wakes a task which polls or drops the Future,
+            // which it only does after use of &mut Resolution is complete.
             let ptr: &mut Resolution = unsafe { Pin::into_inner_unchecked(this.as_mut()) };
             ctx.data = ptr as *mut Resolution as *mut c_void;
         }
 
+        // Start name resolution using the ctx. If the name is in the dns
+        // cache, the handler may get called from this stack. Otherwise, it
+        // will be called later by nginx when it gets a dns response or a
+        // timeout.
         let ret = unsafe { ngx_resolve_name(ctx.as_ptr()) };
         if ret != 0 {
             return Err(Error::Resolver(
@@ -180,18 +207,26 @@ impl<'a> Resolution<'a> {
         Ok(this)
     }
 
+    // Nginx will call this handler when name resolution completes. If the
+    // result is cached, this could be
     unsafe extern "C" fn handler(ctx: *mut ngx_resolver_ctx_t) {
         let mut data = unsafe { NonNull::new_unchecked((*ctx).data as *mut Resolution) };
         let this: &mut Resolution = unsafe { data.as_mut() };
         this.complete = Some(Self::resolve_result(ctx, this.pool));
-        this.ctx.take();
+
+        let mut ctx = this.ctx.take().expect("ctx must be present");
+        unsafe { nginx_sys::ngx_resolve_name_done(ctx.as_mut()) };
+
+        // Wake last, after all use of &mut Resolution, because wake may
+        // poll Resolution future on current stack.
         if let Some(waker) = this.waker.take() {
-            // Wake last, after all use of &mut Resolution, because wake may
-            // poll Resolution future on current stack.
             waker.wake();
         }
     }
 
+    /// Take the results in a ctx and make an owned copy as a
+    /// Result<Vec<ngx_addr_t>, Error>, where both the Vec and internals of
+    /// the ngx_addr_t are allocated on the given Pool
     fn resolve_result(ctx: *mut ngx_resolver_ctx_t, pool: &Pool) -> Res {
         let ctx = unsafe { ctx.as_ref().unwrap() };
         let s = ctx.state;
@@ -211,6 +246,8 @@ impl<'a> Resolution<'a> {
         Ok(out)
     }
 
+    /// Take the contents of an ngx_resolver_addr_t and make an owned copy as
+    /// an ngx_addr_t, using the Pool for allocation of the internals.
     fn copy_resolved_addr(
         addr: *mut nginx_sys::ngx_resolver_addr_t,
         pool: &Pool,
@@ -247,9 +284,12 @@ impl<'a> core::future::Future for Resolution<'a> {
     type Output = Result<Vec<ngx_addr_t>, Error>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.as_mut();
+        // The handler populates this.complete, and we consume it here:
         match this.complete.take() {
             Some(res) => Poll::Ready(res),
             None => {
+                // If the handler has not yet fired, populate the waker field,
+                // which the handler will consume:
                 match &mut self.waker {
                     None => {
                         self.waker = Some(cx.waker().clone());
@@ -264,6 +304,9 @@ impl<'a> core::future::Future for Resolution<'a> {
 
 impl<'a> Drop for Resolution<'a> {
     fn drop(&mut self) {
+        // ctx is taken and freed if the Resolution reaches the handler
+        // callback, but if dropped before that callback, this will cancel any
+        // ongoing work as well as free the ctx memory.
         if let Some(mut ctx) = self.ctx.take() {
             unsafe {
                 nginx_sys::ngx_resolve_name_done(ctx.as_mut());
