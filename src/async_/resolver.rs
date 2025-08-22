@@ -10,7 +10,9 @@
 use alloc::string::{String, ToString};
 use core::ffi::c_void;
 use core::fmt;
+use core::pin::Pin;
 use core::ptr::NonNull;
+use core::task::{Context, Poll, Waker};
 
 use crate::{
     allocator::Box,
@@ -21,7 +23,6 @@ use crate::{
         ngx_resolver_t, ngx_str_t,
     },
 };
-use futures_channel::oneshot::{channel, Sender};
 use nginx_sys::{
     NGX_RESOLVE_FORMERR, NGX_RESOLVE_NOTIMP, NGX_RESOLVE_NXDOMAIN, NGX_RESOLVE_REFUSED,
     NGX_RESOLVE_SERVFAIL, NGX_RESOLVE_TIMEDOUT,
@@ -106,52 +107,6 @@ impl TryFrom<isize> for ResolverError {
 
 type Res = Result<Vec<ngx_addr_t>, Error>;
 
-struct ResCtx<'a> {
-    ctx: Option<*mut ngx_resolver_ctx_t>,
-    sender: Option<Sender<Res>>,
-    pool: &'a Pool,
-}
-
-impl Drop for ResCtx<'_> {
-    fn drop(&mut self) {
-        if let Some(ctx) = self.ctx.take() {
-            unsafe {
-                nginx_sys::ngx_resolve_name_done(ctx);
-            }
-        }
-    }
-}
-
-fn copy_resolved_addr(
-    addr: *mut nginx_sys::ngx_resolver_addr_t,
-    pool: &Pool,
-) -> Result<ngx_addr_t, Error> {
-    let addr = NonNull::new(addr).ok_or(Error::Unexpected(
-        "null ngx_resolver_addr_t in ngx_resolver_ctx_t.addrs".to_string(),
-    ))?;
-    let addr = unsafe { addr.as_ref() };
-
-    let sockaddr = pool.alloc(addr.socklen as usize) as *mut nginx_sys::sockaddr;
-    if sockaddr.is_null() {
-        Err(Error::AllocationFailed)?;
-    }
-    unsafe {
-        addr.sockaddr
-            .cast::<u8>()
-            .copy_to_nonoverlapping(sockaddr.cast(), addr.socklen as usize)
-    };
-
-    let name =
-        unsafe { ngx_str_t::from_bytes(pool.as_ref() as *const _ as *mut _, addr.name.as_bytes()) }
-            .ok_or(Error::AllocationFailed)?;
-
-    Ok(ngx_addr_t {
-        sockaddr,
-        socklen: addr.socklen,
-        name,
-    })
-}
-
 /// A wrapper for an ngx_resolver_t which provides an async Rust API
 pub struct Resolver {
     resolver: NonNull<ngx_resolver_t>,
@@ -170,68 +125,156 @@ impl Resolver {
     /// The set of addresses may not be deterministic, because the
     /// implementation of the resolver may race multiple DNS requests.
     pub async fn resolve(&self, name: &ngx_str_t, pool: &Pool) -> Res {
-        unsafe {
-            let ctx: *mut ngx_resolver_ctx_t =
-                ngx_resolve_start(self.resolver.as_ptr(), core::ptr::null_mut());
-            if ctx.is_null() {
-                Err(Error::AllocationFailed)?
-            }
-            if ctx as isize == -1 {
-                Err(Error::NoResolver)?
-            }
+        let ctx = unsafe {
+            NonNull::new(ngx_resolve_start(
+                self.resolver.as_ptr(),
+                core::ptr::null_mut(),
+            ))
+            .ok_or_else(|| Error::AllocationFailed)?
+        };
 
-            let (sender, receiver) = channel::<Res>();
-            let rctx = Box::new(ResCtx {
-                ctx: Some(ctx),
-                sender: Some(sender),
-                pool,
-            });
+        let mut resolver = Resolution::new(name, pool, self.timeout, ctx)?;
+        resolver.as_mut().await
+        // FIXME how does timeout get caught??
+        /*
+        resolver
+            .await
+            .map_err(|_| Error::Resolver(ResolverError::TimedOut, name.to_string()))?
+        */
+    }
+}
 
-            (*ctx).name = *name;
-            (*ctx).timeout = self.timeout;
-            (*ctx).set_cancelable(1);
-            (*ctx).handler = Some(Self::resolve_handler);
-            (*ctx).data = Box::into_raw(rctx) as *mut c_void;
+struct Resolution<'a> {
+    complete: Option<Res>,
+    waker: Option<Waker>,
+    pool: &'a Pool,
+    ctx: Option<NonNull<ngx_resolver_ctx_t>>,
+}
 
-            let ret = ngx_resolve_name(ctx);
-            if ret != 0 {
-                Err(Error::Resolver(
-                    ResolverError::try_from(ret).expect("nonzero, checked above"),
-                    name.to_string(),
-                ))?;
-            }
+impl<'a> Resolution<'a> {
+    fn new(
+        name: &ngx_str_t,
+        pool: &'a Pool,
+        timeout: ngx_msec_t,
+        mut ctx: NonNull<ngx_resolver_ctx_t>,
+    ) -> Result<Pin<Box<Self>>, Error> {
+        let mut this = Pin::new(Box::new(Resolution {
+            complete: None,
+            waker: None,
+            pool,
+            ctx: Some(ctx),
+        }));
 
-            receiver
-                .await
-                .map_err(|_| Error::Resolver(ResolverError::TimedOut, name.to_string()))?
+        {
+            let ctx: &mut ngx_resolver_ctx_t = unsafe { ctx.as_mut() };
+            ctx.name = *name;
+            ctx.timeout = timeout;
+            ctx.set_cancelable(1);
+            ctx.handler = Some(Self::handler);
+            let ptr: &mut Resolution = unsafe { Pin::into_inner_unchecked(this.as_mut()) };
+            ctx.data = ptr as *mut Resolution as *mut c_void;
         }
+
+        let ret = unsafe { ngx_resolve_name(ctx.as_ptr()) };
+        if ret != 0 {
+            return Err(Error::Resolver(
+                ResolverError::try_from(ret).expect("nonzero, checked above"),
+                name.to_string(),
+            ));
+        }
+
+        Ok(this)
     }
 
-    unsafe extern "C" fn resolve_handler(ctx: *mut ngx_resolver_ctx_t) {
-        let mut rctx = Box::into_inner(unsafe { Box::from_raw((*ctx).data as *mut ResCtx) });
-        rctx.ctx.take();
-        if let Some(sender) = rctx.sender.take() {
-            let _ = sender.send(Self::resolve_result(ctx, rctx.pool));
+    unsafe extern "C" fn handler(ctx: *mut ngx_resolver_ctx_t) {
+        let mut data = unsafe { NonNull::new_unchecked((*ctx).data as *mut Resolution) };
+        let this: &mut Resolution = unsafe { data.as_mut() };
+        this.complete = Some(Self::resolve_result(ctx, this.pool));
+        this.ctx.take();
+        if let Some(waker) = this.waker.take() {
+            // Ensure &mut Resolution no longer exists when wake resumes
+            // suspended Future of Pin<&mut Resolution>
+            let _ = this;
+            waker.wake();
         }
-        unsafe { nginx_sys::ngx_resolve_name_done(ctx) };
     }
 
     fn resolve_result(ctx: *mut ngx_resolver_ctx_t, pool: &Pool) -> Res {
         let ctx = unsafe { ctx.as_ref().unwrap() };
         let s = ctx.state;
         if s != 0 {
-            Err(Error::Resolver(
+            return Err(Error::Resolver(
                 ResolverError::try_from(s).expect("nonzero, checked above"),
                 ctx.name.to_string(),
-            ))?;
+            ));
         }
         if ctx.addrs.is_null() {
             Err(Error::AllocationFailed)?;
         }
         let mut out = Vec::new();
         for i in 0..ctx.naddrs {
-            out.push(copy_resolved_addr(unsafe { ctx.addrs.add(i) }, pool)?);
+            out.push(Self::copy_resolved_addr(unsafe { ctx.addrs.add(i) }, pool)?);
         }
         Ok(out)
+    }
+
+    fn copy_resolved_addr(
+        addr: *mut nginx_sys::ngx_resolver_addr_t,
+        pool: &Pool,
+    ) -> Result<ngx_addr_t, Error> {
+        let addr = NonNull::new(addr).ok_or(Error::Unexpected(
+            "null ngx_resolver_addr_t in ngx_resolver_ctx_t.addrs".to_string(),
+        ))?;
+        let addr = unsafe { addr.as_ref() };
+
+        let sockaddr = pool.alloc(addr.socklen as usize) as *mut nginx_sys::sockaddr;
+        if sockaddr.is_null() {
+            Err(Error::AllocationFailed)?;
+        }
+        unsafe {
+            addr.sockaddr
+                .cast::<u8>()
+                .copy_to_nonoverlapping(sockaddr.cast(), addr.socklen as usize)
+        };
+
+        let name = unsafe {
+            ngx_str_t::from_bytes(pool.as_ref() as *const _ as *mut _, addr.name.as_bytes())
+        }
+        .ok_or(Error::AllocationFailed)?;
+
+        Ok(ngx_addr_t {
+            sockaddr,
+            socklen: addr.socklen,
+            name,
+        })
+    }
+}
+
+impl<'a> core::future::Future for Resolution<'a> {
+    type Output = Result<Vec<ngx_addr_t>, Error>;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.as_mut();
+        match this.complete.take() {
+            Some(res) => Poll::Ready(res),
+            None => {
+                match &mut self.waker {
+                    None => {
+                        self.waker = Some(cx.waker().clone());
+                    }
+                    Some(w) => w.clone_from(cx.waker()),
+                }
+                Poll::Pending
+            }
+        }
+    }
+}
+
+impl<'a> Drop for Resolution<'a> {
+    fn drop(&mut self) {
+        if let Some(mut ctx) = self.ctx.take() {
+            unsafe {
+                nginx_sys::ngx_resolve_name_done(ctx.as_mut());
+            }
+        }
     }
 }
