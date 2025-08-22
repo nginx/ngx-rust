@@ -130,17 +130,11 @@ impl Resolver {
                 self.resolver.as_ptr(),
                 core::ptr::null_mut(),
             ))
-            .ok_or_else(|| Error::AllocationFailed)?
+            .ok_or(Error::AllocationFailed)?
         };
 
         let mut resolver = Resolution::new(name, pool, self.timeout, ctx)?;
         resolver.as_mut().await
-        // FIXME how does timeout get caught??
-        /*
-        resolver
-            .await
-            .map_err(|_| Error::Resolver(ResolverError::TimedOut, name.to_string()))?
-        */
     }
 }
 
@@ -192,9 +186,8 @@ impl<'a> Resolution<'a> {
         this.complete = Some(Self::resolve_result(ctx, this.pool));
         this.ctx.take();
         if let Some(waker) = this.waker.take() {
-            // Ensure &mut Resolution no longer exists when wake resumes
-            // suspended Future of Pin<&mut Resolution>
-            let _ = this;
+            // Wake last, after all use of &mut Resolution, because wake may
+            // poll Resolution future on current stack.
             waker.wake();
         }
     }
