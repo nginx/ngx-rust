@@ -23,16 +23,18 @@ impl HttpModule for HttpSharedDictModule {
     }
 
     unsafe extern "C" fn preconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
-        for mut v in NGX_HTTP_SHARED_DICT_VARS {
-            let var = ngx_http_add_variable(cf, &mut v.name, v.flags);
-            if var.is_null() {
-                return Status::NGX_ERROR.into();
+        unsafe {
+            for mut v in NGX_HTTP_SHARED_DICT_VARS {
+                let var = ngx_http_add_variable(cf, &mut v.name, v.flags);
+                if var.is_null() {
+                    return Status::NGX_ERROR.into();
+                }
+                (*var).get_handler = v.get_handler;
+                (*var).set_handler = v.set_handler;
+                (*var).data = v.data;
             }
-            (*var).get_handler = v.get_handler;
-            (*var).set_handler = v.set_handler;
-            (*var).data = v.data;
+            Status::NGX_OK.into()
         }
-        Status::NGX_OK.into()
     }
 }
 

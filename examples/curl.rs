@@ -18,19 +18,21 @@ impl http::HttpModule for Module {
     }
 
     unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
-        // SAFETY: this function is called with non-NULL cf always
-        let cf = &mut *cf;
-        let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
+        unsafe {
+            // SAFETY: this function is called with non-NULL cf always
+            let cf = &mut *cf;
+            let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
 
-        let h = ngx_array_push(
-            &mut cmcf.phases[ngx_http_phases_NGX_HTTP_ACCESS_PHASE as usize].handlers,
-        ) as *mut ngx_http_handler_pt;
-        if h.is_null() {
-            return core::Status::NGX_ERROR.into();
+            let h = ngx_array_push(
+                &mut cmcf.phases[ngx_http_phases_NGX_HTTP_ACCESS_PHASE as usize].handlers,
+            ) as *mut ngx_http_handler_pt;
+            if h.is_null() {
+                return core::Status::NGX_ERROR.into();
+            }
+            // set an Access phase handler
+            *h = Some(curl_access_handler);
+            core::Status::NGX_OK.into()
         }
-        // set an Access phase handler
-        *h = Some(curl_access_handler);
-        core::Status::NGX_OK.into()
     }
 }
 
