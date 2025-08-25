@@ -69,4 +69,5 @@ vendored = ["nginx-sys/vendored"]
 maintenance = { status = "experimental" }
 
 [dev-dependencies]
+nginx-sys = { path = "nginx-sys", version = "0.5.0-beta", features = ["unittest"]}
 tempfile = { version = "3.20.0", default-features = false }
