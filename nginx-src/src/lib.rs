@@ -113,6 +113,12 @@ fn nginx_configure_flags(vendored: &[String]) -> Vec<String> {
         nginx_opts.push(format!("--with-ld-opt={ldflags}"));
     }
 
+    #[cfg(feature = "unittest")]
+    nginx_opts.push(format!(
+        "--add-dynamic-module={}/libnginx",
+        env!("CARGO_MANIFEST_DIR")
+    ));
+
     nginx_opts
 }
 
