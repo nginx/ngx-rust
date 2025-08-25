@@ -63,7 +63,7 @@ jobs:
           key:  ${{ runner.os }}-deps-${{ hashFiles('**/nginx-sys/build.rs') }}
           restore-keys: ${{ runner.os }}-deps-
 
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           components: rustfmt, clippy
           toolchain: ${{ matrix.rust-version }}
@@ -143,7 +143,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
             submodules: true
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           toolchain: stable
       - name: set up cargo cache
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
         with:
           components: rustfmt
           toolchain: stable
