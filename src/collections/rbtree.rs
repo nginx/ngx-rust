@@ -70,7 +70,7 @@ where
     /// `tree` is a valid pointer to [ngx_rbtree_t], and `T::from_rbtree_node` on the tree nodes
     /// results in valid pointers to `T`.
     pub unsafe fn from_ptr<'a>(tree: *const ngx_rbtree_t) -> &'a Self {
-        &*tree.cast()
+        unsafe { &*tree.cast() }
     }
 
     /// Creates a mutable tree reference from a pointer to [ngx_rbtree_t].
@@ -80,7 +80,7 @@ where
     /// `tree` is a valid pointer to [ngx_rbtree_t], and `T::from_rbtree_node` on the tree nodes
     /// results in valid pointers to `T`.
     pub unsafe fn from_ptr_mut<'a>(tree: *mut ngx_rbtree_t) -> &'a mut Self {
-        &mut *tree.cast()
+        unsafe { &mut *tree.cast() }
     }
 
     /// Returns `true` if the tree contains no elements.
