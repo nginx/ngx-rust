@@ -1,0 +1,5 @@
+
+# Copyright (C) Nginx, Inc.
+
+
+ngx_addon_name="libnginx"

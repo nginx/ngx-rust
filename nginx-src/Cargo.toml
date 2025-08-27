@@ -12,6 +12,10 @@ homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Builds nginx library from vendored sources for unit tests.
+unittest = []
+
 [dependencies]
 duct = "1"
 flate2 = "1"
