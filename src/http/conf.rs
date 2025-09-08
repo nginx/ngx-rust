@@ -38,16 +38,33 @@ pub trait HttpModuleConfExt {
     }
 }
 
+impl HttpModuleConfExt for crate::ffi::ngx_http_conf_ctx_t {
+    #[inline]
+    unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
+        NonNull::new(unsafe { *self.main_conf.add(module.ctx_index) }.cast())
+    }
+
+    #[inline]
+    unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
+        NonNull::new(unsafe { *self.srv_conf.add(module.ctx_index) }.cast())
+    }
+
+    #[inline]
+    unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
+        NonNull::new(unsafe { *self.loc_conf.add(module.ctx_index) }.cast())
+    }
+}
+
 impl HttpModuleConfExt for crate::ffi::ngx_cycle_t {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        let http_conf = self
-            .conf_ctx
-            .add(nginx_sys::ngx_http_module.index)
-            .as_ref()?;
+        let http_conf = unsafe {
+            self.conf_ctx
+                .add(nginx_sys::ngx_http_module.index)
+                .as_ref()?
+        };
         let conf_ctx = (*http_conf).cast::<ngx_http_conf_ctx_t>();
-        let conf_ctx = conf_ctx.as_ref()?;
-        NonNull::new((*conf_ctx.main_conf.add(module.ctx_index)).cast())
+        unsafe { conf_ctx.as_ref()?.http_main_conf_unchecked(module) }
     }
 }
 
@@ -55,59 +72,70 @@ impl HttpModuleConfExt for crate::ffi::ngx_conf_t {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         let conf_ctx = self.ctx.cast::<ngx_http_conf_ctx_t>();
-        let conf_ctx = conf_ctx.as_ref()?;
-        NonNull::new((*conf_ctx.main_conf.add(module.ctx_index)).cast())
+        unsafe { conf_ctx.as_ref()?.http_main_conf_unchecked(module) }
     }
 
     #[inline]
     unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         let conf_ctx = self.ctx.cast::<ngx_http_conf_ctx_t>();
-        let conf_ctx = conf_ctx.as_ref()?;
-        NonNull::new((*conf_ctx.srv_conf.add(module.ctx_index)).cast())
+        unsafe { conf_ctx.as_ref()?.http_server_conf_unchecked(module) }
     }
 
     #[inline]
     unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         let conf_ctx = self.ctx.cast::<ngx_http_conf_ctx_t>();
-        let conf_ctx = conf_ctx.as_ref()?;
-        NonNull::new((*conf_ctx.loc_conf.add(module.ctx_index)).cast())
+        unsafe { conf_ctx.as_ref()?.http_location_conf_unchecked(module) }
+    }
+}
+
+impl HttpModuleConfExt for crate::ffi::ngx_http_connection_t {
+    #[inline]
+    unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
+        unsafe { self.conf_ctx.as_ref()?.http_main_conf_unchecked(module) }
+    }
+
+    #[inline]
+    unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
+        unsafe { self.conf_ctx.as_ref()?.http_server_conf_unchecked(module) }
+    }
+
+    #[inline]
+    unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
+        unsafe { self.conf_ctx.as_ref()?.http_location_conf_unchecked(module) }
     }
 }
 
 impl HttpModuleConfExt for ngx_http_core_srv_conf_t {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        let conf_ctx = self.ctx.as_ref()?;
-        NonNull::new((*conf_ctx.main_conf.add(module.ctx_index)).cast())
+        unsafe { self.ctx.as_ref()?.http_main_conf_unchecked(module) }
     }
 
     #[inline]
     unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        let conf_ctx = self.ctx.as_ref()?;
-        NonNull::new((*conf_ctx.srv_conf.add(module.ctx_index)).cast())
+        unsafe { self.ctx.as_ref()?.http_server_conf_unchecked(module) }
     }
 
     #[inline]
     unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        let conf_ctx = self.ctx.as_ref()?;
-        NonNull::new((*conf_ctx.loc_conf.add(module.ctx_index)).cast())
+        unsafe { self.ctx.as_ref()?.http_location_conf_unchecked(module) }
     }
 }
 
 impl HttpModuleConfExt for ngx_http_request_t {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        NonNull::new((*self.main_conf.add(module.ctx_index)).cast())
+        NonNull::new(unsafe { *self.main_conf.add(module.ctx_index) }.cast())
     }
 
     #[inline]
     unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        NonNull::new((*self.srv_conf.add(module.ctx_index)).cast())
+        NonNull::new(unsafe { *self.srv_conf.add(module.ctx_index) }.cast())
     }
 
     #[inline]
     unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        NonNull::new((*self.loc_conf.add(module.ctx_index)).cast())
+        NonNull::new(unsafe { *self.loc_conf.add(module.ctx_index) }.cast())
     }
 }
 
@@ -118,7 +146,7 @@ impl HttpModuleConfExt for ngx_http_upstream_srv_conf_t {
         if conf.is_null() {
             return None;
         }
-        NonNull::new((*conf.add(module.ctx_index)).cast())
+        NonNull::new(unsafe { *conf.add(module.ctx_index) }.cast())
     }
 }
 
