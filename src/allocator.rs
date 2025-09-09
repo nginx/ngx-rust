@@ -14,7 +14,7 @@ use ::core::ptr::{self, NonNull};
 pub use allocator_api2::alloc::{AllocError, Allocator};
 
 #[cfg(feature = "alloc")]
-pub use allocator_api2::{alloc::Global, boxed::Box};
+pub use allocator_api2::{alloc::Global, boxed::Box, unsize_box};
 
 /// Explicitly duplicate an object using the specified Allocator.
 pub trait TryCloneIn: Sized {
@@ -80,25 +80,4 @@ mod impls {
             Box::try_new_in(x, alloc)
         }
     }
-}
-
-/// Allows turning a [`Box<T: Sized, A>`][Box] into a [`Box<U: ?Sized, A>`][Box] where `T` can be
-/// unsizing-coerced into a `U`.
-///
-/// See [allocator_api2::unsize_box] for an explanation why this macro is necessary.
-#[cfg(feature = "alloc")]
-#[doc(inline)]
-pub use crate::__unsize_box as unsize_box;
-
-// We have to reimplement this macro because the original implementation is not reexportable.
-// Macro definitions float to the top of the crate, thus we also mark it as hidden and reexport
-// again from the right namespace.
-#[cfg(feature = "alloc")]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __unsize_box {
-    ( $boxed:expr $(,)? ) => {{
-        let (ptr, alloc) = $crate::allocator::Box::into_raw_with_allocator($boxed);
-        unsafe { $crate::allocator::Box::from_raw_in(ptr as *mut _, alloc) }
-    }};
 }
