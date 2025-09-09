@@ -116,22 +116,26 @@ static VERIFIER: LazyLock<Option<SignatureVerifier>> = LazyLock::new(|| {
         .ok()
 });
 
-fn make_cache_dir() -> io::Result<PathBuf> {
-    let base_dir = env::var("CARGO_MANIFEST_DIR")
+static CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    let base_dir = env::var("OUT_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| env::current_dir().expect("Failed to get current directory"));
-    // Choose `.cache` relative to the manifest directory (nginx-src) as the default cache directory
+    // Choose `.cache` relative to the OUT_DIR of the caller (nginx-sys) as the default cache directory
     // Environment variable `CACHE_DIR` overrides this
     // Recommendation: set env "CACHE_DIR = { value = ".cache", relative = true }" in
     // `.cargo/config.toml` in your project
     let cache_dir = env::var("CACHE_DIR")
         .map(PathBuf::from)
         .unwrap_or(base_dir.join(".cache"));
+
     if !cache_dir.exists() {
-        fs::create_dir_all(&cache_dir)?;
+        fs::create_dir_all(&cache_dir)
+            .map_err(|err| format!("Failed to create {cache_dir:?}: {err}"))
+            .unwrap();
     }
-    Ok(cache_dir)
-}
+
+    cache_dir
+});
 
 /// Downloads a tarball from the specified URL into the `.cache` directory.
 fn download(cache_dir: &Path, url: &str) -> Result<PathBuf, Box<dyn StdError + Send + Sync>> {
@@ -228,12 +232,11 @@ pub fn prepare(source_dir: &Path, build_dir: &Path) -> io::Result<(PathBuf, Vec<
         fs::create_dir_all(&extract_output_base_dir)?;
     }
 
-    let cache_dir = make_cache_dir()?;
     let mut options = vec![];
 
     // Download NGINX only if NGX_VERSION is set.
     let source_dir = if let Ok(version) = env::var(NGINX_SOURCE.variable) {
-        let archive_path = get_archive(&cache_dir, &NGINX_SOURCE, version.as_str())?;
+        let archive_path = get_archive(&CACHE_DIR, &NGINX_SOURCE, version.as_str())?;
         let output_base_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
         extract_archive(&archive_path, &output_base_dir)?
     } else {
@@ -246,7 +249,7 @@ pub fn prepare(source_dir: &Path, build_dir: &Path) -> io::Result<(PathBuf, Vec<
             continue;
         };
 
-        let archive_path = get_archive(&cache_dir, source, &requested)?;
+        let archive_path = get_archive(&CACHE_DIR, source, &requested)?;
         let output_dir = extract_archive(&archive_path, &extract_output_base_dir)?;
         let output_dir = output_dir.to_string_lossy();
         options.push(format!("--with-{name}={output_dir}"));
