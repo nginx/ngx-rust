@@ -89,31 +89,10 @@ macro_rules! http_variable_get {
 /// requests.
 ///
 /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
-#[repr(transparent)]
-pub struct Request(ngx_http_request_t);
+pub struct Request(foreign_types::Opaque);
 
-impl<'a> From<&'a Request> for *const ngx_http_request_t {
-    fn from(request: &'a Request) -> Self {
-        &request.0 as *const _
-    }
-}
-
-impl<'a> From<&'a mut Request> for *mut ngx_http_request_t {
-    fn from(request: &'a mut Request) -> Self {
-        &request.0 as *const _ as *mut _
-    }
-}
-
-impl AsRef<ngx_http_request_t> for Request {
-    fn as_ref(&self) -> &ngx_http_request_t {
-        &self.0
-    }
-}
-
-impl AsMut<ngx_http_request_t> for Request {
-    fn as_mut(&mut self) -> &mut ngx_http_request_t {
-        &mut self.0
-    }
+unsafe impl foreign_types::ForeignTypeRef for Request {
+    type CType = ngx_http_request_t;
 }
 
 impl Request {
@@ -123,20 +102,30 @@ impl Request {
     ///
     /// The caller has provided a valid non-null pointer to a valid `ngx_http_request_t`
     /// which shares the same representation as `Request`.
+    #[inline]
     pub unsafe fn from_ngx_http_request<'a>(r: *mut ngx_http_request_t) -> &'a mut Request {
-        &mut *r.cast::<Request>()
+        ForeignTypeRef::from_ptr_mut(r)
+    }
+
+    #[inline]
+    fn inner(&self) -> &ngx_http_request_t {
+        unsafe { &*self.as_ptr() }
+    }
+    #[inline]
+    fn inner_mut(&mut self) -> &mut ngx_http_request_t {
+        unsafe { &mut *self.as_ptr() }
     }
 
     /// Is this the main request (as opposed to a subrequest)?
     pub fn is_main(&self) -> bool {
-        let main = self.0.main.cast();
+        let main = self.inner().main.cast();
         core::ptr::eq(self, main)
     }
 
     /// Request pool.
     pub fn pool(&self) -> Pool {
         // SAFETY: This request is allocated from `pool`, thus must be a valid pool.
-        unsafe { Pool::from_ngx_pool(self.0.pool) }
+        unsafe { Pool::from_ngx_pool(self.inner().pool) }
     }
 
     /// Returns the result as an `Option` if it exists, otherwise `None`.
@@ -147,17 +136,17 @@ impl Request {
     /// [`ngx_http_upstream_t`] is best described in
     /// <https://nginx.org/en/docs/dev/development_guide.html#http_load_balancing>
     pub fn upstream(&self) -> Option<*mut ngx_http_upstream_t> {
-        if self.0.upstream.is_null() {
+        if self.inner().upstream.is_null() {
             return None;
         }
-        Some(self.0.upstream)
+        Some(self.inner().upstream)
     }
 
     /// Pointer to a [`ngx_connection_t`] client connection object.
     ///
     /// [`ngx_connection_t`]: https://nginx.org/en/docs/dev/development_guide.html#connection
     pub fn connection(&self) -> *mut ngx_connection_t {
-        self.0.connection
+        self.inner().connection
     }
 
     /// Pointer to a [`ngx_log_t`].
@@ -169,7 +158,7 @@ impl Request {
 
     /// Get Module context pointer
     fn get_module_ctx_ptr(&self, module: &ngx_module_t) -> *mut c_void {
-        unsafe { *self.0.ctx.add(module.ctx_index) }
+        unsafe { *self.inner().ctx.add(module.ctx_index) }
     }
 
     /// Get Module context
@@ -183,9 +172,9 @@ impl Request {
     /// Sets the value as the module's context.
     ///
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
-    pub fn set_module_ctx(&self, value: *mut c_void, module: &ngx_module_t) {
+    pub fn set_module_ctx(&mut self, value: *mut c_void, module: &ngx_module_t) {
         unsafe {
-            *self.0.ctx.add(module.ctx_index) = value;
+            *self.inner_mut().ctx.add(module.ctx_index) = value;
         };
     }
 
@@ -210,15 +199,19 @@ impl Request {
     ///
     /// [request body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
     pub fn discard_request_body(&mut self) -> Status {
-        unsafe { Status(ngx_http_discard_request_body(&mut self.0)) }
+        unsafe { Status(ngx_http_discard_request_body(self.as_ptr())) }
     }
 
     /// Client HTTP [User-Agent].
     ///
     /// [User-Agent]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/User-Agent
     pub fn user_agent(&self) -> Option<&NgxStr> {
-        if !self.0.headers_in.user_agent.is_null() {
-            unsafe { Some(NgxStr::from_ngx_str((*self.0.headers_in.user_agent).value)) }
+        if !self.inner().headers_in.user_agent.is_null() {
+            unsafe {
+                Some(NgxStr::from_ngx_str(
+                    (*self.inner().headers_in.user_agent).value,
+                ))
+            }
         } else {
             None
         }
@@ -226,7 +219,7 @@ impl Request {
 
     /// Set HTTP status of response.
     pub fn set_status(&mut self, status: HTTPStatus) {
-        self.0.headers_out.status = status.into();
+        self.inner_mut().headers_out.status = status.into();
     }
 
     /// Add header to the `headers_in` object.
@@ -234,8 +227,8 @@ impl Request {
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
     pub fn add_header_in(&mut self, key: &str, value: &str) -> Option<()> {
         let table: *mut ngx_table_elt_t =
-            unsafe { ngx_list_push(&mut self.0.headers_in.headers) as _ };
-        unsafe { add_to_ngx_table(table, self.0.pool, key, value) }
+            unsafe { ngx_list_push(&mut self.inner_mut().headers_in.headers) as _ };
+        unsafe { add_to_ngx_table(table, self.inner().pool, key, value) }
     }
 
     /// Add header to the `headers_out` object.
@@ -243,44 +236,44 @@ impl Request {
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
     pub fn add_header_out(&mut self, key: &str, value: &str) -> Option<()> {
         let table: *mut ngx_table_elt_t =
-            unsafe { ngx_list_push(&mut self.0.headers_out.headers) as _ };
-        unsafe { add_to_ngx_table(table, self.0.pool, key, value) }
+            unsafe { ngx_list_push(&mut self.inner_mut().headers_out.headers) as _ };
+        unsafe { add_to_ngx_table(table, self.inner().pool, key, value) }
     }
 
     /// Set response body [Content-Length].
     ///
     /// [Content-Length]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Length
     pub fn set_content_length_n(&mut self, n: usize) {
-        self.0.headers_out.content_length_n = n as off_t;
+        self.inner_mut().headers_out.content_length_n = n as off_t;
     }
 
     /// Send the output header.
     ///
     /// Do not call this function until all output headers are set.
     pub fn send_header(&mut self) -> Status {
-        unsafe { Status(ngx_http_send_header(&mut self.0)) }
+        unsafe { Status(ngx_http_send_header(self.as_ptr())) }
     }
 
     /// Flag indicating that the output does not require a body.
     ///
     /// For example, this flag is used by `HTTP HEAD` requests.
     pub fn header_only(&self) -> bool {
-        self.0.header_only() != 0
+        self.inner().header_only() != 0
     }
 
     /// request method
     pub fn method(&self) -> Method {
-        Method::from_ngx(self.0.method)
+        Method::from_ngx(self.inner().method)
     }
 
     /// path part of request only
     pub fn path(&self) -> &NgxStr {
-        unsafe { NgxStr::from_ngx_str(self.0.uri) }
+        unsafe { NgxStr::from_ngx_str(self.inner().uri) }
     }
 
     /// full uri - containing path and args
     pub fn unparsed_uri(&self) -> &NgxStr {
-        unsafe { NgxStr::from_ngx_str(self.0.unparsed_uri) }
+        unsafe { NgxStr::from_ngx_str(self.inner().unparsed_uri) }
     }
 
     /// Send the [response body].
@@ -290,13 +283,13 @@ impl Request {
     ///
     /// [response body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
     pub fn output_filter(&mut self, body: &mut ngx_chain_t) -> Status {
-        unsafe { Status(ngx_http_output_filter(&mut self.0, body)) }
+        unsafe { Status(ngx_http_output_filter(self.as_ptr(), body)) }
     }
 
     /// Perform internal redirect to a location
     pub fn internal_redirect(&self, location: &str) -> Status {
         assert!(!location.is_empty(), "uri location is empty");
-        let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.0.pool, location) as *mut _ };
+        let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.inner().pool, location) as *mut _ };
 
         // FIXME: check status of ngx_http_named_location or ngx_http_internal_redirect
         if location.starts_with('@') {
@@ -326,7 +319,7 @@ impl Request {
             ngx_int_t,
         ) -> ngx_int_t,
     ) -> Status {
-        let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.0.pool, uri) as *mut _ };
+        let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.inner().pool, uri) as *mut _ };
         // -------------
         // allocate memory and set values for ngx_http_post_subrequest_t
         let sub_ptr = self
@@ -377,13 +370,13 @@ impl Request {
     /// Iterate over headers_in
     /// each header item is (&str, &str) (borrowed)
     pub fn headers_in_iterator(&self) -> NgxListIterator<'_> {
-        unsafe { list_iterator(&self.0.headers_in.headers) }
+        unsafe { list_iterator(&self.inner().headers_in.headers) }
     }
 
     /// Iterate over headers_out
     /// each header item is (&str, &str) (borrowed)
     pub fn headers_out_iterator(&self) -> NgxListIterator<'_> {
-        unsafe { list_iterator(&self.0.headers_out.headers) }
+        unsafe { list_iterator(&self.inner().headers_out.headers) }
     }
 }
 
@@ -392,21 +385,21 @@ impl crate::http::HttpModuleConfExt for Request {
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         // SAFETY: main_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
         // explicitly initialized by the module
-        NonNull::new((*self.0.main_conf.add(module.ctx_index)).cast())
+        NonNull::new((*self.inner().main_conf.add(module.ctx_index)).cast())
     }
 
     #[inline]
     unsafe fn http_server_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         // SAFETY: srv_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
         // explicitly initialized by the module
-        NonNull::new((*self.0.srv_conf.add(module.ctx_index)).cast())
+        NonNull::new((*self.inner().srv_conf.add(module.ctx_index)).cast())
     }
 
     #[inline]
     unsafe fn http_location_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         // SAFETY: loc_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
         // explicitly initialized by the module
-        NonNull::new((*self.0.loc_conf.add(module.ctx_index)).cast())
+        NonNull::new((*self.inner().loc_conf.add(module.ctx_index)).cast())
     }
 }
 
@@ -417,7 +410,7 @@ impl crate::http::HttpModuleConfExt for Request {
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Request")
-            .field("request_", &self.0)
+            .field("request_", &self.inner())
             .finish()
     }
 }
