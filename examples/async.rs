@@ -25,17 +25,19 @@ impl http::HttpModule for Module {
 
     unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
         // SAFETY: this function is called with non-NULL cf always
-        let cf = &mut *cf;
+        let cf = unsafe { &mut *cf };
         let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
 
-        let h = ngx_array_push(
-            &mut cmcf.phases[ngx_http_phases_NGX_HTTP_ACCESS_PHASE as usize].handlers,
-        ) as *mut ngx_http_handler_pt;
+        let h = unsafe {
+            ngx_array_push(
+                &mut cmcf.phases[ngx_http_phases_NGX_HTTP_ACCESS_PHASE as usize].handlers,
+            ) as *mut ngx_http_handler_pt
+        };
         if h.is_null() {
             return core::Status::NGX_ERROR.into();
         }
         // set an Access phase handler
-        *h = Some(async_access_handler);
+        unsafe { *h = Some(async_access_handler) };
         core::Status::NGX_OK.into()
     }
 }
@@ -98,16 +100,16 @@ impl http::Merge for ModuleConfig {
 
 unsafe extern "C" fn check_async_work_done(event: *mut ngx_event_t) {
     let ctx = ngx::ngx_container_of!(event, RequestCTX, event);
-    let c: *mut ngx_connection_t = (*event).data.cast();
+    let c: *mut ngx_connection_t = unsafe { (*event).data.cast() };
 
-    if (*ctx).done.load(Ordering::Relaxed) {
+    if unsafe { (*ctx).done.load(Ordering::Relaxed) } {
         // Triggering async_access_handler again
-        ngx_post_event((*c).write, addr_of_mut!(ngx_posted_events));
+        unsafe { ngx_post_event((*c).write, addr_of_mut!(ngx_posted_events)) };
     } else {
         // this doesn't have have good performance but works as a simple thread-safe example and
         // doesn't causes segfault. The best method that provides both thread-safety and
         // performance requires an nginx patch.
-        ngx_post_event(event, addr_of_mut!(ngx_posted_next_events));
+        unsafe { ngx_post_event(event, addr_of_mut!(ngx_posted_next_events)) };
     }
 }
 

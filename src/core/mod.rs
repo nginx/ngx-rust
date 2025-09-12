@@ -18,8 +18,8 @@ pub use string::*;
 /// `$ptr` must be a valid pointer to the field `$field` of `$type`.
 #[macro_export]
 macro_rules! ngx_container_of {
-    ($ptr:expr, $type:path, $field:ident) => {
-        $ptr.byte_sub(::core::mem::offset_of!($type, $field))
-            .cast::<$type>()
-    };
+    ($ptr:expr, $type:path, $field:ident) => {{
+        let ptr = $ptr;
+        unsafe { ptr.byte_sub(::core::mem::offset_of!($type, $field)) }.cast::<$type>()
+    }};
 }

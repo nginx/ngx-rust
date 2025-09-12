@@ -16,10 +16,8 @@ macro_rules! http_upstream_init_peer_pt {
             r: *mut $crate::ffi::ngx_http_request_t,
             us: *mut $crate::ffi::ngx_http_upstream_srv_conf_t,
         ) -> $crate::ffi::ngx_int_t {
-            let status: $crate::core::Status = $handler(
-                unsafe { &mut $crate::http::Request::from_ngx_http_request(r) },
-                us,
-            );
+            let mut request = unsafe { $crate::http::Request::from_ngx_http_request(r) };
+            let status: $crate::core::Status = $handler(&mut request, us);
             status.0
         }
     };
