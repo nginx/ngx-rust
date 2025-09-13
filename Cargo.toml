@@ -36,11 +36,14 @@ all-features = true
 default-target = "x86_64-unknown-linux-gnu"
 targets = []
 
+[workspace.dependencies]
+nginx-sys = { path = "nginx-sys", version = "0.5.0-beta" }
+
 [dependencies]
 allocator-api2 = { version = "0.2.21", default-features = false }
 async-task = { version = "4.7.1", optional = true }
 lock_api = "0.4.13"
-nginx-sys = { path = "nginx-sys", version = "0.5.0-beta"}
+nginx-sys = { workspace = true }
 pin-project-lite = { version = "0.2.16", optional = true }
 
 [features]
@@ -69,4 +72,5 @@ vendored = ["nginx-sys/vendored"]
 maintenance = { status = "experimental" }
 
 [dev-dependencies]
+nginx-sys = { workspace = true, features = ["unittest"] }
 tempfile = { version = "3.20.0", default-features = false }
