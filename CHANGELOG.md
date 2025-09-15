@@ -2,7 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## Release v0.5.0-beta
+## Release 0.5.0
+
+### Breaking changes
+
+The release contains too many breaking changes to offer a complete migration
+guide. We will strive to do better in future releases; meanwhile, we suggest to
+look at the changes in example modules:
+
+    git diff v0.4.1..v0.5.0 -- examples/*.rs
 
 ### Build experience
 
@@ -36,6 +44,17 @@ your project.
 [#160]: https://github.com/nginx/ngx-rust/pull/160
 [#176]: https://github.com/nginx/ngx-rust/pull/176
 
+### Module declaration
+
+The traits for declaring a module and accessing module configuration underwent
+significant changes in [#142] with the goal of reducing the amount of unsafe
+code and enforcing type safety.
+
+See <https://github.com/nginx/ngx-rust/pull/142#issuecomment-2755624647> for a
+summary and migration steps.
+
+[#142]: https://github.com/nginx/ngx-rust/pull/142
+
 ### Allocators
 
 `ngx` now offers custom allocator support based on the [allocator-api2] crate.
@@ -64,7 +83,6 @@ in NGINX in [`ngx::collections`](./src/collections/) ([#164], [#181]).
   ([#124], [#161]). No further porting or testing work was done.
 * Reimplementations for `nginx-sys` methods and macros that cannot be translated
   with bindgen ([#131], [#162], [#167])
-* Improved API for module configuration access ([#142]).
 * Initial work on the NGINX async runtime ([#170])
 * The default branch was renamed to `main`.
 
@@ -72,7 +90,6 @@ in NGINX in [`ngx::collections`](./src/collections/) ([#164], [#181]).
 [#111]: https://github.com/nginx/ngx-rust/pull/111
 [#113]: https://github.com/nginx/ngx-rust/pull/113
 [#131]: https://github.com/nginx/ngx-rust/pull/131
-[#142]: https://github.com/nginx/ngx-rust/pull/142
 [#152]: https://github.com/nginx/ngx-rust/pull/152
 [#161]: https://github.com/nginx/ngx-rust/pull/161
 [#162]: https://github.com/nginx/ngx-rust/pull/162
@@ -90,7 +107,7 @@ distributions.
 The minimum supported NGINX version is 1.22. The bindings may compile with an
 older version of NGINX, but we do not test that regularly.
 
-Full changelog: [v0.4.1..v0.5.0-beta](https://github.com/nginx/ngx-rust/compare/v0.4.1...v0.5.0-beta)
+Full changelog: [v0.4.1..v0.5.0](https://github.com/nginx/ngx-rust/compare/v0.4.1...v0.5.0)
 
 ## Release v0.4.1
  * release:     ngx 0.4.1                                                       (9d2ce0d)
