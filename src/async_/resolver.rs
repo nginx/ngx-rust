@@ -217,7 +217,7 @@ impl<'a> Resolution<'a> {
     }
 }
 
-impl<'a> core::future::Future for Resolution<'a> {
+impl core::future::Future for Resolution<'_> {
     type Output = Result<Vec<ngx_addr_t, Pool>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
