@@ -1,5 +1,7 @@
 [![Rust](https://github.com/nginx/ngx-rust/actions/workflows/ci.yaml/badge.svg)](https://github.com/nginx/ngx-rust/actions/workflows/ci.yaml)
 [![crates.io](https://img.shields.io/crates/v/ngx.svg)](https://crates.io/crates/ngx)
+[![docs.rs](https://img.shields.io/docsrs/ngx?label=docs(ngx))](https://docs.rs/ngx)
+[![docs.rs](https://img.shields.io/docsrs/nginx-sys?label=docs(nginx-sys))](https://docs.rs/nginx-sys)
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 [![Community Support](https://badgen.net/badge/support/community/cyan?icon=awesome)](https://github.com/nginx/ngx-rust/discussions)
 
