@@ -9,7 +9,7 @@
 use std::ffi::{c_char, c_void};
 use std::mem;
 
-use ngx::core::{Pool, Status};
+use ngx::core::{ForeignTypeRef, Pool, Status};
 use ngx::ffi::{
     ngx_atoi, ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_free_peer_pt,
     ngx_event_get_peer_pt, ngx_http_module_t, ngx_http_upstream_init_peer_pt,
@@ -133,7 +133,7 @@ http_upstream_init_peer_pt!(
         };
 
         let original_init_peer = hccf.original_init_peer.unwrap();
-        if unsafe { original_init_peer(request.into(), us) != Status::NGX_OK.into() } {
+        if unsafe { original_init_peer(request.as_ptr(), us) != Status::NGX_OK.into() } {
             return Status::NGX_ERROR;
         }
 

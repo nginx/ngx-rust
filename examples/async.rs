@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 
-use ngx::core;
+use ngx::core::{self, ForeignTypeRef};
 use ngx::ffi::{
     ngx_array_push, ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_t, ngx_http_handler_pt,
     ngx_http_module_t, ngx_http_phases_NGX_HTTP_ACCESS_PHASE, ngx_int_t, ngx_module_t,
@@ -171,7 +171,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
     unsafe { ngx_post_event(&mut ctx.event, addr_of_mut!(ngx_posted_next_events)) };
 
     // Request is no longer needed and can be converted to something movable to the async block
-    let req = AtomicPtr::new(request.into());
+    let req = AtomicPtr::new(request.as_ptr());
     let done_flag = ctx.done.clone();
 
     let rt = ngx_http_async_runtime();

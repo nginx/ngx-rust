@@ -10,6 +10,8 @@ pub use slab::SlabPool;
 pub use status::*;
 pub use string::*;
 
+pub use foreign_types::ForeignTypeRef;
+
 /// Gets an outer object pointer from a pointer to one of its fields.
 /// While there is no corresponding C macro, the pattern is common in the NGINX source.
 ///
