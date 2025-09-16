@@ -272,7 +272,7 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
         }
     });
     if !conf.enable {
-        return core::Status::NGX_DECLINED;
+        return core::NGX_O_DECLINED;
     }
 
     // TODO: build url properly from the original URL from client
@@ -284,7 +284,7 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
     let datetime = chrono::Utc::now();
     let uri = match request.unparsed_uri().to_str() {
         Ok(v) => format!("https://{}.{}{}", conf.s3_bucket, conf.s3_endpoint, v),
-        Err(_) => return core::Status::NGX_DECLINED,
+        Err(_) => return core::NGX_O_DECLINED,
     };
 
     let datetime_now = datetime.format("%Y%m%dT%H%M%SZ");
@@ -301,11 +301,11 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
                     if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
                         headers.insert(http::header::HOST, value);
                     } else {
-                        return core::Status::NGX_DECLINED;
+                        return core::NGX_O_DECLINED;
                     }
                 }
             } else {
-                return core::Status::NGX_DECLINED;
+                return core::NGX_O_DECLINED;
             }
         }
         headers.insert("X-Amz-Date", datetime_now.parse().unwrap());
@@ -338,5 +338,5 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
         ngx_log_debug_http!(request, "headers_in  {name}: {value}",);
     }
 
-    core::Status::NGX_OK
+    core::NGX_O_OK
 });

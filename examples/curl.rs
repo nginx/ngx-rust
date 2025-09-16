@@ -103,10 +103,10 @@ http_request_handler!(curl_access_handler, |request: &mut http::Request| {
             {
                 http::HTTPStatus::FORBIDDEN.into()
             } else {
-                core::Status::NGX_DECLINED
+                core::NGX_O_DECLINED
             }
         }
-        false => core::Status::NGX_DECLINED,
+        false => core::NGX_O_DECLINED,
     }
 });
 

@@ -5,27 +5,29 @@ use core::ptr::NonNull;
 use core::slice;
 use core::str::FromStr;
 
+use allocator_api2::alloc::Allocator;
+
 use crate::core::*;
 use crate::ffi::*;
 use crate::http::status::*;
 
 /// Define a static request handler.
 ///
-/// Handlers are expected to take a single [`Request`] argument and return a [`Status`].
+/// Handlers are expected to take a single [`Request`] argument and return a [`Option<ngx_int_t>`].
 #[macro_export]
 macro_rules! http_request_handler {
     ( $name: ident, $handler: expr ) => {
         extern "C" fn $name(r: *mut $crate::ffi::ngx_http_request_t) -> $crate::ffi::ngx_int_t {
-            let status: $crate::core::Status =
+            let res: Option<$crate::ffi::ngx_int_t> =
                 $handler(unsafe { &mut $crate::http::Request::from_ngx_http_request(r) });
-            status.0
+            res.unwrap_or($crate::ffi::NGX_ERROR as _)
         }
     };
 }
 
 /// Define a static post subrequest handler.
 ///
-/// Handlers are expected to take a single [`Request`] argument and return a [`Status`].
+/// Handlers are expected to take a single [`Request`] argument and return a [`Option<ngx_int_t>`].
 #[macro_export]
 macro_rules! http_subrequest_handler {
     ( $name: ident, $handler: expr ) => {
@@ -34,7 +36,8 @@ macro_rules! http_subrequest_handler {
             data: *mut ::core::ffi::c_void,
             rc: $crate::ffi::ngx_int_t,
         ) -> $crate::ffi::ngx_int_t {
-            $handler(r, data, rc)
+            let res: Option<$crate::ffi::ngx_int_t> = $handler(r, data, rc);
+            res.unwrap_or($crate::ffi::NGX_ERROR as _)
         }
     };
 }
@@ -64,8 +67,8 @@ macro_rules! http_variable_set {
 /// Define a static variable evaluator.
 ///
 /// The get handler is responsible for evaluating a variable in the context of a specific request.
-/// Variable evaluators accept a [`Request`] input argument and two output
-/// arguments: [`ngx_variable_value_t`] and [`usize`].
+/// Variable evaluators accept a [`Request`] and [`usize`] as input arguments and
+/// [`ngx_variable_value_t`] as output argument.
 /// Variables: <https://nginx.org/en/docs/dev/development_guide.html#http_variables>
 #[macro_export]
 macro_rules! http_variable_get {
@@ -127,6 +130,11 @@ impl Request {
         &mut *r.cast::<Request>()
     }
 
+    /// Get the raw pointer to the underlying [`ngx_http_request_t`].
+    pub fn as_ptr(&self) -> *mut ngx_http_request_t {
+        &self.0 as *const _ as *mut _
+    }
+
     /// Is this the main request (as opposed to a subrequest)?
     pub fn is_main(&self) -> bool {
         let main = self.0.main.cast();
@@ -164,6 +172,7 @@ impl Request {
     ///
     /// [`ngx_log_t`]: https://nginx.org/en/docs/dev/development_guide.html#logging
     pub fn log(&self) -> *mut ngx_log_t {
+        // SAFETY: valid request always contains non-NULL connection pointer
         unsafe { (*self.connection()).log }
     }
 
@@ -209,8 +218,8 @@ impl Request {
     /// Discard (read and ignore) the [request body].
     ///
     /// [request body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
-    pub fn discard_request_body(&mut self) -> Status {
-        unsafe { Status(ngx_http_discard_request_body(&mut self.0)) }
+    pub fn discard_request_body(&mut self) -> Option<ngx_int_t> {
+        unsafe { ngx_make_opt(ngx_http_discard_request_body(&mut self.0)) }
     }
 
     /// Client HTTP [User-Agent].
@@ -257,8 +266,8 @@ impl Request {
     /// Send the output header.
     ///
     /// Do not call this function until all output headers are set.
-    pub fn send_header(&mut self) -> Status {
-        unsafe { Status(ngx_http_send_header(&mut self.0)) }
+    pub fn send_header(&mut self) -> Option<ngx_int_t> {
+        unsafe { ngx_make_opt(ngx_http_send_header(&mut self.0)) }
     }
 
     /// Flag indicating that the output does not require a body.
@@ -289,30 +298,26 @@ impl Request {
     /// Set the `last_buf` flag in the last body buffer.
     ///
     /// [response body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
-    pub fn output_filter(&mut self, body: &mut ngx_chain_t) -> Status {
-        unsafe { Status(ngx_http_output_filter(&mut self.0, body)) }
+    pub fn output_filter(&mut self, body: &mut ngx_chain_t) -> Option<ngx_int_t> {
+        unsafe { ngx_make_opt(ngx_http_output_filter(&mut self.0, body)) }
     }
 
     /// Perform internal redirect to a location
-    pub fn internal_redirect(&self, location: &str) -> Status {
+    pub fn internal_redirect(&self, location: &str) -> Option<ngx_int_t> {
         assert!(!location.is_empty(), "uri location is empty");
         let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.0.pool, location) as *mut _ };
 
         // FIXME: check status of ngx_http_named_location or ngx_http_internal_redirect
         if location.starts_with('@') {
             unsafe {
-                ngx_http_named_location((self as *const Request as *mut Request).cast(), uri_ptr);
+                ngx_http_named_location(self.as_ptr(), uri_ptr);
             }
         } else {
             unsafe {
-                ngx_http_internal_redirect(
-                    (self as *const Request as *mut Request).cast(),
-                    uri_ptr,
-                    core::ptr::null_mut(),
-                );
+                ngx_http_internal_redirect(self.as_ptr(), uri_ptr, core::ptr::null_mut());
             }
         }
-        Status::NGX_DONE
+        NGX_O_DONE
     }
 
     /// Send a subrequest
@@ -325,53 +330,55 @@ impl Request {
             *mut c_void,
             ngx_int_t,
         ) -> ngx_int_t,
-    ) -> Status {
+    ) -> Option<ngx_int_t> {
         let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.0.pool, uri) as *mut _ };
         // -------------
         // allocate memory and set values for ngx_http_post_subrequest_t
-        let sub_ptr = self
-            .pool()
-            .alloc(core::mem::size_of::<ngx_http_post_subrequest_t>());
+        let post_subreq = <Pool as Allocator>::allocate(
+            &self.pool(),
+            core::alloc::Layout::new::<ngx_http_post_subrequest_t>(),
+        )
+        .ok()?
+        .as_ptr() as *mut ngx_http_post_subrequest_t;
 
-        // assert!(sub_ptr.is_null());
-        let post_subreq =
-            sub_ptr as *const ngx_http_post_subrequest_t as *mut ngx_http_post_subrequest_t;
+        // SAFETY: parent request context must be set already.
         unsafe {
             (*post_subreq).handler = Some(post_callback);
-            (*post_subreq).data = self.get_module_ctx_ptr(module); // WARN: safety! ensure that ctx
-                                                                   // is already set
+            (*post_subreq).data = self.get_module_ctx_ptr(module);
         }
         // -------------
 
         let mut psr: *mut ngx_http_request_t = core::ptr::null_mut();
-        let r = unsafe {
+        if unsafe {
             ngx_http_subrequest(
-                (self as *const Request as *mut Request).cast(),
+                self.as_ptr(),
                 uri_ptr,
                 core::ptr::null_mut(),
                 &mut psr as *mut _,
-                sub_ptr as *mut _,
+                post_subreq as *mut _,
                 NGX_HTTP_SUBREQUEST_WAITED as _,
-            )
-        };
+            ) != NGX_OK as ngx_int_t
+        } {
+            return NGX_O_ERROR;
+        }
 
-        // previously call of ngx_http_subrequest() would ensure that the pointer is not null
-        // anymore
+        // SAFETY: previous call of ngx_http_subrequest() would ensure that the pointer is not null
         let sr = unsafe { &mut *psr };
 
         /*
          * allocate fake request body to avoid attempts to read it and to make
          * sure real body file (if already read) won't be closed by upstream
          */
-        sr.request_body =
-            self.pool()
-                .alloc(core::mem::size_of::<ngx_http_request_body_t>()) as *mut _;
+        sr.request_body = <Pool as Allocator>::allocate(
+            &self.pool(),
+            core::alloc::Layout::new::<ngx_http_request_body_t>(),
+        )
+        .ok()?
+        .as_ptr() as *mut _;
 
-        if sr.request_body.is_null() {
-            return Status::NGX_ERROR;
-        }
         sr.set_header_only(1 as _);
-        Status(r)
+
+        NGX_O_OK
     }
 
     /// Iterate over headers_in

@@ -1,5 +1,5 @@
 use std::ffi::{c_char, c_void};
-use std::ptr::{addr_of, addr_of_mut};
+use std::ptr::addr_of_mut;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
@@ -145,24 +145,22 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
     ngx_log_debug_http!(request, "async module enabled: {}", co.enable);
 
     if !co.enable {
-        return core::Status::NGX_DECLINED;
+        return core::NGX_O_DECLINED;
     }
 
-    if let Some(ctx) =
-        unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_async_module)) }
-    {
+    if let Some(ctx) = request.get_module_ctx::<RequestCTX>(Module::module()) {
         if !ctx.done.load(Ordering::Relaxed) {
-            return core::Status::NGX_AGAIN;
+            return core::NGX_O_AGAIN;
         }
 
-        return core::Status::NGX_OK;
+        return core::NGX_O_OK;
     }
 
     let ctx = request.pool().allocate(RequestCTX::default());
     if ctx.is_null() {
-        return core::Status::NGX_ERROR;
+        return core::NGX_O_ERROR;
     }
-    request.set_module_ctx(ctx.cast(), unsafe { &*addr_of!(ngx_http_async_module) });
+    request.set_module_ctx(ctx.cast(), Module::module());
 
     let ctx = unsafe { &mut *ctx };
     ctx.event.handler = Some(check_async_work_done);
@@ -194,7 +192,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
         // and use the same trick as the thread pool)
     }));
 
-    core::Status::NGX_AGAIN
+    core::NGX_O_AGAIN
 });
 
 extern "C" fn ngx_http_async_commands_set_enable(

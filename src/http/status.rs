@@ -36,6 +36,16 @@ impl From<HTTPStatus> for Status {
     }
 }
 
+impl From<HTTPStatus> for Option<ngx_int_t> {
+    fn from(val: HTTPStatus) -> Self {
+        if (100..599).contains(&val.0) {
+            Some(val.0 as ngx_int_t)
+        } else {
+            None
+        }
+    }
+}
+
 impl From<HTTPStatus> for ngx_uint_t {
     fn from(val: HTTPStatus) -> Self {
         val.0
@@ -49,7 +59,7 @@ impl fmt::Debug for HTTPStatus {
 }
 
 impl HTTPStatus {
-    /// Convets a u16 to a status code.
+    /// Converts a u16 to a status code.
     #[inline]
     pub fn from_u16(src: u16) -> Result<HTTPStatus, InvalidHTTPStatusCode> {
         if !(100..600).contains(&src) {

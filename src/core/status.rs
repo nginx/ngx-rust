@@ -68,3 +68,28 @@ ngx_codes! {
 pub const NGX_CONF_ERROR: *mut c_char = ptr::null_mut::<c_char>().wrapping_offset(-1);
 /// Configuration handler succeeded.
 pub const NGX_CONF_OK: *mut c_char = ptr::null_mut();
+
+/// Converts an NGINX status code to an Option type.
+pub fn ngx_make_opt(code: ngx_int_t) -> Option<ngx_int_t> {
+    if code != NGX_ERROR as ngx_int_t {
+        Some(code)
+    } else {
+        None
+    }
+}
+
+/// NGX_OK - Operation succeeded.
+pub const NGX_O_OK: Option<ngx_int_t> = Some(NGX_OK as ngx_int_t);
+/// NGX_ERROR - Operation failed.
+pub const NGX_O_ERROR: Option<ngx_int_t> = None;
+/// NGX_AGAIN - Operation incomplete; call the function again.
+pub const NGX_O_AGAIN: Option<ngx_int_t> = Some(NGX_AGAIN as ngx_int_t);
+/// NGX_BUSY - Resource is not available.
+pub const NGX_O_BUSY: Option<ngx_int_t> = Some(NGX_BUSY as ngx_int_t);
+/// NGX_DONE - Operation complete or continued elsewhere. Also used as an alternative success code.
+pub const NGX_O_DONE: Option<ngx_int_t> = Some(NGX_DONE as ngx_int_t);
+/// NGX_DECLINED - Operation rejected, for example, because it is disabled in the configuration.
+/// This is never an error.
+pub const NGX_O_DECLINED: Option<ngx_int_t> = Some(NGX_DECLINED as ngx_int_t);
+/// NGX_ABORT - Function was aborted. Also used as an alternative error code.
+pub const NGX_O_ABORT: Option<ngx_int_t> = Some(NGX_ABORT as ngx_int_t);
