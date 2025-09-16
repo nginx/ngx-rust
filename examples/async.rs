@@ -145,23 +145,22 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
     ngx_log_debug_http!(request, "async module enabled: {}", co.enable);
 
     if !co.enable {
-        return core::Status::NGX_DECLINED;
+        return core::Status::NGX_DECLINED.into();
     }
 
     if let Some(ctx) =
         unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_async_module)) }
     {
         if !ctx.done.load(Ordering::Relaxed) {
-            return core::Status::NGX_AGAIN;
+            return core::Status::NGX_AGAIN.into();
         }
 
-        return core::Status::NGX_OK;
+        return core::Status::NGX_OK.into();
     }
 
-    let ctx = request.pool().allocate(RequestCTX::default());
-    if ctx.is_null() {
-        return core::Status::NGX_ERROR;
-    }
+    let ctx = request
+        .pool()
+        .allocate_with_cleanup(RequestCTX::default())?;
     request.set_module_ctx(ctx.cast(), unsafe { &*addr_of!(ngx_http_async_module) });
 
     let ctx = unsafe { &mut *ctx };
@@ -194,7 +193,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
         // and use the same trick as the thread pool)
     }));
 
-    core::Status::NGX_AGAIN
+    core::Status::NGX_AGAIN.into()
 });
 
 extern "C" fn ngx_http_async_commands_set_enable(

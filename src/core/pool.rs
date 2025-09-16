@@ -272,7 +272,7 @@ impl Pool {
     ///
     /// Returns a typed pointer to the allocated memory if successful, or a null pointer if
     /// allocation or cleanup handler addition fails.
-    pub fn allocate<T>(&self, value: T) -> *mut T {
+    pub fn alloc_with_cleanup<T>(&self, value: T) -> *mut T {
         unsafe {
             let p = self.alloc(mem::size_of::<T>()) as *mut T;
             ptr::write(p, value);
@@ -281,6 +281,23 @@ impl Pool {
                 return ptr::null_mut();
             };
             p
+        }
+    }
+
+    /// Allocates memory for a value of a specified type and adds a cleanup handler to the memory
+    /// pool.
+    ///
+    /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
+    /// or Result::Err(NgxError) if allocation or cleanup handler addition fails.
+    pub fn allocate_with_cleanup<T>(&self, value: T) -> Result<*mut T, AllocError> {
+        unsafe {
+            let p = self.allocate(Layout::new::<T>())?.as_ptr() as *mut T;
+            ptr::write(p, value);
+            if self.add_cleanup_for_value(p).is_err() {
+                ptr::drop_in_place(p);
+                return Err(AllocError);
+            };
+            Ok(p)
         }
     }
 
@@ -308,7 +325,7 @@ impl Pool {
             Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
         } else {
             let size = core::cmp::min(old_layout.size(), new_layout.size());
-            let new_ptr = <Self as Allocator>::allocate(self, new_layout)?;
+            let new_ptr = self.allocate(new_layout)?;
             unsafe {
                 ptr.copy_to_nonoverlapping(new_ptr.cast(), size);
                 self.deallocate(ptr, old_layout);
