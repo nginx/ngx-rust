@@ -196,7 +196,7 @@ http_variable_get!(
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             obj.bind_addr(v);
-            return core::Status::NGX_OK;
+            return core::Status::NGX_OK.into();
         }
         // lazy initialization:
         //   get original dest information
@@ -207,17 +207,17 @@ http_variable_get!(
         let r = ngx_get_origdst(request);
         match r {
             Err(e) => {
-                return e;
+                return e.into();
             }
             Ok((ip, port)) => {
                 // create context,
                 // set context
                 let new_ctx = request
                     .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
+                    .alloc_with_cleanup::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
-                    return core::Status::NGX_ERROR;
+                    return core::Status::NGX_ERROR.into();
                 }
 
                 ngx_log_debug_http!(
@@ -232,7 +232,7 @@ http_variable_get!(
                     .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
             }
         }
-        core::Status::NGX_OK
+        core::Status::NGX_OK.into()
     }
 );
 
@@ -243,7 +243,7 @@ http_variable_get!(
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             obj.bind_port(v);
-            return core::Status::NGX_OK;
+            return core::Status::NGX_OK.into();
         }
         // lazy initialization:
         //   get original dest information
@@ -254,17 +254,17 @@ http_variable_get!(
         let r = ngx_get_origdst(request);
         match r {
             Err(e) => {
-                return e;
+                return e.into();
             }
             Ok((ip, port)) => {
                 // create context,
                 // set context
                 let new_ctx = request
                     .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
+                    .alloc_with_cleanup::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
-                    return core::Status::NGX_ERROR;
+                    return core::Status::NGX_ERROR.into();
                 }
 
                 ngx_log_debug_http!(
@@ -279,7 +279,7 @@ http_variable_get!(
                     .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
             }
         }
-        core::Status::NGX_OK
+        core::Status::NGX_OK.into()
     }
 );
 

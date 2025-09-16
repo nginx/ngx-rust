@@ -272,7 +272,7 @@ impl Pool {
     ///
     /// Returns a typed pointer to the allocated memory if successful, or a null pointer if
     /// allocation or cleanup handler addition fails.
-    pub fn allocate<T>(&self, value: T) -> *mut T {
+    pub fn alloc_with_cleanup<T>(&self, value: T) -> *mut T {
         unsafe {
             let p = self.alloc(mem::size_of::<T>()) as *mut T;
             ptr::write(p, value);
@@ -308,7 +308,7 @@ impl Pool {
             Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
         } else {
             let size = core::cmp::min(old_layout.size(), new_layout.size());
-            let new_ptr = <Self as Allocator>::allocate(self, new_layout)?;
+            let new_ptr = self.allocate(new_layout)?;
             unsafe {
                 ptr.copy_to_nonoverlapping(new_ptr.cast(), size);
                 self.deallocate(ptr, old_layout);
