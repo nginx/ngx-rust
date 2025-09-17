@@ -3,6 +3,9 @@ use core::fmt::{self, Write};
 use core::mem::MaybeUninit;
 use core::ptr::NonNull;
 
+#[cfg(feature = "log")]
+pub mod interop;
+
 use crate::ffi::{self, ngx_err_t, ngx_log_t, ngx_uint_t, NGX_MAX_ERROR_STR};
 
 /// This constant is set to `true` if NGINX is compiled with debug logging (`--with-debug`).
@@ -193,7 +196,7 @@ macro_rules! ngx_log_debug_mask {
 
 /// Debug masks for use with [`ngx_log_debug_mask`], these represent the only accepted values for
 /// the mask.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum DebugMask {
     /// Aligns to the NGX_LOG_DEBUG_CORE mask.
     Core,
