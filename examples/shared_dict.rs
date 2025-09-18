@@ -200,10 +200,10 @@ extern "C" fn ngx_http_shared_dict_add_variable(
     let cf = unsafe { cf.as_mut().unwrap() };
     let pool = unsafe { Pool::from_ngx_pool(cf.pool) };
 
-    let key = pool.calloc_type::<ngx_http_complex_value_t>();
-    if key.is_null() {
-        return NGX_CONF_ERROR;
-    }
+    let key = match pool.allocate_type_zeroed::<ngx_http_complex_value_t>() {
+        Ok(p) => p.as_ptr(),
+        Err(_) => return NGX_CONF_ERROR,
+    };
 
     // SAFETY:
     // - `cf.args` is guaranteed to be a pointer to an array with 3 elements (NGX_CONF_TAKE2).
