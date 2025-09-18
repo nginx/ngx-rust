@@ -156,7 +156,7 @@ http_request_handler!(async_access_handler, |request: &mut http::Request| {
         return core::NGX_O_OK;
     }
 
-    let ctx = request.pool().allocate(RequestCTX::default());
+    let ctx = request.pool().alloc_with_cleanup(RequestCTX::default());
     if ctx.is_null() {
         return core::NGX_O_ERROR;
     }

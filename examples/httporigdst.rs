@@ -19,31 +19,11 @@ struct NgxHttpOrigDstCtx {
 }
 
 impl NgxHttpOrigDstCtx {
-    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &core::Pool) -> core::Status {
-        let addr_data = pool.alloc_unaligned(addr.len());
-        if addr_data.is_null() {
-            return core::Status::NGX_ERROR;
-        }
-        unsafe { libc::memcpy(addr_data, addr.as_ptr() as *const c_void, addr.len()) };
-        self.orig_dst_addr.len = addr.len();
-        self.orig_dst_addr.data = addr_data as *mut u8;
+    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &core::Pool) {
+        self.orig_dst_addr = unsafe { ngx_str_t::from_str(pool.as_ptr(), addr) };
 
         let port_str = port.to_string();
-        let port_data = pool.alloc_unaligned(port_str.len());
-        if port_data.is_null() {
-            return core::Status::NGX_ERROR;
-        }
-        unsafe {
-            libc::memcpy(
-                port_data,
-                port_str.as_bytes().as_ptr() as *const c_void,
-                port_str.len(),
-            )
-        };
-        self.orig_dst_port.len = port_str.len();
-        self.orig_dst_port.data = port_data as *mut u8;
-
-        core::Status::NGX_OK
+        self.orig_dst_port = unsafe { ngx_str_t::from_str(pool.as_ptr(), &port_str) };
     }
 
     pub unsafe fn bind_addr(&self, v: *mut ngx_variable_value_t) {
@@ -214,7 +194,7 @@ http_variable_get!(
                 // set context
                 let new_ctx = request
                     .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
+                    .alloc_with_cleanup::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
                     return core::Status::NGX_ERROR;
@@ -261,7 +241,7 @@ http_variable_get!(
                 // set context
                 let new_ctx = request
                     .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
+                    .alloc_with_cleanup::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
                     return core::Status::NGX_ERROR;

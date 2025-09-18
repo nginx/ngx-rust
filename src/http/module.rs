@@ -78,7 +78,7 @@ pub trait HttpModule {
         Self::MainConf: Default,
     {
         let pool = Pool::from_ngx_pool((*cf).pool);
-        pool.allocate::<Self::MainConf>(Default::default()) as *mut c_void
+        pool.alloc_with_cleanup::<Self::MainConf>(Default::default()) as *mut c_void
     }
 
     /// # Safety
@@ -103,7 +103,7 @@ pub trait HttpModule {
         Self::ServerConf: Default,
     {
         let pool = Pool::from_ngx_pool((*cf).pool);
-        pool.allocate::<Self::ServerConf>(Default::default()) as *mut c_void
+        pool.alloc_with_cleanup::<Self::ServerConf>(Default::default()) as *mut c_void
     }
 
     /// # Safety
@@ -137,7 +137,7 @@ pub trait HttpModule {
         Self::LocationConf: Default,
     {
         let pool = Pool::from_ngx_pool((*cf).pool);
-        pool.allocate::<Self::LocationConf>(Default::default()) as *mut c_void
+        pool.alloc_with_cleanup::<Self::LocationConf>(Default::default()) as *mut c_void
     }
 
     /// # Safety
