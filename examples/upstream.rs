@@ -120,44 +120,34 @@ http_upstream_init_peer_pt!(
     |request: &mut Request, us: *mut ngx_http_upstream_srv_conf_t| {
         ngx_log_debug_http!(request, "CUSTOM UPSTREAM request peer init");
 
-        let hcpd = request.pool().alloc_type::<UpstreamPeerData>();
-        if hcpd.is_null() {
-            return Status::NGX_ERROR;
-        }
+        let hcpd = request.pool().allocate_type::<UpstreamPeerData>()?;
 
         // SAFETY: this function is called with non-NULL uf always
         let us = unsafe { &mut *us };
-        let hccf = match Module::server_conf(us) {
-            Some(x) => x,
-            None => return Status::NGX_ERROR,
-        };
+        let hccf = Module::server_conf(us).ok_or(ngx::core::NgxError {})?;
 
         let original_init_peer = hccf.original_init_peer.unwrap();
         if unsafe { original_init_peer(request.into(), us) != Status::NGX_OK.into() } {
-            return Status::NGX_ERROR;
+            return Status::NGX_ERROR.into();
         }
 
-        let maybe_upstream = request.upstream();
-        if maybe_upstream.is_none() {
-            return Status::NGX_ERROR;
-        }
-        let upstream_ptr = maybe_upstream.unwrap();
+        let upstream_ptr = request.upstream().ok_or(ngx::core::NgxError {})?;
 
         unsafe {
             (*hcpd).conf = Some(hccf);
-            (*hcpd).upstream = maybe_upstream;
+            (*hcpd).upstream = Some(upstream_ptr);
             (*hcpd).data = (*upstream_ptr).peer.data;
             (*hcpd).client_connection = Some(request.connection());
             (*hcpd).original_get_peer = (*upstream_ptr).peer.get;
             (*hcpd).original_free_peer = (*upstream_ptr).peer.free;
 
-            (*upstream_ptr).peer.data = hcpd as *mut c_void;
+            (*upstream_ptr).peer.data = hcpd as _;
             (*upstream_ptr).peer.get = Some(ngx_http_upstream_get_custom_peer);
             (*upstream_ptr).peer.free = Some(ngx_http_upstream_free_custom_peer);
         }
 
         ngx_log_debug_http!(request, "CUSTOM UPSTREAM end request peer init");
-        Status::NGX_OK
+        Status::NGX_OK.into()
     }
 );
 
@@ -312,24 +302,25 @@ impl HttpModule for Module {
 
     unsafe extern "C" fn create_srv_conf(cf: *mut ngx_conf_t) -> *mut c_void {
         let pool = Pool::from_ngx_pool((*cf).pool);
-        let conf = pool.alloc_type::<SrvConfig>();
-        if conf.is_null() {
+
+        if let Ok(conf) = pool.allocate_type::<SrvConfig>() {
+            unsafe {
+                (*conf).max = NGX_CONF_UNSET as u32;
+            }
+            ngx_log_debug_mask!(
+                DebugMask::Http,
+                (*cf).log,
+                "CUSTOM UPSTREAM end create_srv_conf"
+            );
+            conf as *mut c_void
+        } else {
             ngx_conf_log_error!(
                 NGX_LOG_EMERG,
                 cf,
                 "CUSTOM UPSTREAM could not allocate memory for config"
             );
-            return std::ptr::null_mut();
+            std::ptr::null_mut()
         }
-
-        (*conf).max = NGX_CONF_UNSET as u32;
-
-        ngx_log_debug_mask!(
-            DebugMask::Http,
-            (*cf).log,
-            "CUSTOM UPSTREAM end create_srv_conf"
-        );
-        conf as *mut c_void
     }
 }
 

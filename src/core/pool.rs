@@ -4,7 +4,7 @@ use core::mem;
 use core::ptr::{self, NonNull};
 
 use nginx_sys::{
-    ngx_buf_t, ngx_create_temp_buf, ngx_palloc, ngx_pcalloc, ngx_pfree, ngx_pmemalign, ngx_pnalloc,
+    ngx_buf_t, ngx_create_temp_buf, ngx_palloc, ngx_pfree, ngx_pmemalign, ngx_pnalloc,
     ngx_pool_cleanup_add, ngx_pool_t, NGX_ALIGNMENT,
 };
 
@@ -183,10 +183,7 @@ impl Pool {
     /// Returns `Some(MemoryBuffer)` if the buffer is successfully created, or `None` if allocation
     /// fails.
     pub fn create_buffer_from_static_str(&self, str: &'static str) -> Option<MemoryBuffer> {
-        let buf = self.calloc_type::<ngx_buf_t>();
-        if buf.is_null() {
-            return None;
-        }
+        let buf = self.allocate(Layout::new::<ngx_buf_t>()).ok()?.as_ptr() as *mut ngx_buf_t;
 
         // We cast away const, but buffers with the memory flag are read-only
         let start = str.as_ptr() as *mut u8;
@@ -229,44 +226,6 @@ impl Pool {
         unsafe { ngx_palloc(self.0.as_ptr(), size) }
     }
 
-    /// Allocates memory for a type from the pool.
-    /// The resulting pointer is aligned to a platform word size.
-    ///
-    /// Returns a typed pointer to the allocated memory.
-    pub fn alloc_type<T: Copy>(&self) -> *mut T {
-        self.alloc(mem::size_of::<T>()) as *mut T
-    }
-
-    /// Allocates zeroed memory from the pool of the specified size.
-    /// The resulting pointer is aligned to a platform word size.
-    ///
-    /// Returns a raw pointer to the allocated memory.
-    pub fn calloc(&self, size: usize) -> *mut c_void {
-        unsafe { ngx_pcalloc(self.0.as_ptr(), size) }
-    }
-
-    /// Allocates zeroed memory for a type from the pool.
-    /// The resulting pointer is aligned to a platform word size.
-    ///
-    /// Returns a typed pointer to the allocated memory.
-    pub fn calloc_type<T: Copy>(&self) -> *mut T {
-        self.calloc(mem::size_of::<T>()) as *mut T
-    }
-
-    /// Allocates unaligned memory from the pool of the specified size.
-    ///
-    /// Returns a raw pointer to the allocated memory.
-    pub fn alloc_unaligned(&self, size: usize) -> *mut c_void {
-        unsafe { ngx_pnalloc(self.0.as_ptr(), size) }
-    }
-
-    /// Allocates unaligned memory for a type from the pool.
-    ///
-    /// Returns a typed pointer to the allocated memory.
-    pub fn alloc_type_unaligned<T: Copy>(&self) -> *mut T {
-        self.alloc_unaligned(mem::size_of::<T>()) as *mut T
-    }
-
     /// Allocates memory for a value of a specified type and adds a cleanup handler to the memory
     /// pool.
     ///
@@ -288,7 +247,7 @@ impl Pool {
     /// pool.
     ///
     /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
-    /// or Result::Err(NgxError) if allocation or cleanup handler addition fails.
+    /// or Result::Err(AllocError) if allocation or cleanup handler addition fails.
     pub fn allocate_with_cleanup<T>(&self, value: T) -> Result<*mut T, AllocError> {
         unsafe {
             let p = self.allocate(Layout::new::<T>())?.as_ptr() as *mut T;
@@ -299,6 +258,34 @@ impl Pool {
             };
             Ok(p)
         }
+    }
+
+    /// Allocates unaligned memory from the pool of the specified size.
+    ///
+    /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
+    /// or Result::Err(AllocError) if allocation or cleanup handler addition fails.
+    pub fn allocate_unaligned(&self, size: usize) -> Result<*mut c_void, AllocError> {
+        Ok(self
+            .allocate(unsafe { Layout::from_size_align_unchecked(size, 1) })?
+            .as_ptr() as _)
+    }
+
+    /// Allocates memory for a type from the pool.
+    /// The resulting pointer is aligned to a platform word size.
+    ///
+    /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
+    /// or Result::Err(AllocError) if allocation fails.
+    pub fn allocate_type<T>(&self) -> Result<*mut T, AllocError> {
+        Ok(self.allocate(Layout::new::<T>())?.as_ptr() as *mut T)
+    }
+
+    /// Allocates zeroed memory for a type from the pool.
+    /// The resulting pointer is aligned to a platform word size.
+    ///
+    /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
+    /// or Result::Err(AllocError) if allocation fails.
+    pub fn allocate_type_zeroed<T>(&self) -> Result<*mut T, AllocError> {
+        Ok(self.allocate_zeroed(Layout::new::<T>())?.as_ptr() as *mut T)
     }
 
     /// Resizes a memory allocation in place if possible.

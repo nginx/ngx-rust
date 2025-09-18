@@ -19,20 +19,14 @@ struct NgxHttpOrigDstCtx {
 }
 
 impl NgxHttpOrigDstCtx {
-    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &core::Pool) -> core::Status {
-        let addr_data = pool.alloc_unaligned(addr.len());
-        if addr_data.is_null() {
-            return core::Status::NGX_ERROR;
-        }
+    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &core::Pool) -> core::NgxResult {
+        let addr_data = pool.allocate_unaligned(addr.len())?;
         unsafe { libc::memcpy(addr_data, addr.as_ptr() as *const c_void, addr.len()) };
         self.orig_dst_addr.len = addr.len();
         self.orig_dst_addr.data = addr_data as *mut u8;
 
         let port_str = port.to_string();
-        let port_data = pool.alloc_unaligned(port_str.len());
-        if port_data.is_null() {
-            return core::Status::NGX_ERROR;
-        }
+        let port_data = pool.allocate_unaligned(port_str.len())?;
         unsafe {
             libc::memcpy(
                 port_data,
@@ -43,7 +37,7 @@ impl NgxHttpOrigDstCtx {
         self.orig_dst_port.len = port_str.len();
         self.orig_dst_port.data = port_data as *mut u8;
 
-        core::Status::NGX_OK
+        Ok(core::Status::NGX_OK.into())
     }
 
     pub unsafe fn bind_addr(&self, v: *mut ngx_variable_value_t) {
@@ -222,7 +216,7 @@ http_variable_get!(
                     ip,
                     port,
                 );
-                (*new_ctx).save(&ip, port, &request.pool());
+                (*new_ctx).save(&ip, port, &request.pool())?;
                 (*new_ctx).bind_addr(v);
                 request
                     .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
@@ -265,7 +259,7 @@ http_variable_get!(
                     ip,
                     port,
                 );
-                (*new_ctx).save(&ip, port, &request.pool());
+                (*new_ctx).save(&ip, port, &request.pool())?;
                 (*new_ctx).bind_port(v);
                 request
                     .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
