@@ -55,9 +55,9 @@ macro_rules! http_variable_set {
             v: *mut $crate::ffi::ngx_variable_value_t,
             data: usize,
         ) {
-            $handler(
+            let _: Option<()> = $handler(
                 unsafe { &mut $crate::http::Request::from_ngx_http_request(r) },
-                v,
+                ::core::ptr::NonNull::new(v).unwrap().as_mut(),
                 data,
             );
         }
@@ -78,12 +78,13 @@ macro_rules! http_variable_get {
             v: *mut $crate::ffi::ngx_variable_value_t,
             data: usize,
         ) -> $crate::ffi::ngx_int_t {
-            let status: $crate::core::Status = $handler(
+            let res: Option<ngx_int_t> = $handler(
                 unsafe { &mut $crate::http::Request::from_ngx_http_request(r) },
-                v,
+                // SAFETY: pointer to variable value is non-NULL and valid
+                ::core::ptr::NonNull::new(v).unwrap().as_mut(),
                 data,
             );
-            status.0
+            res.unwrap_or($crate::ffi::NGX_ERROR as _)
         }
     };
 }
