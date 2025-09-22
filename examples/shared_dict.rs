@@ -4,16 +4,15 @@ use ::core::{mem, ptr};
 
 use nginx_sys::{
     ngx_command_t, ngx_conf_t, ngx_http_add_variable, ngx_http_compile_complex_value_t,
-    ngx_http_complex_value, ngx_http_complex_value_t, ngx_http_module_t, ngx_http_request_t,
-    ngx_http_variable_t, ngx_http_variable_value_t, ngx_int_t, ngx_module_t, ngx_parse_size,
-    ngx_shared_memory_add, ngx_shm_zone_t, ngx_str_t, ngx_uint_t, NGX_CONF_TAKE2, NGX_HTTP_DELETE,
-    NGX_HTTP_MAIN_CONF, NGX_HTTP_MAIN_CONF_OFFSET, NGX_HTTP_MODULE, NGX_HTTP_VAR_CHANGEABLE,
-    NGX_HTTP_VAR_NOCACHEABLE, NGX_LOG_EMERG,
+    ngx_http_complex_value_t, ngx_http_module_t, ngx_http_variable_t, ngx_int_t, ngx_module_t,
+    ngx_parse_size, ngx_shared_memory_add, ngx_shm_zone_t, ngx_str_t, ngx_uint_t,
+    ngx_variable_value_t, NGX_CONF_TAKE2, NGX_HTTP_MAIN_CONF, NGX_HTTP_MAIN_CONF_OFFSET,
+    NGX_HTTP_MODULE, NGX_HTTP_VAR_CHANGEABLE, NGX_HTTP_VAR_NOCACHEABLE, NGX_LOG_EMERG,
 };
 use ngx::collections::RbTreeMap;
-use ngx::core::{NgxStr, NgxString, Pool, SlabPool, Status, NGX_CONF_ERROR, NGX_CONF_OK};
-use ngx::http::{HttpModule, HttpModuleMainConf};
-use ngx::{ngx_conf_log_error, ngx_log_debug, ngx_string};
+use ngx::core::{NgxError, NgxStr, NgxString, Pool, SlabPool, Status, NGX_CONF_ERROR, NGX_CONF_OK};
+use ngx::http::{HttpModule, HttpModuleMainConf, Request};
+use ngx::{http_variable_get, http_variable_set, ngx_conf_log_error, ngx_log_debug, ngx_string};
 
 struct HttpSharedDictModule;
 
@@ -154,19 +153,16 @@ extern "C" fn ngx_http_shared_dict_add_zone(
     NGX_CONF_OK
 }
 
-fn ngx_http_shared_dict_get_shared(shm_zone: &mut ngx_shm_zone_t) -> Result<&SharedData, Status> {
-    let mut alloc = unsafe { SlabPool::from_shm_zone(shm_zone) }.ok_or(Status::NGX_ERROR)?;
+fn ngx_http_shared_dict_get_shared(shm_zone: &mut ngx_shm_zone_t) -> Result<&SharedData, NgxError> {
+    let mut alloc = unsafe { SlabPool::from_shm_zone(shm_zone) }.ok_or(NgxError {})?;
 
     if alloc.as_mut().data.is_null() {
         let shared: RbTreeMap<NgxString<SlabPool>, NgxString<SlabPool>, SlabPool> =
-            RbTreeMap::try_new_in(alloc.clone()).map_err(|_| Status::NGX_ERROR)?;
+            RbTreeMap::try_new_in(alloc.clone())?;
 
         let shared = ngx::sync::RwLock::new(shared);
 
-        alloc.as_mut().data = ngx::allocator::allocate(shared, &alloc)
-            .map_err(|_| Status::NGX_ERROR)?
-            .as_ptr()
-            .cast();
+        alloc.as_mut().data = ngx::allocator::allocate(shared, &alloc)?.as_ptr().cast();
     }
 
     unsafe {
@@ -175,7 +171,7 @@ fn ngx_http_shared_dict_get_shared(shm_zone: &mut ngx_shm_zone_t) -> Result<&Sha
             .data
             .cast::<SharedData>()
             .as_ref()
-            .ok_or(Status::NGX_ERROR)
+            .ok_or(NgxError {})
     }
 }
 
@@ -185,10 +181,9 @@ extern "C" fn ngx_http_shared_dict_zone_init(
 ) -> ngx_int_t {
     let shm_zone = unsafe { &mut *shm_zone };
 
-    match ngx_http_shared_dict_get_shared(shm_zone) {
-        Err(e) => e.into(),
-        Ok(_) => Status::NGX_OK.into(),
-    }
+    ngx_http_shared_dict_get_shared(shm_zone)
+        .map_or_else(|_| Status::NGX_ERROR, |_| Status::NGX_OK)
+        .into()
 }
 
 extern "C" fn ngx_http_shared_dict_add_variable(
@@ -201,7 +196,7 @@ extern "C" fn ngx_http_shared_dict_add_variable(
     let pool = unsafe { Pool::from_ngx_pool(cf.pool) };
 
     let key = match pool.allocate_type_zeroed::<ngx_http_complex_value_t>() {
-        Ok(p) => p,
+        Ok(p) => p.as_ptr(),
         Err(_) => return NGX_CONF_ERROR,
     };
 
@@ -250,191 +245,157 @@ extern "C" fn ngx_http_shared_dict_add_variable(
     NGX_CONF_OK
 }
 
-extern "C" fn ngx_http_shared_dict_get_variable(
-    r: *mut ngx_http_request_t,
-    v: *mut ngx_http_variable_value_t,
-    data: usize,
-) -> ngx_int_t {
-    let r = unsafe { &mut *r };
-    let v = unsafe { &mut *v };
-    let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
+http_variable_get!(
+    ngx_http_shared_dict_get_variable,
+    |r: &mut Request, v: &mut ngx_variable_value_t, data: usize| {
+        let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
 
-    let mut key = ngx_str_t::empty();
-    if unsafe { ngx_http_complex_value(r, data as _, &mut key) } != Status::NGX_OK.into() {
-        return Status::NGX_ERROR.into();
-    }
+        let key = r
+            .get_complex_value(&*(data as *mut ngx_http_complex_value_t))
+            .ok_or(NgxError {})?;
 
-    let key = unsafe { NgxStr::from_ngx_str(key) };
+        let shared = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone })?;
 
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
-        return Status::NGX_ERROR.into();
-    };
-
-    let value = shared
-        .read()
-        .get(key)
-        .and_then(|x| unsafe { ngx_str_t::from_bytes(r.pool, x.as_bytes()) });
-
-    ngx_log_debug!(
-        unsafe { (*r.connection).log },
-        "shared dict: get \"{}\" -> {:?} w:{} p:{}",
-        key,
-        value.as_ref().map(|x| unsafe { NgxStr::from_ngx_str(*x) }),
-        unsafe { nginx_sys::ngx_worker },
-        unsafe { nginx_sys::ngx_pid },
-    );
-
-    let Some(value) = value else {
-        v.set_not_found(1);
-        return Status::NGX_ERROR.into();
-    };
-
-    v.data = value.data;
-    v.set_len(value.len as _);
-
-    v.set_valid(1);
-    v.set_no_cacheable(0);
-    v.set_not_found(0);
-
-    Status::NGX_OK.into()
-}
-
-extern "C" fn ngx_http_shared_dict_set_variable(
-    r: *mut ngx_http_request_t,
-    v: *mut ngx_http_variable_value_t,
-    data: usize,
-) {
-    let r = unsafe { &mut *r };
-    let v = unsafe { &mut *v };
-    let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
-    let mut key = ngx_str_t::empty();
-
-    if unsafe { ngx_http_complex_value(r, data as _, &mut key) } != Status::NGX_OK.into() {
-        return;
-    }
-
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
-        return;
-    };
-
-    if r.method == NGX_HTTP_DELETE as _ {
-        let key = unsafe { NgxStr::from_ngx_str(key) };
+        let value = shared
+            .read()
+            .get(key)
+            .and_then(|x| unsafe { ngx_str_t::from_bytes(r.as_ref().pool, x.as_bytes()) });
 
         ngx_log_debug!(
-            unsafe { (*r.connection).log },
-            "shared dict: delete \"{}\" w:{} p:{}",
+            unsafe { (*r.connection()).log },
+            "shared dict: get \"{}\" -> {:?} w:{} p:{}",
             key,
+            value.as_ref().map(|x| unsafe { NgxStr::from_ngx_str(*x) }),
             unsafe { nginx_sys::ngx_worker },
             unsafe { nginx_sys::ngx_pid },
         );
 
-        let _ = shared.write().remove(key);
-    } else {
-        let alloc = unsafe { SlabPool::from_shm_zone(&*smcf.shm_zone).expect("slab pool") };
-
-        let Ok(key) = NgxString::try_from_bytes_in(key.as_bytes(), alloc.clone()) else {
-            return;
+        let Some(value) = value else {
+            v.set_not_found(1);
+            return Status::NGX_ERROR.into();
         };
 
-        let Ok(value) = NgxString::try_from_bytes_in(v.as_bytes(), alloc.clone()) else {
-            return;
-        };
+        v.data = value.data;
+        v.set_len(value.len as _);
+
+        v.set_valid(1);
+        v.set_no_cacheable(0);
+        v.set_not_found(0);
+
+        Status::NGX_OK.into()
+    }
+);
+
+http_variable_set!(
+    ngx_http_shared_dict_set_variable,
+    |r: &mut Request, v: &mut ngx_variable_value_t, data: usize| {
+        let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
+
+        let key = r
+            .get_complex_value(&*(data as *mut ngx_http_complex_value_t))
+            .ok_or(NgxError {})?;
+
+        let shared = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone })?;
+
+        if r.method() == ngx::http::Method::DELETE {
+            ngx_log_debug!(
+                unsafe { (*r.connection()).log },
+                "shared dict: delete \"{}\" w:{} p:{}",
+                key,
+                unsafe { nginx_sys::ngx_worker },
+                unsafe { nginx_sys::ngx_pid },
+            );
+
+            let _ = shared.write().remove(key);
+        } else {
+            let alloc = unsafe { SlabPool::from_shm_zone(&*smcf.shm_zone).expect("slab pool") };
+
+            let key =
+                NgxString::try_from_bytes_in(key.as_bytes(), alloc.clone()).or(Err(NgxError {}))?;
+
+            let value =
+                NgxString::try_from_bytes_in(v.as_bytes(), alloc.clone()).or(Err(NgxError {}))?;
+
+            ngx_log_debug!(
+                unsafe { (*r.connection()).log },
+                "shared dict: set \"{}\" -> \"{}\" w:{} p:{}",
+                key,
+                value,
+                unsafe { nginx_sys::ngx_worker },
+                unsafe { nginx_sys::ngx_pid },
+            );
+
+            let _ = shared.write().try_insert(key, value);
+        }
+        Ok(())
+    }
+);
+
+http_variable_get!(
+    ngx_http_shared_dict_get_entries,
+    |r: &mut Request, v: &mut ngx_variable_value_t, _data: usize| {
+        use core::fmt::Write;
+
+        let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
 
         ngx_log_debug!(
-            unsafe { (*r.connection).log },
-            "shared dict: set \"{}\" -> \"{}\" w:{} p:{}",
-            key,
-            value,
-            unsafe { nginx_sys::ngx_worker },
-            unsafe { nginx_sys::ngx_pid },
+            unsafe { (*r.connection()).log },
+            "shared dict: get all entries"
         );
 
-        let _ = shared.write().try_insert(key, value);
-    }
-}
+        let shared = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone })?;
 
-extern "C" fn ngx_http_shared_dict_get_entries(
-    r: *mut ngx_http_request_t,
-    v: *mut ngx_http_variable_value_t,
-    _data: usize,
-) -> ngx_int_t {
-    use core::fmt::Write;
+        let mut str = NgxString::new_in(r.pool());
+        {
+            let dict = shared.read();
 
-    let r = unsafe { &mut *r };
-    let v = unsafe { &mut *v };
-    let pool = unsafe { Pool::from_ngx_pool(r.pool) };
-    let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
+            let mut len: usize = 0;
+            let mut values: usize = 0;
 
-    ngx_log_debug!(
-        unsafe { (*r.connection).log },
-        "shared dict: get all entries"
-    );
+            for (key, value) in dict.iter() {
+                len += key.len() + value.len() + b" = ; ".len();
+                values += 1;
+            }
 
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
-        return Status::NGX_ERROR.into();
-    };
+            len += values.checked_ilog10().unwrap_or(0) as usize + b"0; ".len();
 
-    let mut str = NgxString::new_in(pool);
-    {
-        let dict = shared.read();
+            str.try_reserve(len).or(Err(NgxError {}))?;
 
-        let mut len: usize = 0;
-        let mut values: usize = 0;
+            write!(str, "{values}; ").or(Err(NgxError {}))?;
 
-        for (key, value) in dict.iter() {
-            len += key.len() + value.len() + b" = ; ".len();
-            values += 1;
-        }
-
-        len += values.checked_ilog10().unwrap_or(0) as usize + b"0; ".len();
-
-        if str.try_reserve(len).is_err() {
-            return Status::NGX_ERROR.into();
-        }
-
-        if write!(str, "{values}; ").is_err() {
-            return Status::NGX_ERROR.into();
-        }
-
-        for (key, value) in dict.iter() {
-            if write!(str, "{key} = {value}; ").is_err() {
-                return Status::NGX_ERROR.into();
+            for (key, value) in dict.iter() {
+                write!(str, "{key} = {value}; ").or(Err(NgxError {}))?;
             }
         }
+
+        // The string is allocated on the `ngx_pool_t` and will be freed with the request.
+        let (data, len, _, _) = str.into_raw_parts();
+
+        v.data = data;
+        v.set_len(len as _);
+
+        v.set_valid(1);
+        v.set_no_cacheable(1);
+        v.set_not_found(0);
+
+        Status::NGX_OK.into()
     }
+);
 
-    // The string is allocated on the `ngx_pool_t` and will be freed with the request.
-    let (data, len, _, _) = str.into_raw_parts();
+http_variable_set!(
+    ngx_http_shared_dict_set_entries,
+    |r: &mut Request, _v: &mut ngx_variable_value_t, _data: usize| {
+        let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
 
-    v.data = data;
-    v.set_len(len as _);
+        ngx_log_debug!(unsafe { (*r.connection()).log }, "shared dict: clear");
 
-    v.set_valid(1);
-    v.set_no_cacheable(1);
-    v.set_not_found(0);
+        let shared = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone })?;
 
-    Status::NGX_OK.into()
-}
+        let tree = RbTreeMap::try_new_in(shared.read().allocator().clone())?;
 
-extern "C" fn ngx_http_shared_dict_set_entries(
-    r: *mut ngx_http_request_t,
-    _v: *mut ngx_http_variable_value_t,
-    _data: usize,
-) {
-    let r = unsafe { &mut *r };
-    let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
-
-    ngx_log_debug!(unsafe { (*r.connection).log }, "shared dict: clear");
-
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
-        return;
-    };
-
-    let Ok(tree) = RbTreeMap::try_new_in(shared.read().allocator().clone()) else {
-        return;
-    };
-
-    // This would check both .clear() and the drop implementation
-    *shared.write() = tree;
-    // shared.write().clear()
-}
+        // This would check both .clear() and the drop implementation
+        *shared.write() = tree;
+        // shared.write().clear()
+        Ok(())
+    }
+);

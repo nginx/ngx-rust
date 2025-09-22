@@ -248,7 +248,7 @@ impl Pool {
     ///
     /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
     /// or Result::Err(AllocError) if allocation or cleanup handler addition fails.
-    pub fn allocate_with_cleanup<T>(&self, value: T) -> Result<*mut T, AllocError> {
+    pub fn allocate_with_cleanup<T>(&self, value: T) -> Result<NonNull<T>, AllocError> {
         unsafe {
             let p = self.allocate(Layout::new::<T>())?.as_ptr() as *mut T;
             ptr::write(p, value);
@@ -256,7 +256,7 @@ impl Pool {
                 ptr::drop_in_place(p);
                 return Err(AllocError);
             };
-            Ok(p)
+            NonNull::new(p).ok_or(AllocError)
         }
     }
 
@@ -264,10 +264,8 @@ impl Pool {
     ///
     /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
     /// or Result::Err(AllocError) if allocation or cleanup handler addition fails.
-    pub fn allocate_unaligned(&self, size: usize) -> Result<*mut c_void, AllocError> {
-        Ok(self
-            .allocate(unsafe { Layout::from_size_align_unchecked(size, 1) })?
-            .as_ptr() as _)
+    pub fn allocate_unaligned(&self, size: usize) -> Result<NonNull<[u8]>, AllocError> {
+        self.allocate(unsafe { Layout::from_size_align_unchecked(size, 1) })
     }
 
     /// Allocates memory for a type from the pool.
@@ -275,8 +273,8 @@ impl Pool {
     ///
     /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
     /// or Result::Err(AllocError) if allocation fails.
-    pub fn allocate_type<T>(&self) -> Result<*mut T, AllocError> {
-        Ok(self.allocate(Layout::new::<T>())?.as_ptr() as *mut T)
+    pub fn allocate_type<T>(&self) -> Result<NonNull<T>, AllocError> {
+        self.allocate(Layout::new::<T>()).map(|ptr| ptr.cast())
     }
 
     /// Allocates zeroed memory for a type from the pool.
@@ -284,8 +282,9 @@ impl Pool {
     ///
     /// Returns Result::Ok with a typed pointer to the allocated memory if successful,
     /// or Result::Err(AllocError) if allocation fails.
-    pub fn allocate_type_zeroed<T>(&self) -> Result<*mut T, AllocError> {
-        Ok(self.allocate_zeroed(Layout::new::<T>())?.as_ptr() as *mut T)
+    pub fn allocate_type_zeroed<T>(&self) -> Result<NonNull<T>, AllocError> {
+        self.allocate_zeroed(Layout::new::<T>())
+            .map(|ptr| ptr.cast())
     }
 
     /// Resizes a memory allocation in place if possible.

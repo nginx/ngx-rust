@@ -120,7 +120,7 @@ http_upstream_init_peer_pt!(
     |request: &mut Request, us: *mut ngx_http_upstream_srv_conf_t| {
         ngx_log_debug_http!(request, "CUSTOM UPSTREAM request peer init");
 
-        let hcpd = request.pool().allocate_type::<UpstreamPeerData>()?;
+        let hcpd = request.pool().allocate_type::<UpstreamPeerData>()?.as_ptr();
 
         // SAFETY: this function is called with non-NULL uf always
         let us = unsafe { &mut *us };
@@ -303,16 +303,16 @@ impl HttpModule for Module {
     unsafe extern "C" fn create_srv_conf(cf: *mut ngx_conf_t) -> *mut c_void {
         let pool = Pool::from_ngx_pool((*cf).pool);
 
-        if let Ok(conf) = pool.allocate_type::<SrvConfig>() {
+        if let Ok(mut conf) = pool.allocate_type::<SrvConfig>() {
             unsafe {
-                (*conf).max = NGX_CONF_UNSET as u32;
+                conf.as_mut().max = NGX_CONF_UNSET as u32;
             }
             ngx_log_debug_mask!(
                 DebugMask::Http,
                 (*cf).log,
                 "CUSTOM UPSTREAM end create_srv_conf"
             );
-            conf as *mut c_void
+            conf.as_ptr() as _
         } else {
             ngx_conf_log_error!(
                 NGX_LOG_EMERG,
