@@ -334,7 +334,7 @@ mod tests {
         assert_eq!(str::from_utf8(buf.filled()), Ok("Hello World!"));
 
         // overflow results in truncated output
-        write!(&mut buf, " This is a test, {}", usize::MAX).unwrap();
+        write!(&mut buf, " This is a test, {}", u64::MAX).unwrap();
         assert_eq!(
             str::from_utf8(buf.filled()),
             Ok("Hello World! This is a test, 184")
