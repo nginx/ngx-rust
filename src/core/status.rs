@@ -1,6 +1,9 @@
+use core::error::Error;
 use core::ffi::c_char;
 use core::fmt;
 use core::ptr;
+
+use allocator_api2::alloc::AllocError;
 
 use crate::ffi::*;
 
@@ -68,3 +71,34 @@ ngx_codes! {
 pub const NGX_CONF_ERROR: *mut c_char = ptr::null_mut::<c_char>().wrapping_offset(-1);
 /// Configuration handler succeeded.
 pub const NGX_CONF_OK: *mut c_char = ptr::null_mut();
+
+/// Error type encapsulating normal NGINX return codes
+#[derive(Debug)]
+pub struct NgxError {}
+
+impl fmt::Display for NgxError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "NGINX Error")
+    }
+}
+
+impl Error for NgxError {}
+
+impl From<AllocError> for NgxError {
+    fn from(_err: AllocError) -> Self {
+        NgxError {}
+    }
+}
+
+/// Result type for NGINX status codes.
+pub type NgxResult<T = nginx_sys::ngx_int_t> = core::result::Result<T, NgxError>;
+
+impl From<Status> for NgxResult {
+    fn from(val: Status) -> Self {
+        if val == Status::NGX_ERROR {
+            Err(NgxError {})
+        } else {
+            Ok(val.0)
+        }
+    }
+}

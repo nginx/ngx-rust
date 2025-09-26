@@ -1,5 +1,4 @@
-use std::ffi::{c_int, c_void};
-use std::ptr::addr_of;
+use std::ffi::c_int;
 
 use ngx::core;
 use ngx::ffi::{
@@ -19,57 +18,39 @@ struct NgxHttpOrigDstCtx {
 }
 
 impl NgxHttpOrigDstCtx {
-    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &core::Pool) -> core::Status {
-        let addr_data = pool.alloc_unaligned(addr.len());
-        if addr_data.is_null() {
-            return core::Status::NGX_ERROR;
-        }
-        unsafe { libc::memcpy(addr_data, addr.as_ptr() as *const c_void, addr.len()) };
-        self.orig_dst_addr.len = addr.len();
-        self.orig_dst_addr.data = addr_data as *mut u8;
+    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &core::Pool) -> core::NgxResult {
+        self.orig_dst_addr = unsafe { ngx_str_t::from_str(pool.as_ptr(), addr) };
 
         let port_str = port.to_string();
-        let port_data = pool.alloc_unaligned(port_str.len());
-        if port_data.is_null() {
-            return core::Status::NGX_ERROR;
-        }
-        unsafe {
-            libc::memcpy(
-                port_data,
-                port_str.as_bytes().as_ptr() as *const c_void,
-                port_str.len(),
-            )
-        };
-        self.orig_dst_port.len = port_str.len();
-        self.orig_dst_port.data = port_data as *mut u8;
+        self.orig_dst_port = unsafe { ngx_str_t::from_str(pool.as_ptr(), &port_str) };
 
-        core::Status::NGX_OK
+        Ok(core::Status::NGX_OK.into())
     }
 
-    pub unsafe fn bind_addr(&self, v: *mut ngx_variable_value_t) {
+    pub unsafe fn bind_addr(&self, v: &mut ngx_variable_value_t) {
         if self.orig_dst_addr.len == 0 {
-            (*v).set_not_found(1);
+            v.set_not_found(1);
             return;
         }
 
-        (*v).set_valid(1);
-        (*v).set_no_cacheable(0);
-        (*v).set_not_found(0);
-        (*v).set_len(self.orig_dst_addr.len as u32);
-        (*v).data = self.orig_dst_addr.data;
+        v.set_valid(1);
+        v.set_no_cacheable(0);
+        v.set_not_found(0);
+        v.set_len(self.orig_dst_addr.len as u32);
+        v.data = self.orig_dst_addr.data;
     }
 
-    pub unsafe fn bind_port(&self, v: *mut ngx_variable_value_t) {
+    pub unsafe fn bind_port(&self, v: &mut ngx_variable_value_t) {
         if self.orig_dst_port.len == 0 {
-            (*v).set_not_found(1);
+            v.set_not_found(1);
             return;
         }
 
-        (*v).set_valid(1);
-        (*v).set_no_cacheable(0);
-        (*v).set_not_found(0);
-        (*v).set_len(self.orig_dst_port.len as u32);
-        (*v).data = self.orig_dst_port.data;
+        v.set_valid(1);
+        v.set_no_cacheable(0);
+        v.set_not_found(0);
+        v.set_len(self.orig_dst_port.len as u32);
+        v.data = self.orig_dst_port.data;
     }
 }
 
@@ -191,12 +172,12 @@ unsafe fn ngx_get_origdst(
 
 http_variable_get!(
     ngx_http_orig_dst_addr_variable,
-    |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(&*addr_of!(ngx_http_orig_dst_module));
+    |request: &mut http::Request, v: &mut ngx_variable_value_t, _: usize| {
+        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(Module::module());
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             obj.bind_addr(v);
-            return core::Status::NGX_OK;
+            return core::Status::NGX_OK.into();
         }
         // lazy initialization:
         //   get original dest information
@@ -207,18 +188,14 @@ http_variable_get!(
         let r = ngx_get_origdst(request);
         match r {
             Err(e) => {
-                return e;
+                return e.into();
             }
             Ok((ip, port)) => {
                 // create context,
                 // set context
-                let new_ctx = request
+                let mut new_ctx = request
                     .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
-
-                if new_ctx.is_null() {
-                    return core::Status::NGX_ERROR;
-                }
+                    .allocate_with_cleanup::<NgxHttpOrigDstCtx>(Default::default())?;
 
                 ngx_log_debug_http!(
                     request,
@@ -226,24 +203,23 @@ http_variable_get!(
                     ip,
                     port,
                 );
-                (*new_ctx).save(&ip, port, &request.pool());
-                (*new_ctx).bind_addr(v);
-                request
-                    .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
+                new_ctx.as_mut().save(&ip, port, &request.pool())?;
+                new_ctx.as_mut().bind_addr(v);
+                request.set_module_ctx(new_ctx, Module::module());
             }
         }
-        core::Status::NGX_OK
+        core::Status::NGX_OK.into()
     }
 );
 
 http_variable_get!(
     ngx_http_orig_dst_port_variable,
-    |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(&*addr_of!(ngx_http_orig_dst_module));
+    |request: &mut http::Request, v: &mut ngx_variable_value_t, _: usize| {
+        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(Module::module());
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             obj.bind_port(v);
-            return core::Status::NGX_OK;
+            return core::Status::NGX_OK.into();
         }
         // lazy initialization:
         //   get original dest information
@@ -254,18 +230,14 @@ http_variable_get!(
         let r = ngx_get_origdst(request);
         match r {
             Err(e) => {
-                return e;
+                return e.into();
             }
             Ok((ip, port)) => {
                 // create context,
                 // set context
-                let new_ctx = request
+                let mut new_ctx = request
                     .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
-
-                if new_ctx.is_null() {
-                    return core::Status::NGX_ERROR;
-                }
+                    .allocate_with_cleanup::<NgxHttpOrigDstCtx>(Default::default())?;
 
                 ngx_log_debug_http!(
                     request,
@@ -273,13 +245,12 @@ http_variable_get!(
                     ip,
                     port,
                 );
-                (*new_ctx).save(&ip, port, &request.pool());
-                (*new_ctx).bind_port(v);
-                request
-                    .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
+                new_ctx.as_mut().save(&ip, port, &request.pool())?;
+                new_ctx.as_mut().bind_port(v);
+                request.set_module_ctx(new_ctx, Module::module());
             }
         }
-        core::Status::NGX_OK
+        core::Status::NGX_OK.into()
     }
 );
 
