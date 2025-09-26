@@ -1,6 +1,7 @@
 use core::error;
 use core::ffi::c_void;
 use core::fmt;
+use core::marker::PhantomData;
 use core::ptr::NonNull;
 use core::slice;
 use core::str::FromStr;
@@ -10,6 +11,7 @@ use allocator_api2::alloc::Allocator;
 use crate::core::*;
 use crate::ffi::*;
 use crate::http::status::*;
+use crate::http::{HttpModule, HttpModuleMainConf, NgxHttpCoreModule};
 
 /// Define a static request handler.
 ///
@@ -87,6 +89,49 @@ macro_rules! http_variable_get {
             res.unwrap_or_else(|_| $crate::core::Status::NGX_ERROR.into())
         }
     };
+}
+
+/// Trait for static request handler.
+pub trait RequestHandler {
+    /// The phase in which the handler is invoked
+    const PHASE: NgxHttpPhases;
+    /// The module to which the handler belongs
+    type Module: HttpModule + ?Sized;
+    /// The handler function
+    fn handler(request: &mut Request) -> NgxResult;
+    /// Wrapper for the handler function to match the C function signature
+    ///
+    /// # Safety
+    /// The caller must provide a valid non-null pointer to an `ngx_http_request_t`
+    unsafe extern "C" fn handler_wrapper(r: *mut ngx_http_request_t) -> ngx_int_t {
+        let res: NgxResult = Self::handler(unsafe { Request::from_ngx_http_request(r) });
+        res.unwrap_or_else(|_| Status::NGX_ERROR.into())
+    }
+    /// Register a request handler for a specified phase.
+    fn register(&self, cf: &mut ngx_conf_t) -> bool {
+        let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
+        let h: *mut ngx_http_handler_pt =
+            unsafe { ngx_array_push(&mut cmcf.phases[Self::PHASE as usize].handlers) as _ };
+        if h.is_null() {
+            return false;
+        }
+        // set an H::PHASE phase handler
+        unsafe {
+            *h = Some(Self::handler_wrapper);
+        }
+        true
+    }
+}
+
+pub(crate) struct EmptyHandler<M: HttpModule + ?Sized>(PhantomData<M>);
+
+impl<M: HttpModule + ?Sized> RequestHandler for EmptyHandler<M> {
+    const PHASE: NgxHttpPhases = NgxHttpPhases::Access;
+    type Module = M;
+
+    fn handler(_request: &mut Request) -> NgxResult {
+        Status::NGX_OK.into()
+    }
 }
 
 /// Wrapper struct for an [`ngx_http_request_t`] pointer, providing methods for working with HTTP

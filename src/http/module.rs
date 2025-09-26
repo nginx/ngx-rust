@@ -6,6 +6,7 @@ use core::ptr;
 use crate::core::NGX_CONF_ERROR;
 use crate::core::*;
 use crate::ffi::*;
+use crate::http::RequestHandler;
 
 /// MergeConfigError - configuration cannot be merged with levels above.
 #[derive(Debug)]
@@ -52,6 +53,27 @@ pub trait HttpModule {
     /// Returns reference to a global variable of type [ngx_module_t] created for this module.
     fn module() -> &'static ngx_module_t;
 
+    /// Returns an iterator over request handlers provided by this module.
+    fn request_handlers() -> impl Iterator<Item = impl RequestHandler<Module = Self>> {
+        // returns empty iterator by default
+        core::iter::empty::<super::EmptyHandler<Self>>()
+    }
+    /// Register all request handlers provided by this module.
+    ///
+    /// # Safety
+    ///
+    /// Callers should provide valid non-null `ngx_conf_t` arguments. Implementers must
+    /// guard against null inputs or risk runtime errors.
+    unsafe fn register_request_handlers(cf: *mut ngx_conf_t) -> ngx_int_t {
+        let cf = unsafe { &mut *cf };
+        for rh in Self::request_handlers() {
+            if !rh.register(cf) {
+                return Status::NGX_ERROR.into();
+            }
+        }
+        Status::NGX_OK.into()
+    }
+
     /// # Safety
     ///
     /// Callers should provide valid non-null `ngx_conf_t` arguments. Implementers must
@@ -64,8 +86,8 @@ pub trait HttpModule {
     ///
     /// Callers should provide valid non-null `ngx_conf_t` arguments. Implementers must
     /// guard against null inputs or risk runtime errors.
-    unsafe extern "C" fn postconfiguration(_cf: *mut ngx_conf_t) -> ngx_int_t {
-        Status::NGX_OK.into()
+    unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
+        Self::register_request_handlers(cf)
     }
 
     /// # Safety
