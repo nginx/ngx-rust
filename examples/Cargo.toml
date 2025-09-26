@@ -65,3 +65,6 @@ default = ["export-modules", "ngx/vendored"]
 # See https://github.com/rust-lang/rust/issues/20267
 export-modules = []
 linux = []
+
+[lints]
+workspace = true

@@ -77,8 +77,10 @@ pub trait HttpModule {
         Self: super::HttpModuleMainConf,
         Self::MainConf: Default,
     {
-        let pool = Pool::from_ngx_pool((*cf).pool);
-        pool.allocate::<Self::MainConf>(Default::default()) as *mut c_void
+        unsafe {
+            let pool = Pool::from_ngx_pool((*cf).pool);
+            pool.allocate::<Self::MainConf>(Default::default()) as *mut c_void
+        }
     }
 
     /// # Safety
@@ -102,8 +104,10 @@ pub trait HttpModule {
         Self: super::HttpModuleServerConf,
         Self::ServerConf: Default,
     {
-        let pool = Pool::from_ngx_pool((*cf).pool);
-        pool.allocate::<Self::ServerConf>(Default::default()) as *mut c_void
+        unsafe {
+            let pool = Pool::from_ngx_pool((*cf).pool);
+            pool.allocate::<Self::ServerConf>(Default::default()) as *mut c_void
+        }
     }
 
     /// # Safety
@@ -119,11 +123,13 @@ pub trait HttpModule {
         Self: super::HttpModuleServerConf,
         Self::ServerConf: Merge,
     {
-        let prev = &mut *(prev as *mut Self::ServerConf);
-        let conf = &mut *(conf as *mut Self::ServerConf);
-        match conf.merge(prev) {
-            Ok(_) => ptr::null_mut(),
-            Err(_) => NGX_CONF_ERROR as _,
+        unsafe {
+            let prev = &mut *(prev as *mut Self::ServerConf);
+            let conf = &mut *(conf as *mut Self::ServerConf);
+            match conf.merge(prev) {
+                Ok(_) => ptr::null_mut(),
+                Err(_) => NGX_CONF_ERROR as _,
+            }
         }
     }
 
@@ -136,8 +142,10 @@ pub trait HttpModule {
         Self: super::HttpModuleLocationConf,
         Self::LocationConf: Default,
     {
-        let pool = Pool::from_ngx_pool((*cf).pool);
-        pool.allocate::<Self::LocationConf>(Default::default()) as *mut c_void
+        unsafe {
+            let pool = Pool::from_ngx_pool((*cf).pool);
+            pool.allocate::<Self::LocationConf>(Default::default()) as *mut c_void
+        }
     }
 
     /// # Safety
@@ -153,11 +161,13 @@ pub trait HttpModule {
         Self: super::HttpModuleLocationConf,
         Self::LocationConf: Merge,
     {
-        let prev = &mut *(prev as *mut Self::LocationConf);
-        let conf = &mut *(conf as *mut Self::LocationConf);
-        match conf.merge(prev) {
-            Ok(_) => ptr::null_mut(),
-            Err(_) => NGX_CONF_ERROR as _,
+        unsafe {
+            let prev = &mut *(prev as *mut Self::LocationConf);
+            let conf = &mut *(conf as *mut Self::LocationConf);
+            match conf.merge(prev) {
+                Ok(_) => ptr::null_mut(),
+                Err(_) => NGX_CONF_ERROR as _,
+            }
         }
     }
 }
