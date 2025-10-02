@@ -42,14 +42,17 @@ async-task = { version = "4.7.1", optional = true }
 lock_api = "0.4.13"
 nginx-sys = { path = "nginx-sys", version = "0.5.0"}
 pin-project-lite = { version = "0.2.16", optional = true }
+crossbeam-channel = {version = "0.5", optional = true}
 
 [features]
 default = ["std"]
 # Enables a minimal async runtime built on top of the NGINX event loop.
 async = [
     "alloc",
+    "std",
     "dep:async-task",
     "dep:pin-project-lite",
+    "dep:crossbeam-channel",
 ]
 # Provides APIs that require allocations via the `alloc` crate.
 alloc = ["allocator-api2/alloc"]

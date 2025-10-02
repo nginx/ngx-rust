@@ -23,7 +23,19 @@ http = "1.1.0"
 # use unicode-rs idna backend for lower MSRV and faster builds
 idna_adapter = "=1.1.0"
 libc = "0.2.140"
+# async
 tokio = { version = "1.33.0", features = ["full"] }
+hyper = { version = "1", features = ["full"] }
+http-body-util = "0.1"
+hyper-util = { version = "0.1", features = ["full"] }
+cargo_metadata = "0.23"
+futures = "0.3.31"
+futures-util = "0.3.31"
+async-compat = "0.2"
+reqwest = { version = "0.12", default-features = false, features = [ "rustls-tls", ] }
+
+[build-dependencies]
+cargo_metadata = "0.23"
 
 [[example]]
 name = "curl"
@@ -50,6 +62,7 @@ crate-type = ["cdylib"]
 name = "async"
 path = "async.rs"
 crate-type = ["cdylib"]
+required-features = ["async"]
 
 [[example]]
 name = "shared_dict"
@@ -65,3 +78,4 @@ default = ["export-modules", "ngx/vendored"]
 # See https://github.com/rust-lang/rust/issues/20267
 export-modules = []
 linux = []
+async = ["ngx/async"]
