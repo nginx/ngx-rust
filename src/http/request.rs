@@ -10,6 +10,7 @@ use allocator_api2::alloc::Allocator;
 use crate::core::*;
 use crate::ffi::*;
 use crate::http::status::*;
+use crate::http::{HttpModule, HttpModuleMainConf, NgxHttpCoreModule};
 
 /// Define a static request handler.
 ///
@@ -87,6 +88,78 @@ macro_rules! http_variable_get {
             res.unwrap_or($crate::ffi::NGX_ERROR as _)
         }
     };
+}
+
+/// Trait for static request handler.
+/// Predefined return types are `Option<ngx_int_t>`
+/// and `Result<ngx_int_t, E>` where `E: ::core::error::Error`.
+/// Handler with `Result<ngx_int_t, E>` return type logs the error message automatically.
+pub trait HttpRequestHandler<ReturnType> {
+    /// The phase in which the handler is invoked
+    const PHASE: NgxHttpPhases;
+    /// The module to which the handler belongs
+    type Module: HttpModule;
+
+    /// The handler function
+    fn handler(request: &mut Request) -> ReturnType;
+    /// Register a request handler for a specified phase.
+    /// This function must be called from the module's `postconfiguration()` function.
+    fn register(cf: &mut ngx_conf_t) -> bool
+    where
+        Self: HttpHandlerWrapper<ReturnType>,
+    {
+        let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
+        let h: *mut ngx_http_handler_pt =
+            unsafe { ngx_array_push(&mut cmcf.phases[Self::PHASE as usize].handlers) as _ };
+        if h.is_null() {
+            return false;
+        }
+        // set an H::PHASE phase handler
+        unsafe {
+            *h = Some(Self::handler_wrapper);
+        }
+        true
+    }
+}
+
+/// Trait for wrapping a request handler with a C-compatible function.
+pub trait HttpHandlerWrapper<ReturnType>: HttpRequestHandler<ReturnType> {
+    /// Convert the handler return type to `ngx_int_t`.
+    fn convert(r: &Request, res: ReturnType) -> ngx_int_t;
+    /// The C-compatible handler wrapper function.
+    ///
+    /// # Safety
+    ///
+    /// The caller has provided a valid non-null pointer to an `ngx_http_request_t`.
+    unsafe extern "C" fn handler_wrapper(r: *mut ngx_http_request_t) -> ngx_int_t {
+        let r = unsafe { Request::from_ngx_http_request(r) };
+        let res = Self::handler(r);
+        Self::convert(r, res)
+    }
+}
+
+/// Implementation of `HttpHandlerWrapper` for `Option<ngx_int_t>`.
+impl<T> HttpHandlerWrapper<Option<ngx_int_t>> for T
+where
+    T: HttpRequestHandler<Option<ngx_int_t>>,
+{
+    fn convert(_r: &Request, res: Option<ngx_int_t>) -> ngx_int_t {
+        res.unwrap_or(NGX_ERROR as _)
+    }
+}
+
+/// Implementation of `HttpHandlerWrapper` for `Result<ngx_int_t, E>`.
+impl<T, E> HttpHandlerWrapper<Result<ngx_int_t, E>> for T
+where
+    T: HttpRequestHandler<Result<ngx_int_t, E>>,
+    E: ::core::error::Error,
+{
+    fn convert(r: &Request, res: Result<ngx_int_t, E>) -> ngx_int_t {
+        res.unwrap_or_else(|err| {
+            crate::ngx_log_error!(NGX_LOG_ERR, r.log(), "{err}");
+            NGX_ERROR as _
+        })
+    }
 }
 
 /// Wrapper struct for an [`ngx_http_request_t`] pointer, providing methods for working with HTTP
