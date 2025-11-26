@@ -2,6 +2,7 @@
 members = [
     "nginx-src",
     "nginx-sys",
+    "nginx-unittest",
     "examples",
 ]
 
@@ -40,7 +41,7 @@ targets = []
 allocator-api2 = { version = "0.3.1", default-features = false }
 async-task = { version = "4.7.1", optional = true }
 lock_api = "0.4.13"
-nginx-sys = { path = "nginx-sys", version = "0.5.0"}
+nginx-sys = { path = "nginx-sys", version = "0.5.0" }
 pin-project-lite = { version = "0.2.16", optional = true }
 
 [features]
@@ -70,3 +71,7 @@ maintenance = { status = "experimental" }
 
 [dev-dependencies]
 tempfile = { version = "3.20.0", default-features = false }
+
+[target.'cfg(not(windows))'.dev-dependencies]
+nginx-sys = { path = "nginx-sys", version = "0.5.0", features = ["unittest"] }
+nginx-unittest = { path = "nginx-unittest", version = "0.1.0" }

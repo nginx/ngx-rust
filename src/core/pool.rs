@@ -332,3 +332,95 @@ impl Pool {
 unsafe extern "C" fn cleanup_type<T>(data: *mut c_void) {
     ptr::drop_in_place(data as *mut T);
 }
+
+#[cfg(all(test, feature = "vendored"))]
+mod tests {
+
+    use nginx_sys::{ngx_create_pool, ngx_destroy_pool};
+    use nginx_unittest::LibNginx;
+
+    use super::*;
+
+    #[test]
+    fn test_pool_resize() {
+        let _nginx = LibNginx::new("prefix");
+
+        let mut log: nginx_sys::ngx_log_t = unsafe { core::mem::zeroed() };
+        let p: *mut nginx_sys::ngx_pool_t = unsafe { ngx_create_pool(1024, &mut log) };
+        let pool = unsafe { Pool::from_ngx_pool(p) };
+
+        let layout = Layout::from_size_align(16, 8).unwrap();
+        let slice_ptr = Allocator::allocate(&pool, layout).unwrap();
+        let ptr = slice_ptr.as_ptr().cast::<u8>();
+
+        let new_layout = Layout::from_size_align(32, 8).unwrap();
+        let nonnull_ptr = unsafe { NonNull::new_unchecked(ptr) };
+        let newptr = unsafe { pool.resize(nonnull_ptr, layout, new_layout) };
+
+        assert!(newptr.is_ok());
+        assert!(core::ptr::addr_eq(newptr.unwrap().as_ptr(), ptr));
+
+        unsafe { ngx_destroy_pool(p) };
+    }
+
+    #[test]
+    fn test_vec() {
+        let _nginx = LibNginx::new("prefix");
+
+        let mut log: nginx_sys::ngx_log_t = unsafe { core::mem::zeroed() };
+        let p: *mut nginx_sys::ngx_pool_t = unsafe { ngx_create_pool(1024, &mut log) };
+        let pool = unsafe { Pool::from_ngx_pool(p) };
+
+        let mut v1: allocator_api2::vec::Vec<u8, Pool> = allocator_api2::vec::Vec::new_in(pool);
+
+        v1.reserve(4);
+        assert!(v1.capacity() >= 4);
+        let v1_ptr1 = v1.as_ptr();
+
+        v1.reserve(4);
+        assert!(v1.capacity() >= 8);
+        let v1_ptr2 = v1.as_ptr();
+
+        assert!(v1_ptr1 == v1_ptr2);
+
+        v1.resize(4, 1);
+
+        v1.shrink_to_fit();
+        let v1_ptr3 = v1.as_ptr();
+
+        assert!(v1_ptr1 == v1_ptr3);
+
+        unsafe { ngx_destroy_pool(p) };
+    }
+
+    #[test]
+    fn test_two_vecs() {
+        let _nginx = LibNginx::new("prefix");
+
+        let mut log: nginx_sys::ngx_log_t = unsafe { core::mem::zeroed() };
+        let p: *mut nginx_sys::ngx_pool_t = unsafe { ngx_create_pool(2048, &mut log) };
+        let pool = unsafe { Pool::from_ngx_pool(p) };
+
+        let mut v1: allocator_api2::vec::Vec<u8, Pool> =
+            allocator_api2::vec::Vec::new_in(pool.clone());
+
+        v1.reserve(128);
+        assert!(v1.capacity() >= 128);
+        let v1_ptr1 = v1.as_ptr();
+
+        v1.resize(128, 1);
+
+        let mut v2: allocator_api2::vec::Vec<u8, Pool> = allocator_api2::vec::Vec::new_in(pool);
+
+        v2.reserve(128);
+        assert!(v2.capacity() >= 128);
+
+        v1.reserve(128);
+        assert!(v1.capacity() >= 256, "actual capacity: {}", v1.capacity());
+        let v1_ptr2 = v1.as_ptr();
+
+        assert!(v1_ptr1 != v1_ptr2);
+
+        unsafe { ngx_destroy_pool(p) };
+    }
+}
