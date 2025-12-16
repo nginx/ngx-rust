@@ -20,6 +20,7 @@ const NGX_CONF_FEATURES: &[&str] = &[
     "compat",
     "debug",
     "have_epollrdhup",
+    "have_eventfd",
     "have_file_aio",
     "have_kqueue",
     "have_memalign",
