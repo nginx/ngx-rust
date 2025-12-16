@@ -7,6 +7,9 @@ version: 2
 updates:
 
   - package-ecosystem: "cargo"
+    allow:
+      # Allow both direct and indirect updates for all packages.
+      - dependency-type: "all"
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
