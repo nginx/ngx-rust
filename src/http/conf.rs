@@ -207,9 +207,15 @@ pub unsafe trait HttpModuleLocationConf: HttpModule {
 }
 
 mod core {
-    use crate::ffi::{
-        ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t, ngx_http_core_module,
-        ngx_http_core_srv_conf_t,
+    use allocator_api2::alloc::AllocError;
+
+    use crate::{
+        ffi::{
+            ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t, ngx_http_core_module,
+            ngx_http_core_srv_conf_t,
+        },
+        http::{HttpModuleMainConf, HttpRequestHandler},
+        ngx_conf_log_error,
     };
 
     /// Auxiliary structure to access `ngx_http_core_module` configuration.
@@ -229,9 +235,61 @@ mod core {
     unsafe impl crate::http::HttpModuleLocationConf for NgxHttpCoreModule {
         type LocationConf = ngx_http_core_loc_conf_t;
     }
+
+    /// HTTP phases in which a module can register handlers.
+    #[repr(usize)]
+    pub enum HttpPhase {
+        /// Post-read phase
+        PostRead = crate::ffi::ngx_http_phases_NGX_HTTP_POST_READ_PHASE as _,
+        /// Server rewrite phase
+        ServerRewrite = crate::ffi::ngx_http_phases_NGX_HTTP_SERVER_REWRITE_PHASE as _,
+        /// Find configuration phase
+        FindConfig = crate::ffi::ngx_http_phases_NGX_HTTP_FIND_CONFIG_PHASE as _,
+        /// Rewrite phase
+        Rewrite = crate::ffi::ngx_http_phases_NGX_HTTP_REWRITE_PHASE as _,
+        /// Post-rewrite phase
+        PostRewrite = crate::ffi::ngx_http_phases_NGX_HTTP_POST_REWRITE_PHASE as _,
+        /// Pre-access phase
+        Preaccess = crate::ffi::ngx_http_phases_NGX_HTTP_PREACCESS_PHASE as _,
+        /// Access phase
+        Access = crate::ffi::ngx_http_phases_NGX_HTTP_ACCESS_PHASE as _,
+        /// Post-access phase
+        PostAccess = crate::ffi::ngx_http_phases_NGX_HTTP_POST_ACCESS_PHASE as _,
+        /// Pre-content phase
+        PreContent = crate::ffi::ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE as _,
+        /// Content phase
+        Content = crate::ffi::ngx_http_phases_NGX_HTTP_CONTENT_PHASE as _,
+        /// Log phase
+        Log = crate::ffi::ngx_http_phases_NGX_HTTP_LOG_PHASE as _,
+    }
+
+    /// Register a request handler for a specified phase.
+    /// This function must be called from the module's `postconfiguration()` function.
+    pub fn add_phase_handler<H>(cf: &mut nginx_sys::ngx_conf_t) -> Result<(), AllocError>
+    where
+        H: HttpRequestHandler,
+    {
+        let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
+        let h: *mut nginx_sys::ngx_http_handler_pt =
+            unsafe { nginx_sys::ngx_array_push(&mut cmcf.phases[H::PHASE as usize].handlers) as _ };
+        if h.is_null() {
+            ngx_conf_log_error!(
+                nginx_sys::NGX_LOG_EMERG,
+                cf,
+                "failed to register {} handler",
+                H::name(),
+            );
+            return Err(AllocError);
+        }
+        // set an H::PHASE phase handler
+        unsafe {
+            *h = Some(crate::http::handler_wrapper::<H>);
+        }
+        Ok(())
+    }
 }
 
-pub use core::NgxHttpCoreModule;
+pub use core::{add_phase_handler, HttpPhase, NgxHttpCoreModule};
 
 #[cfg(ngx_feature = "http_ssl")]
 mod ssl {
