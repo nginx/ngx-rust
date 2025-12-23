@@ -1,8 +1,8 @@
-ARG NGX_VERSION=1.28.0
+ARG NGX_VERSION=1.28.1
 # NGINX official images are available for one specific release of Debian,
-# e.g `nginx:1.28.0-bookworm`. Please see the list of tags on docker hub
+# e.g `nginx:1.28.1-trixie`. Please see the list of tags on docker hub
 # if you need to change NGX_VERSION.
-ARG DEBIAN_RELEASE=bookworm
+ARG DEBIAN_RELEASE=trixie
 
 # --- builder: build all examples
 FROM rust:slim-${DEBIAN_RELEASE} AS build
