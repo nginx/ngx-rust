@@ -29,7 +29,7 @@
 //! specific version of NGINX:
 //!
 //! ```sh
-//! NGINX_BUILD_DIR=/path/to/nginx-1.28.0/objs cargo build --package=examples --examples
+//! NGINX_BUILD_DIR=/path/to/nginx-1.28.1/objs cargo build --package=examples --examples
 //! ```
 //!
 //! ### Building with the NGINX build script
