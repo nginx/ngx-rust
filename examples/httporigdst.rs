@@ -1,5 +1,5 @@
 use std::ffi::{c_int, c_void};
-use std::ptr::addr_of;
+use std::ptr::{addr_of, NonNull};
 
 use ngx::core;
 use ngx::ffi::{
@@ -47,29 +47,33 @@ impl NgxHttpOrigDstCtx {
     }
 
     pub unsafe fn bind_addr(&self, v: *mut ngx_variable_value_t) {
+        let mut v = NonNull::new(v).unwrap();
+        let v = unsafe { v.as_mut() };
         if self.orig_dst_addr.len == 0 {
-            (*v).set_not_found(1);
+            v.set_not_found(1);
             return;
         }
 
-        (*v).set_valid(1);
-        (*v).set_no_cacheable(0);
-        (*v).set_not_found(0);
-        (*v).set_len(self.orig_dst_addr.len as u32);
-        (*v).data = self.orig_dst_addr.data;
+        v.set_valid(1);
+        v.set_no_cacheable(0);
+        v.set_not_found(0);
+        v.set_len(self.orig_dst_addr.len as u32);
+        v.data = self.orig_dst_addr.data;
     }
 
     pub unsafe fn bind_port(&self, v: *mut ngx_variable_value_t) {
+        let mut v = NonNull::new(v).unwrap();
+        let v = unsafe { v.as_mut() };
         if self.orig_dst_port.len == 0 {
-            (*v).set_not_found(1);
+            v.set_not_found(1);
             return;
         }
 
-        (*v).set_valid(1);
-        (*v).set_no_cacheable(0);
-        (*v).set_not_found(0);
-        (*v).set_len(self.orig_dst_port.len as u32);
-        (*v).data = self.orig_dst_port.data;
+        v.set_valid(1);
+        v.set_no_cacheable(0);
+        v.set_not_found(0);
+        v.set_len(self.orig_dst_port.len as u32);
+        v.data = self.orig_dst_port.data;
     }
 }
 
@@ -129,19 +133,21 @@ unsafe fn ngx_get_origdst(
 ) -> Result<(String, in_port_t), core::Status> {
     let c = request.connection();
 
-    if (*c).type_ != libc::SOCK_STREAM {
+    if unsafe { (*c).type_ } != libc::SOCK_STREAM {
         ngx_log_debug_http!(request, "httporigdst: connection is not type SOCK_STREAM");
         return Err(core::Status::NGX_DECLINED);
     }
 
-    if ngx_connection_local_sockaddr(c, std::ptr::null_mut(), 0) != core::Status::NGX_OK.into() {
+    if unsafe { ngx_connection_local_sockaddr(c, std::ptr::null_mut(), 0) }
+        != core::Status::NGX_OK.into()
+    {
         ngx_log_debug_http!(request, "httporigdst: no local sockaddr from connection");
         return Err(core::Status::NGX_ERROR);
     }
 
     let level: c_int;
     let optname: c_int;
-    match (*(*c).local_sockaddr).sa_family as i32 {
+    match unsafe { (*(*c).local_sockaddr).sa_family } as i32 {
         libc::AF_INET => {
             level = libc::SOL_IP;
             optname = libc::SO_ORIGINAL_DST;
@@ -152,15 +158,17 @@ unsafe fn ngx_get_origdst(
         }
     }
 
-    let mut addr: sockaddr_storage = { std::mem::zeroed() };
+    let mut addr: sockaddr_storage = unsafe { std::mem::zeroed() };
     let mut addrlen: libc::socklen_t = std::mem::size_of_val(&addr) as libc::socklen_t;
-    let rc = libc::getsockopt(
-        (*c).fd,
-        level,
-        optname,
-        &mut addr as *mut _ as *mut _,
-        &mut addrlen as *mut u32,
-    );
+    let rc = unsafe {
+        libc::getsockopt(
+            (*c).fd,
+            level,
+            optname,
+            &mut addr as *mut _ as *mut _,
+            &mut addrlen as *mut u32,
+        )
+    };
     if rc == -1 {
         ngx_log_debug_http!(request, "httporigdst: getsockopt failed");
         return Err(core::Status::NGX_DECLINED);
@@ -192,10 +200,11 @@ unsafe fn ngx_get_origdst(
 http_variable_get!(
     ngx_http_orig_dst_addr_variable,
     |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(&*addr_of!(ngx_http_orig_dst_module));
+        let ctx = request
+            .get_module_ctx::<NgxHttpOrigDstCtx>(unsafe { &*addr_of!(ngx_http_orig_dst_module) });
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
-            obj.bind_addr(v);
+            unsafe { obj.bind_addr(v) };
             return core::Status::NGX_OK;
         }
         // lazy initialization:
@@ -204,7 +213,7 @@ http_variable_get!(
         //   set context
         // bind address
         ngx_log_debug_http!(request, "httporigdst: context not found, getting address");
-        let r = ngx_get_origdst(request);
+        let r = unsafe { ngx_get_origdst(request) };
         match r {
             Err(e) => {
                 return e;
@@ -226,10 +235,11 @@ http_variable_get!(
                     ip,
                     port,
                 );
-                (*new_ctx).save(&ip, port, &request.pool());
-                (*new_ctx).bind_addr(v);
-                request
-                    .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
+                unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
+                unsafe { (*new_ctx).bind_addr(v) };
+                request.set_module_ctx(new_ctx as *mut c_void, unsafe {
+                    &*addr_of!(ngx_http_orig_dst_module)
+                });
             }
         }
         core::Status::NGX_OK
@@ -239,10 +249,11 @@ http_variable_get!(
 http_variable_get!(
     ngx_http_orig_dst_port_variable,
     |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(&*addr_of!(ngx_http_orig_dst_module));
+        let ctx = request
+            .get_module_ctx::<NgxHttpOrigDstCtx>(unsafe { &*addr_of!(ngx_http_orig_dst_module) });
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
-            obj.bind_port(v);
+            unsafe { obj.bind_port(v) };
             return core::Status::NGX_OK;
         }
         // lazy initialization:
@@ -251,7 +262,7 @@ http_variable_get!(
         //   set context
         // bind port
         ngx_log_debug_http!(request, "httporigdst: context not found, getting address");
-        let r = ngx_get_origdst(request);
+        let r = unsafe { ngx_get_origdst(request) };
         match r {
             Err(e) => {
                 return e;
@@ -273,10 +284,11 @@ http_variable_get!(
                     ip,
                     port,
                 );
-                (*new_ctx).save(&ip, port, &request.pool());
-                (*new_ctx).bind_port(v);
-                request
-                    .set_module_ctx(new_ctx as *mut c_void, &*addr_of!(ngx_http_orig_dst_module));
+                unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
+                unsafe { (*new_ctx).bind_port(v) };
+                request.set_module_ctx(new_ctx as *mut c_void, unsafe {
+                    &*addr_of!(ngx_http_orig_dst_module)
+                });
             }
         }
         core::Status::NGX_OK
@@ -292,13 +304,15 @@ impl HttpModule for Module {
 
     // static ngx_int_t ngx_http_orig_dst_add_variables(ngx_conf_t *cf)
     unsafe extern "C" fn preconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
-        for mut v in NGX_HTTP_ORIG_DST_VARS {
-            let var = ngx_http_add_variable(cf, &mut v.name, v.flags);
-            if var.is_null() {
+        for mut v in unsafe { NGX_HTTP_ORIG_DST_VARS } {
+            let var = NonNull::new(unsafe { ngx_http_add_variable(cf, &mut v.name, v.flags) });
+            if var.is_none() {
                 return core::Status::NGX_ERROR.into();
             }
-            (*var).get_handler = v.get_handler;
-            (*var).data = v.data;
+            let mut var = var.unwrap();
+            let var = unsafe { var.as_mut() };
+            var.get_handler = v.get_handler;
+            var.data = v.data;
         }
         core::Status::NGX_OK.into()
     }
