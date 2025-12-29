@@ -36,6 +36,12 @@ impl From<HTTPStatus> for Status {
     }
 }
 
+impl From<HTTPStatus> for ngx_int_t {
+    fn from(val: HTTPStatus) -> Self {
+        val.0 as _
+    }
+}
+
 impl From<HTTPStatus> for ngx_uint_t {
     fn from(val: HTTPStatus) -> Self {
         val.0
