@@ -7,6 +7,14 @@ version = "1.28.1+1.28.0"
 license = "Apache-2.0 AND BSD-2-Clause"
 description = "Source of NGINX"
 keywords = ["nginx", "module", "sys"]
+exclude = [
+    "/nginx/.git*",
+    "/nginx/contrib",
+    "/nginx/docs",
+    "/nginx/misc",
+    "!/nginx/docs/html",
+    "!/nginx/docs/man",
+]
 edition.workspace = true
 homepage.workspace = true
 repository.workspace = true
