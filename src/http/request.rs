@@ -259,6 +259,14 @@ impl Request {
         unsafe { ctx.as_ref() }
     }
 
+    /// Get mutable Module context
+    pub fn get_module_ctx_mut<T>(&mut self, module: &ngx_module_t) -> Option<&mut T> {
+        let ctx = self.get_module_ctx_ptr(module).cast::<T>();
+        // SAFETY: ctx is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { ctx.as_mut() }
+    }
+
     /// Sets the value as the module's context.
     ///
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>

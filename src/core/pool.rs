@@ -221,6 +221,28 @@ impl Pool {
         Ok(())
     }
 
+    /// Removes a cleanup handler for a value in the memory pool.
+    unsafe fn remove_cleanup_for_value<T>(
+        &self,
+        value: *const T,
+    ) -> Option<unsafe extern "C" fn(*mut c_void)> {
+        let mut cln = (*self.0.as_ptr()).cleanup;
+
+        while !cln.is_null() {
+            // SAFETY: comparing function pointers is generally unreliable, but in this specific
+            // case we can assume that the same function pointer was used when adding the cleanup
+            // handler.
+            #[allow(unknown_lints)]
+            #[allow(unpredictable_function_pointer_comparisons)]
+            if (*cln).data == value as *mut c_void && (*cln).handler == Some(cleanup_type::<T>) {
+                return (*cln).handler.take();
+            }
+            cln = (*cln).next;
+        }
+
+        None
+    }
+
     /// Allocates memory from the pool of the specified size.
     /// The resulting pointer is aligned to a platform word size.
     ///
@@ -282,6 +304,16 @@ impl Pool {
             };
             p
         }
+    }
+
+    /// Runs the cleanup handler for a value and removes it.
+    ///
+    /// # Safety
+    /// The caller must ensure that `value` is a valid pointer to a value that has an
+    /// associated cleanup handler in the pool.
+    pub unsafe fn remove<T>(&self, value: *const T) {
+        self.remove_cleanup_for_value(value)
+            .inspect(|cleanup| cleanup(value as _));
     }
 
     /// Resizes a memory allocation in place if possible.
