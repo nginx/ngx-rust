@@ -113,6 +113,11 @@ fn nginx_configure_flags(vendored: &[String]) -> Vec<String> {
         nginx_opts.push(format!("--with-ld-opt={ldflags}"));
     }
 
+    nginx_opts.push(format!(
+        "--add-module={}/libnginx",
+        env!("CARGO_MANIFEST_DIR")
+    ));
+
     nginx_opts
 }
 

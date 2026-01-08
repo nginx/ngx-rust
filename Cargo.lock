@@ -543,6 +543,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "nginx-unittest"
+version = "0.1.0"
+dependencies = [
+ "nginx-sys",
+]
+
+[[package]]
 name = "ngx"
 version = "0.5.0"
 dependencies = [
@@ -550,6 +557,7 @@ dependencies = [
  "async-task",
  "lock_api",
  "nginx-sys",
+ "nginx-unittest",
  "pin-project-lite",
  "tempfile",
 ]
