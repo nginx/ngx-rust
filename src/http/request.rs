@@ -1,6 +1,7 @@
 use core::error;
 use core::ffi::c_void;
 use core::fmt;
+use core::fmt::Display;
 use core::ptr::NonNull;
 use core::slice;
 use core::str::FromStr;
@@ -8,6 +9,7 @@ use core::str::FromStr;
 use crate::core::*;
 use crate::ffi::*;
 use crate::http::status::*;
+use crate::http::HttpPhase;
 
 /// Define a static request handler.
 ///
@@ -83,6 +85,83 @@ macro_rules! http_variable_get {
             status.0
         }
     };
+}
+
+/// Trait for converting handler return types into `ngx_int_t`.
+/// Any desired error handling / logging logic can be implemented in the `into_ngx_int_t` method.
+pub trait HttpHandlerReturn: Sized {
+    /// Convert the handler return type into an `ngx_int_t`.
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t;
+}
+
+impl HttpHandlerReturn for Option<ngx_int_t> {
+    #[inline]
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t {
+        self.unwrap_or(NGX_ERROR as _)
+    }
+}
+
+impl HttpHandlerReturn for ngx_int_t {
+    #[inline]
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t {
+        self
+    }
+}
+
+impl HttpHandlerReturn for Status {
+    #[inline]
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t {
+        self.0
+    }
+}
+
+impl<R, E> HttpHandlerReturn for core::result::Result<R, E>
+where
+    R: HttpHandlerReturn,
+    E: Display,
+{
+    #[inline]
+    fn into_ngx_int_t(self, r: &Request) -> ngx_int_t {
+        match self {
+            Ok(val) => val.into_ngx_int_t(r),
+            Err(e) => {
+                crate::ngx_log_error!(NGX_LOG_ERR, r.log(), "{e}",);
+                NGX_ERROR as _
+            }
+        }
+    }
+}
+
+/// Trait for static request handler.
+/// Return type must implement [`HttpHandlerReturn`].
+/// There are predefined implementations for `ngx_int_t`, [`Status`], `Option<ngx_int_t>`,
+/// and `Result` with value type implementing [`HttpHandlerReturn`] and error type
+/// implementing `Display`.
+pub trait HttpRequestHandler {
+    /// The phase in which the handler is invoked.
+    const PHASE: HttpPhase;
+    /// The return type of the handler.
+    type ReturnType: HttpHandlerReturn;
+    /// The handler function.
+    fn handler(request: &mut Request) -> Self::ReturnType;
+    /// Handler name for logging purposes.
+    /// `core::any::type_name` is used by default.
+    fn name() -> &'static str {
+        core::any::type_name::<Self>()
+    }
+}
+
+/// The C-compatible handler wrapper function.
+///
+/// # Safety
+///
+/// The caller has provided a valid non-null pointer to an `ngx_http_request_t`.
+pub(crate) unsafe extern "C" fn handler_wrapper<H>(r: *mut ngx_http_request_t) -> ngx_int_t
+where
+    H: HttpRequestHandler,
+{
+    let r = unsafe { Request::from_ngx_http_request(r) };
+    H::handler(r).into_ngx_int_t(r)
 }
 
 /// Wrapper struct for an [`ngx_http_request_t`] pointer, providing methods for working with HTTP
