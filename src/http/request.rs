@@ -206,6 +206,16 @@ impl Request {
         &mut *r.cast::<Request>()
     }
 
+    /// Create a const [`Request`] from a const [`ngx_http_request_t`].
+    ///
+    /// # Safety
+    ///
+    /// The caller has provided a valid non-null pointer to a valid `ngx_http_request_t`
+    /// which shares the same representation as `Request`.
+    pub unsafe fn from_const_ngx_http_request<'a>(r: *const ngx_http_request_t) -> &'a Request {
+        &*r.cast::<Request>()
+    }
+
     /// Is this the main request (as opposed to a subrequest)?
     pub fn is_main(&self) -> bool {
         let main = self.0.main.cast();
@@ -311,6 +321,11 @@ impl Request {
         }
     }
 
+    /// Get HTTP status of response.
+    pub fn get_status(&self) -> HTTPStatus {
+        HTTPStatus::from_u16(self.0.headers_out.status as u16).unwrap_or(HTTPStatus(0))
+    }
+
     /// Set HTTP status of response.
     pub fn set_status(&mut self, status: HTTPStatus) {
         self.0.headers_out.status = status.into();
@@ -378,6 +393,14 @@ impl Request {
     /// [response body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
     pub fn output_filter(&mut self, body: &mut ngx_chain_t) -> Status {
         unsafe { Status(ngx_http_output_filter(&mut self.0, body)) }
+    }
+
+    /// Get the output chain buffer.
+    pub fn get_out(&self) -> Option<&ngx_chain_t> {
+        if self.0.out.is_null() {
+            return None;
+        }
+        unsafe { Some(&*self.0.out) }
     }
 
     /// Perform internal redirect to a location
