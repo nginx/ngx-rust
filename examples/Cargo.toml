@@ -13,6 +13,9 @@ autobins = false
 build = "../build.rs"
 
 [dependencies]
+allocator-api2 = { version = "0.4.0", default-features = false, features = ["fresh-rust"] }
+async-task = { version = "4.7.1" }
+futures = "0.3"
 nginx-sys = { path = "../nginx-sys/", default-features = false }
 ngx = { path = "../", default-features = false, features = ["std"] }
 
@@ -52,6 +55,12 @@ path = "async.rs"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "async_request"
+path = "async_request.rs"
+crate-type = ["cdylib"]
+required-features = ["async"]
+
+[[example]]
 name = "shared_dict"
 path = "shared_dict.rs"
 crate-type = ["cdylib"]
@@ -63,5 +72,6 @@ default = ["export-modules", "ngx/vendored"]
 # outside of the NGINX buildsystem. However, cargo currently does not detect
 # this configuration automatically.
 # See https://github.com/rust-lang/rust/issues/20267
+async = ["ngx/async"]
 export-modules = []
 linux = []

@@ -3,13 +3,12 @@ use std::ffi::{c_char, c_void};
 use http::HeaderMap;
 use ngx::core;
 use ngx::ffi::{
-    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_http_handler_pt, ngx_http_module_t,
-    ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t,
+    ngx_command_t, ngx_conf_t, ngx_http_module_t, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t,
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE,
     NGX_HTTP_SRV_CONF, NGX_LOG_EMERG,
 };
 use ngx::http::*;
-use ngx::{http_request_handler, ngx_conf_log_error, ngx_log_debug_http, ngx_string};
+use ngx::{ngx_conf_log_error, ngx_log_debug_http, ngx_string};
 
 struct Module;
 
@@ -20,18 +19,10 @@ impl HttpModule for Module {
 
     unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
         // SAFETY: this function is called with non-NULL cf always
-        let cf = &mut *cf;
-        let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
-
-        let h = ngx_array_push(
-            &mut cmcf.phases[ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE as usize].handlers,
-        ) as *mut ngx_http_handler_pt;
-        if h.is_null() {
-            return core::Status::NGX_ERROR.into();
-        }
-        // set an phase handler
-        *h = Some(awssigv4_header_handler);
-        core::Status::NGX_OK.into()
+        let cf = unsafe { &mut *cf };
+        ngx::http::add_phase_handler::<AwsSigV4HeaderHandler>(cf)
+            .map_or(core::Status::NGX_ERROR, |_| core::Status::NGX_OK)
+            .into()
     }
 }
 
@@ -261,82 +252,89 @@ extern "C" fn ngx_http_awssigv4_commands_set_s3_endpoint(
     ngx::core::NGX_CONF_OK
 }
 
-http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
-    // get Module Config from request
-    let conf = Module::location_conf(request).expect("module conf");
-    ngx_log_debug_http!(request, "AWS signature V4 module {}", {
-        if conf.enable {
-            "enabled"
-        } else {
-            "disabled"
-        }
-    });
-    if !conf.enable {
-        return core::Status::NGX_DECLINED;
-    }
+struct AwsSigV4HeaderHandler;
 
-    // TODO: build url properly from the original URL from client
-    let method = request.method();
-    if !matches!(method, ngx::http::Method::HEAD | ngx::http::Method::GET) {
-        return HTTPStatus::FORBIDDEN.into();
-    }
+impl HttpRequestHandler for AwsSigV4HeaderHandler {
+    const PHASE: HttpPhase = HttpPhase::PreContent;
+    type ReturnType = core::Status;
 
-    let datetime = chrono::Utc::now();
-    let uri = match request.unparsed_uri().to_str() {
-        Ok(v) => format!("https://{}.{}{}", conf.s3_bucket, conf.s3_endpoint, v),
-        Err(_) => return core::Status::NGX_DECLINED,
-    };
-
-    let datetime_now = datetime.format("%Y%m%dT%H%M%SZ");
-    let datetime_now = datetime_now.to_string();
-
-    let signature = {
-        // NOTE: aws_sign_v4::AwsSign::new() implementation requires a HeaderMap.
-        // Iterate over requests headers_in and copy into HeaderMap
-        // Copy only headers that will be used to sign the request
-        let mut headers = HeaderMap::new();
-        for (name, value) in request.headers_in_iterator() {
-            if let Ok(name) = name.to_str() {
-                if name.to_lowercase() == "host" {
-                    if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
-                        headers.insert(http::header::HOST, value);
-                    } else {
-                        return core::Status::NGX_DECLINED;
-                    }
-                }
+    fn handler(request: &mut Request) -> Self::ReturnType {
+        // get Module Config from request
+        let conf = Module::location_conf(request).expect("module conf");
+        ngx_log_debug_http!(request, "AWS signature V4 module {}", {
+            if conf.enable {
+                "enabled"
             } else {
-                return core::Status::NGX_DECLINED;
+                "disabled"
             }
+        });
+        if !conf.enable {
+            return core::Status::NGX_DECLINED;
         }
-        headers.insert("X-Amz-Date", datetime_now.parse().unwrap());
-        ngx_log_debug_http!(request, "headers {:?}", headers);
-        ngx_log_debug_http!(request, "method {:?}", method);
-        ngx_log_debug_http!(request, "uri {:?}", uri);
-        ngx_log_debug_http!(request, "datetime_now {:?}", datetime_now);
 
-        let s = aws_sign_v4::AwsSign::new(
-            method.as_str(),
-            &uri,
-            &datetime,
-            &headers,
-            "us-east-1",
-            conf.access_key.as_str(),
-            conf.secret_key.as_str(),
-            "s3",
-            "",
-        );
-        s.sign()
-    };
+        // TODO: build url properly from the original URL from client
+        let method = request.method();
+        if !matches!(method, ngx::http::Method::HEAD | ngx::http::Method::GET) {
+            return HTTPStatus::FORBIDDEN.into();
+        }
 
-    request.add_header_in("authorization", signature.as_str());
-    request.add_header_in("X-Amz-Date", datetime_now.as_str());
+        let datetime = chrono::Utc::now();
+        let uri = match request.unparsed_uri().to_str() {
+            Ok(v) => format!("https://{}.{}{}", conf.s3_bucket, conf.s3_endpoint, v),
+            Err(_) => return core::Status::NGX_DECLINED,
+        };
 
-    for (name, value) in request.headers_out_iterator() {
-        ngx_log_debug_http!(request, "headers_out {name}: {value}",);
+        let datetime_now = datetime.format("%Y%m%dT%H%M%SZ");
+        let datetime_now = datetime_now.to_string();
+
+        let signature = {
+            // NOTE: aws_sign_v4::AwsSign::new() implementation requires a HeaderMap.
+            // Iterate over requests headers_in and copy into HeaderMap
+            // Copy only headers that will be used to sign the request
+            let mut headers = HeaderMap::new();
+            for (name, value) in request.headers_in_iterator() {
+                if let Ok(name) = name.to_str() {
+                    if name.to_lowercase() == "host" {
+                        if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
+                            headers.insert(http::header::HOST, value);
+                        } else {
+                            return core::Status::NGX_DECLINED;
+                        }
+                    }
+                } else {
+                    return core::Status::NGX_DECLINED;
+                }
+            }
+            headers.insert("X-Amz-Date", datetime_now.parse().unwrap());
+            ngx_log_debug_http!(request, "headers {:?}", headers);
+            ngx_log_debug_http!(request, "method {:?}", method);
+            ngx_log_debug_http!(request, "uri {:?}", uri);
+            ngx_log_debug_http!(request, "datetime_now {:?}", datetime_now);
+
+            let s = aws_sign_v4::AwsSign::new(
+                method.as_str(),
+                &uri,
+                &datetime,
+                &headers,
+                "us-east-1",
+                conf.access_key.as_str(),
+                conf.secret_key.as_str(),
+                "s3",
+                "",
+            );
+            s.sign()
+        };
+
+        request.add_header_in("authorization", signature.as_str());
+        request.add_header_in("X-Amz-Date", datetime_now.as_str());
+
+        for (name, value) in request.headers_out_iterator() {
+            ngx_log_debug_http!(request, "headers_out {name}: {value}",);
+        }
+        for (name, value) in request.headers_in_iterator() {
+            ngx_log_debug_http!(request, "headers_in  {name}: {value}",);
+        }
+
+        core::Status::NGX_OK
     }
-    for (name, value) in request.headers_in_iterator() {
-        ngx_log_debug_http!(request, "headers_in  {name}: {value}",);
-    }
-
-    core::Status::NGX_OK
-});
+}

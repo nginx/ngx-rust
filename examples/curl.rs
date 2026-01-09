@@ -2,13 +2,11 @@ use std::ffi::{c_char, c_void};
 
 use ngx::core;
 use ngx::ffi::{
-    ngx_array_push, ngx_command_t, ngx_conf_t, ngx_http_handler_pt, ngx_http_module_t,
-    ngx_http_phases_NGX_HTTP_ACCESS_PHASE, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t,
+    ngx_command_t, ngx_conf_t, ngx_http_module_t, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t,
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE, NGX_LOG_EMERG,
 };
-use ngx::http::{self, HttpModule, MergeConfigError};
-use ngx::http::{HttpModuleLocationConf, HttpModuleMainConf, NgxHttpCoreModule};
-use ngx::{http_request_handler, ngx_conf_log_error, ngx_log_debug_http, ngx_string};
+use ngx::http::{self, HttpModule, HttpModuleLocationConf, HttpRequestHandler, MergeConfigError};
+use ngx::{ngx_conf_log_error, ngx_log_debug_http, ngx_string};
 
 struct Module;
 
@@ -19,18 +17,10 @@ impl http::HttpModule for Module {
 
     unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
         // SAFETY: this function is called with non-NULL cf always
-        let cf = &mut *cf;
-        let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
-
-        let h = ngx_array_push(
-            &mut cmcf.phases[ngx_http_phases_NGX_HTTP_ACCESS_PHASE as usize].handlers,
-        ) as *mut ngx_http_handler_pt;
-        if h.is_null() {
-            return core::Status::NGX_ERROR.into();
-        }
-        // set an Access phase handler
-        *h = Some(curl_access_handler);
-        core::Status::NGX_OK.into()
+        let cf = unsafe { &mut *cf };
+        http::add_phase_handler::<CurlRequestHandler>(cf)
+            .map_or(core::Status::NGX_ERROR, |_| core::Status::NGX_OK)
+            .into()
     }
 }
 
@@ -90,25 +80,32 @@ impl http::Merge for ModuleConfig {
     }
 }
 
-http_request_handler!(curl_access_handler, |request: &mut http::Request| {
-    let co = Module::location_conf(request).expect("module config is none");
+struct CurlRequestHandler;
 
-    ngx_log_debug_http!(request, "curl module enabled: {}", co.enable);
+impl HttpRequestHandler for CurlRequestHandler {
+    const PHASE: ngx::http::HttpPhase = ngx::http::HttpPhase::Access;
+    type ReturnType = core::Status;
 
-    match co.enable {
-        true => {
-            if request
-                .user_agent()
-                .is_some_and(|ua| ua.as_bytes().starts_with(b"curl"))
-            {
-                http::HTTPStatus::FORBIDDEN.into()
-            } else {
-                core::Status::NGX_DECLINED
+    fn handler(request: &mut http::Request) -> Self::ReturnType {
+        let co = Module::location_conf(request).expect("module config is none");
+
+        ngx_log_debug_http!(request, "curl module enabled: {}", co.enable);
+
+        match co.enable {
+            true => {
+                if request
+                    .user_agent()
+                    .is_some_and(|ua| ua.as_bytes().starts_with(b"curl"))
+                {
+                    http::HTTPStatus::FORBIDDEN.into()
+                } else {
+                    core::Status::NGX_DECLINED
+                }
             }
+            false => core::Status::NGX_DECLINED,
         }
-        false => core::Status::NGX_DECLINED,
     }
-});
+}
 
 extern "C" fn ngx_http_curl_commands_set_enable(
     cf: *mut ngx_conf_t,

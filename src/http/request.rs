@@ -1,6 +1,7 @@
 use core::error;
 use core::ffi::c_void;
 use core::fmt;
+use core::fmt::Display;
 use core::ptr::NonNull;
 use core::slice;
 use core::str::FromStr;
@@ -8,6 +9,7 @@ use core::str::FromStr;
 use crate::core::*;
 use crate::ffi::*;
 use crate::http::status::*;
+use crate::http::HttpPhase;
 
 /// Define a static request handler.
 ///
@@ -85,6 +87,83 @@ macro_rules! http_variable_get {
     };
 }
 
+/// Trait for converting handler return types into `ngx_int_t`.
+/// Any desired error handling / logging logic can be implemented in the `into_ngx_int_t` method.
+pub trait HttpHandlerReturn: Sized {
+    /// Convert the handler return type into an `ngx_int_t`.
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t;
+}
+
+impl HttpHandlerReturn for Option<ngx_int_t> {
+    #[inline]
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t {
+        self.unwrap_or(NGX_ERROR as _)
+    }
+}
+
+impl HttpHandlerReturn for ngx_int_t {
+    #[inline]
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t {
+        self
+    }
+}
+
+impl HttpHandlerReturn for Status {
+    #[inline]
+    fn into_ngx_int_t(self, _r: &Request) -> ngx_int_t {
+        self.0
+    }
+}
+
+impl<R, E> HttpHandlerReturn for core::result::Result<R, E>
+where
+    R: HttpHandlerReturn,
+    E: Display,
+{
+    #[inline]
+    fn into_ngx_int_t(self, r: &Request) -> ngx_int_t {
+        match self {
+            Ok(val) => val.into_ngx_int_t(r),
+            Err(e) => {
+                crate::ngx_log_error!(NGX_LOG_ERR, r.log(), "{e}",);
+                NGX_ERROR as _
+            }
+        }
+    }
+}
+
+/// Trait for static request handler.
+/// Return type must implement [`HttpHandlerReturn`].
+/// There are predefined implementations for `ngx_int_t`, [`Status`], `Option<ngx_int_t>`,
+/// and `Result` with value type implementing [`HttpHandlerReturn`] and error type
+/// implementing `Display`.
+pub trait HttpRequestHandler {
+    /// The phase in which the handler is invoked.
+    const PHASE: HttpPhase;
+    /// The return type of the handler.
+    type ReturnType: HttpHandlerReturn;
+    /// The handler function.
+    fn handler(request: &mut Request) -> Self::ReturnType;
+    /// Handler name for logging purposes.
+    /// `core::any::type_name` is used by default.
+    fn name() -> &'static str {
+        core::any::type_name::<Self>()
+    }
+}
+
+/// The C-compatible handler wrapper function.
+///
+/// # Safety
+///
+/// The caller has provided a valid non-null pointer to an `ngx_http_request_t`.
+pub(crate) unsafe extern "C" fn handler_wrapper<H>(r: *mut ngx_http_request_t) -> ngx_int_t
+where
+    H: HttpRequestHandler,
+{
+    let r = unsafe { Request::from_ngx_http_request(r) };
+    H::handler(r).into_ngx_int_t(r)
+}
+
 /// Wrapper struct for an [`ngx_http_request_t`] pointer, providing methods for working with HTTP
 /// requests.
 ///
@@ -125,6 +204,16 @@ impl Request {
     /// which shares the same representation as `Request`.
     pub unsafe fn from_ngx_http_request<'a>(r: *mut ngx_http_request_t) -> &'a mut Request {
         &mut *r.cast::<Request>()
+    }
+
+    /// Create a const [`Request`] from a const [`ngx_http_request_t`].
+    ///
+    /// # Safety
+    ///
+    /// The caller has provided a valid non-null pointer to a valid `ngx_http_request_t`
+    /// which shares the same representation as `Request`.
+    pub unsafe fn from_const_ngx_http_request<'a>(r: *const ngx_http_request_t) -> &'a Request {
+        &*r.cast::<Request>()
     }
 
     /// Is this the main request (as opposed to a subrequest)?
@@ -180,6 +269,14 @@ impl Request {
         unsafe { ctx.as_ref() }
     }
 
+    /// Get mutable Module context
+    pub fn get_module_ctx_mut<T>(&mut self, module: &ngx_module_t) -> Option<&mut T> {
+        let ctx = self.get_module_ctx_ptr(module).cast::<T>();
+        // SAFETY: ctx is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { ctx.as_mut() }
+    }
+
     /// Sets the value as the module's context.
     ///
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
@@ -222,6 +319,11 @@ impl Request {
         } else {
             None
         }
+    }
+
+    /// Get HTTP status of response.
+    pub fn get_status(&self) -> HTTPStatus {
+        HTTPStatus::from_u16(self.0.headers_out.status as u16).unwrap_or(HTTPStatus(0))
     }
 
     /// Set HTTP status of response.
@@ -291,6 +393,14 @@ impl Request {
     /// [response body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
     pub fn output_filter(&mut self, body: &mut ngx_chain_t) -> Status {
         unsafe { Status(ngx_http_output_filter(&mut self.0, body)) }
+    }
+
+    /// Get the output chain buffer.
+    pub fn get_out(&self) -> Option<&ngx_chain_t> {
+        if self.0.out.is_null() {
+            return None;
+        }
+        unsafe { Some(&*self.0.out) }
     }
 
     /// Perform internal redirect to a location

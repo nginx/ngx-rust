@@ -5,7 +5,7 @@ use core::ptr::{self, NonNull};
 
 use nginx_sys::{
     ngx_buf_t, ngx_create_temp_buf, ngx_palloc, ngx_pcalloc, ngx_pfree, ngx_pmemalign, ngx_pnalloc,
-    ngx_pool_cleanup_add, ngx_pool_t, NGX_ALIGNMENT,
+    ngx_pool_cleanup_add, ngx_pool_cleanup_t, ngx_pool_t, NGX_ALIGNMENT,
 };
 
 use crate::allocator::{dangling_for_layout, AllocError, Allocator};
@@ -133,6 +133,11 @@ impl AsMut<ngx_pool_t> for Pool {
     }
 }
 
+// Wrapper to create an unique value type
+struct Item<T: Sized> {
+    value: T,
+}
+
 impl Pool {
     /// Creates a new `Pool` from an `ngx_pool_t` pointer.
     ///
@@ -203,22 +208,82 @@ impl Pool {
         Some(MemoryBuffer::from_ngx_buf(buf))
     }
 
-    /// Adds a cleanup handler for a value in the memory pool.
+    /// Allocates memory for a value and adds a cleanup handler for it in the memory pool.
     ///
-    /// Returns `Ok(())` if the cleanup handler is successfully added, or `Err(())` if the cleanup
-    /// handler cannot be added.
+    /// Returns `Some(NonNull<T>)` if the allocation and cleanup handler addition are successful,
+    /// or `None` if allocation fails.
     ///
     /// # Safety
     /// This function is marked as unsafe because it involves raw pointer manipulation.
-    unsafe fn add_cleanup_for_value<T>(&self, value: *mut T) -> Result<(), ()> {
-        let cln = ngx_pool_cleanup_add(self.0.as_ptr(), 0);
+    unsafe fn allocate_with_cleanup<T: Sized>(&self, value: T) -> Option<NonNull<T>> {
+        let cln = ngx_pool_cleanup_add(self.0.as_ptr(), mem::size_of::<T>());
         if cln.is_null() {
-            return Err(());
+            return None;
         }
         (*cln).handler = Some(cleanup_type::<T>);
-        (*cln).data = value as *mut c_void;
+        // `data` points to the memory allocated for the value by `ngx_pool_cleanup_add()`
+        ptr::write((*cln).data as *mut T, value);
+        NonNull::new((*cln).data as *mut T)
+    }
 
-        Ok(())
+    /// Allocates memory for a value and adds a cleanup handler for it in the memory pool.
+    /// Memory is not allocated if the value of the same type already exists in the pool.
+    ///
+    /// Returns `Some(NonNull<T>)` if the allocation and cleanup handler addition are successful,
+    /// or `None` if allocation fails or a cleanup handler for the value type already exists.
+    ///
+    /// # Safety
+    /// This function is marked as unsafe because it involves raw pointer manipulation.
+    unsafe fn allocate_with_cleanup_unique<T: Sized>(&self, value: T) -> Option<NonNull<T>> {
+        if self.cleanup_lookup::<T>(None).is_some() {
+            return None;
+        }
+        self.allocate_with_cleanup(value)
+    }
+
+    /// Runs a cleanup handler for a value in the memory pool and removes it.
+    ///
+    /// Returns `true` if a cleanup handler was found and removed, or `false` otherwise.
+    ///
+    /// # Safety
+    /// This function is marked as unsafe because it involves raw pointer manipulation.
+    unsafe fn remove_cleanup<T: Sized>(&self, value: Option<*const T>) -> Option<()> {
+        self.cleanup_lookup::<T>(value).map(|mut cln| {
+            let cln = cln.as_mut();
+            cln.handler.take().inspect(|handler| {
+                handler(cln.data);
+            });
+            cln.data = core::ptr::null_mut();
+        })
+    }
+
+    /// Looks up a cleanup handler for a value in the memory pool.
+    ///
+    /// Returns `Some(NonNull<ngx_pool_cleanup_t>)` if a cleanup handler is found, or `None` otherwise.
+    ///
+    /// # Safety
+    /// This function is marked as unsafe because it involves raw pointer manipulation.
+    unsafe fn cleanup_lookup<T: Sized>(
+        &self,
+        value: Option<*const T>,
+    ) -> Option<NonNull<ngx_pool_cleanup_t>> {
+        let mut cln = (*self.0.as_ptr()).cleanup;
+
+        while !cln.is_null() {
+            // SAFETY: comparing function pointers is generally unreliable, but in this specific
+            // case we can assume that the same function pointer was used when adding the cleanup
+            // handler.
+            #[allow(unknown_lints)]
+            #[allow(unpredictable_function_pointer_comparisons)]
+            if (*cln).handler == Some(cleanup_type::<T>)
+                && (value.is_none() || (*cln).data == value.unwrap() as *mut c_void)
+            {
+                return NonNull::new(cln);
+            }
+            cln = (*cln).next;
+        }
+
+        None
     }
 
     /// Allocates memory from the pool of the specified size.
@@ -272,16 +337,71 @@ impl Pool {
     ///
     /// Returns a typed pointer to the allocated memory if successful, or a null pointer if
     /// allocation or cleanup handler addition fails.
-    pub fn allocate<T>(&self, value: T) -> *mut T {
+    pub fn allocate<T: Sized>(&self, value: T) -> *mut T {
         unsafe {
-            let p = self.alloc(mem::size_of::<T>()) as *mut T;
-            ptr::write(p, value);
-            if self.add_cleanup_for_value(p).is_err() {
-                ptr::drop_in_place(p);
-                return ptr::null_mut();
-            };
-            p
+            match self.allocate_with_cleanup(value) {
+                None => ptr::null_mut(),
+                Some(mut ptr) => ptr.as_mut(),
+            }
         }
+    }
+
+    /// Allocates memory for a value of a specified type and adds a cleanup handler to the memory
+    /// pool. Allocation is unique for the value type.
+    ///
+    /// Returns a typed pointer to the allocated memory if successful, or `None` if
+    /// allocation or cleanup handler addition fails.
+    pub fn allocate_unique<T: Sized>(&mut self, value: T) -> Option<&mut T> {
+        unsafe {
+            self.allocate_with_cleanup_unique(Item { value })
+                .map(|mut ptr| &mut ptr.as_mut().value)
+        }
+    }
+
+    /// Gets the value of a specified type from the memory pool. This value must be allocated with
+    /// [`Pool::allocate_unique`].
+    ///
+    /// Returns a reference to the value if found, or `None` if not found.
+    pub fn get_unique<T: Sized>(&self) -> Option<&T> {
+        unsafe {
+            self.cleanup_lookup::<Item<T>>(None).map(|cln| {
+                let item = cln.as_ref().data as *const Item<T>;
+                &(*item).value
+            })
+        }
+    }
+
+    /// Gets a mutable reference to the value of a specified type from the memory pool.
+    /// This value must be allocated with [`Pool::allocate_unique`].
+    ///
+    /// Returns a mutable reference to the value if found, or `None` if not found.
+    pub fn get_unique_mut<T: Sized>(&mut self) -> Option<&mut T> {
+        unsafe {
+            self.cleanup_lookup::<Item<T>>(None).map(|cln| {
+                let item = cln.as_ref().data as *mut Item<T>;
+                &mut (*item).value
+            })
+        }
+    }
+
+    /// Runs the cleanup handler for a value and removes it.
+    ///
+    /// Returns `Some(())` if the value was successfully removed,
+    /// or `None` if the value was not found.
+    ///
+    /// # Safety
+    /// The caller must ensure that `value` is a valid pointer to a value that has an
+    /// associated cleanup handler in the pool.
+    pub unsafe fn remove<T: Sized>(&self, value: *const T) -> Option<()> {
+        self.remove_cleanup(Some(value))
+    }
+
+    /// Runs the cleanup handler for a unique value and removes it.
+    ///
+    /// Returns `Some(())` if the value was successfully removed,
+    /// or `None` if the value was not found.
+    pub fn remove_unique<T: Sized>(&self) -> Option<()> {
+        unsafe { self.remove_cleanup::<Item<T>>(None) }
     }
 
     /// Resizes a memory allocation in place if possible.
@@ -330,5 +450,7 @@ impl Pool {
 ///
 /// * `data` - A raw pointer to the value of type `T` to be cleaned up.
 unsafe extern "C" fn cleanup_type<T>(data: *mut c_void) {
-    ptr::drop_in_place(data as *mut T);
+    if !data.is_null() {
+        ptr::drop_in_place(data as *mut T);
+    }
 }
