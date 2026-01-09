@@ -549,6 +549,7 @@ dependencies = [
  "allocator-api2",
  "async-task",
  "lock_api",
+ "log",
  "nginx-sys",
  "pin-project-lite",
  "tempfile",
