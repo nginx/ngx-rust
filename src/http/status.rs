@@ -132,6 +132,8 @@ http_status_codes! {
     (400, BAD_REQUEST, "Bad Request");
     /// 401 Unauthorized
     (401, UNAUTHORIZED, "Unauthorized");
+    /// 402 Payment Required
+    (402, PAYMENT_REQUIRED, "Payment Required");
     /// 403 Forbidden
     (403, FORBIDDEN, "Forbidden");
     /// 404 Not Found
