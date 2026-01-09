@@ -50,6 +50,7 @@ env:
   NGX_TEST_FILES: examples/t
   NGX_TEST_GLOBALS_DYNAMIC: >-
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_async_module.so;
+    load_module ${{ github.workspace }}/nginx/objs/ngx_http_tokio_module.so;
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_awssigv4_module.so;
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_curl_module.so;
     load_module ${{ github.workspace }}/nginx/objs/ngx_http_shared_dict_module.so;
@@ -185,9 +186,8 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            nginx/objs/**/CACHEDIR.TAG
-            nginx/objs/**/ngx-debug
-            nginx/objs/**/ngx-release
+            # Windows nmake implementation doesn't support .PHONY. Don't cache
+            # anything make creates because it might not rebuild correctly
           key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-nginx-
 
