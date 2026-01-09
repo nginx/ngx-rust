@@ -1,3 +1,8 @@
+// Allow following allow to work in MSRV 1.81
+#![allow(unknown_lints)]
+// Suppress spurrions lint for 2024 compatibility
+#![allow(tail_expr_drop_order)]
+
 use std::ffi::{c_char, c_void};
 
 use http::HeaderMap;
@@ -20,17 +25,19 @@ impl HttpModule for Module {
 
     unsafe extern "C" fn postconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
         // SAFETY: this function is called with non-NULL cf always
-        let cf = &mut *cf;
+        let cf = unsafe { &mut *cf };
         let cmcf = NgxHttpCoreModule::main_conf_mut(cf).expect("http core main conf");
 
-        let h = ngx_array_push(
-            &mut cmcf.phases[ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE as usize].handlers,
-        ) as *mut ngx_http_handler_pt;
+        let h = unsafe {
+            ngx_array_push(
+                &mut cmcf.phases[ngx_http_phases_NGX_HTTP_PRECONTENT_PHASE as usize].handlers,
+            ) as *mut ngx_http_handler_pt
+        };
         if h.is_null() {
             return core::Status::NGX_ERROR.into();
         }
         // set an phase handler
-        *h = Some(awssigv4_header_handler);
+        unsafe { *h = Some(awssigv4_header_handler) };
         core::Status::NGX_OK.into()
     }
 }
@@ -298,10 +305,13 @@ http_request_handler!(awssigv4_header_handler, |request: &mut Request| {
         for (name, value) in request.headers_in_iterator() {
             if let Ok(name) = name.to_str() {
                 if name.to_lowercase() == "host" {
-                    if let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) {
-                        headers.insert(http::header::HOST, value);
-                    } else {
-                        return core::Status::NGX_DECLINED;
+                    match http::HeaderValue::from_bytes(value.as_bytes()) {
+                        Ok(value) => {
+                            headers.insert(http::header::HOST, value);
+                        }
+                        _ => {
+                            return core::Status::NGX_DECLINED;
+                        }
                     }
                 }
             } else {

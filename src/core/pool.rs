@@ -64,7 +64,7 @@ unsafe impl Allocator for Pool {
         if layout.size() > 0 // 0 is dangling ptr
             && (layout.size() > self.as_ref().max || layout.align() > NGX_ALIGNMENT)
         {
-            ngx_pfree(self.0.as_ptr(), ptr.as_ptr().cast());
+            unsafe { ngx_pfree(self.0.as_ptr(), ptr.as_ptr().cast()) };
         }
     }
 
@@ -78,7 +78,7 @@ unsafe impl Allocator for Pool {
             new_layout.size() >= old_layout.size(),
             "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
         );
-        self.resize(ptr, old_layout, new_layout)
+        unsafe { self.resize(ptr, old_layout, new_layout) }
     }
 
     unsafe fn grow_zeroed(
@@ -91,16 +91,16 @@ unsafe impl Allocator for Pool {
             new_layout.size() >= old_layout.size(),
             "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
         );
-        #[allow(clippy::manual_inspect)]
-        self.resize(ptr, old_layout, new_layout).map(|new_ptr| {
-            unsafe {
+        unsafe {
+            #[allow(clippy::manual_inspect)]
+            self.resize(ptr, old_layout, new_layout).map(|new_ptr| {
                 new_ptr
                     .cast::<u8>()
                     .byte_add(old_layout.size())
-                    .write_bytes(0, new_layout.size() - old_layout.size())
-            };
-            new_ptr
-        })
+                    .write_bytes(0, new_layout.size() - old_layout.size());
+                new_ptr
+            })
+        }
     }
 
     unsafe fn shrink(
@@ -113,7 +113,7 @@ unsafe impl Allocator for Pool {
             new_layout.size() <= old_layout.size(),
             "`new_layout.size()` must be smaller than or equal to `old_layout.size()`"
         );
-        self.resize(ptr, old_layout, new_layout)
+        unsafe { self.resize(ptr, old_layout, new_layout) }
     }
 }
 
@@ -140,9 +140,11 @@ impl Pool {
     /// The caller must ensure that a valid `ngx_pool_t` pointer is provided, pointing to valid
     /// memory and non-null. A null argument will cause an assertion failure and panic.
     pub unsafe fn from_ngx_pool(pool: *mut ngx_pool_t) -> Pool {
-        debug_assert!(!pool.is_null());
-        debug_assert!(pool.is_aligned());
-        Pool(NonNull::new_unchecked(pool))
+        unsafe {
+            debug_assert!(!pool.is_null());
+            debug_assert!(pool.is_aligned());
+            Pool(NonNull::new_unchecked(pool))
+        }
     }
 
     /// Expose the underlying `ngx_pool_t` pointer, for use with `ngx::ffi`
@@ -211,12 +213,15 @@ impl Pool {
     /// # Safety
     /// This function is marked as unsafe because it involves raw pointer manipulation.
     unsafe fn add_cleanup_for_value<T>(&self, value: *mut T) -> Result<(), ()> {
-        let cln = ngx_pool_cleanup_add(self.0.as_ptr(), 0);
+        let cln = unsafe { ngx_pool_cleanup_add(self.0.as_ptr(), 0) };
         if cln.is_null() {
             return Err(());
         }
-        (*cln).handler = Some(cleanup_type::<T>);
-        (*cln).data = value as *mut c_void;
+
+        unsafe {
+            (*cln).handler = Some(cleanup_type::<T>);
+            (*cln).data = value as *mut c_void;
+        }
 
         Ok(())
     }
@@ -299,10 +304,11 @@ impl Pool {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
-        if ptr.byte_add(old_layout.size()).as_ptr() == self.as_ref().d.last
-            && ptr.byte_add(new_layout.size()).as_ptr() <= self.as_ref().d.end
-            && ptr.align_offset(new_layout.align()) == 0
-        {
+        if unsafe {
+            ptr.byte_add(old_layout.size()).as_ptr() == self.as_ref().d.last
+                && ptr.byte_add(new_layout.size()).as_ptr() <= self.as_ref().d.end
+                && ptr.align_offset(new_layout.align()) == 0
+        } {
             let pool = self.0.as_ptr();
             unsafe { (*pool).d.last = ptr.byte_add(new_layout.size()).as_ptr() };
             Ok(NonNull::slice_from_raw_parts(ptr, new_layout.size()))
@@ -330,5 +336,7 @@ impl Pool {
 ///
 /// * `data` - A raw pointer to the value of type `T` to be cleaned up.
 unsafe extern "C" fn cleanup_type<T>(data: *mut c_void) {
-    ptr::drop_in_place(data as *mut T);
+    unsafe {
+        ptr::drop_in_place(data as *mut T);
+    }
 }

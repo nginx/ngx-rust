@@ -30,7 +30,7 @@ unsafe impl Allocator for SlabPool {
 
     #[inline]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        self.lock().deallocate(ptr, layout)
+        unsafe { self.lock().deallocate(ptr, layout) }
     }
 
     #[inline]
@@ -45,7 +45,7 @@ unsafe impl Allocator for SlabPool {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
-        self.lock().grow(ptr, old_layout, new_layout)
+        unsafe { self.lock().grow(ptr, old_layout, new_layout) }
     }
 
     #[inline]
@@ -55,7 +55,7 @@ unsafe impl Allocator for SlabPool {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
-        self.lock().grow_zeroed(ptr, old_layout, new_layout)
+        unsafe { self.lock().grow_zeroed(ptr, old_layout, new_layout) }
     }
 
     #[inline]
@@ -65,7 +65,7 @@ unsafe impl Allocator for SlabPool {
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
-        self.lock().shrink(ptr, old_layout, new_layout)
+        unsafe { self.lock().shrink(ptr, old_layout, new_layout) }
     }
 }
 
@@ -141,7 +141,7 @@ unsafe impl Allocator for LockedSlabPool {
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         if layout.size() != 0 {
-            ngx_slab_free_locked(self.0.as_ptr(), ptr.as_ptr().cast())
+            unsafe { ngx_slab_free_locked(self.0.as_ptr(), ptr.as_ptr().cast()) }
         }
     }
 }
