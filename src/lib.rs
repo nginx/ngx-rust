@@ -83,7 +83,7 @@
 //! or BSD platform:
 //!
 //! - NGINX build dependencies: C compiler, make, OpenSSL, PCRE2, and Zlib.
-//! - Rust toolchain (1.81.0 or later)
+//! - Rust toolchain (1.85.0 or later)
 //! - [libclang] for rust-bindgen
 //!
 //! The installation process and the package names are system-dependent. Please,
