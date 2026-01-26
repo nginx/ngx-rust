@@ -10,7 +10,7 @@ edition = "2021"
 license = "Apache-2.0"
 homepage = "https://github.com/nginx/ngx-rust"
 repository = "https://github.com/nginx/ngx-rust"
-rust-version = "1.81.0"
+rust-version = "1.85.0"
 
 [workspace.lints.rust]
 rust-2024-compatibility = "warn"
