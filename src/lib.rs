@@ -158,21 +158,21 @@ pub mod sync;
 #[macro_export]
 macro_rules! ngx_modules {
     ($( $mod:ident ),+) => {
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         #[allow(non_upper_case_globals)]
         pub static mut ngx_modules: [*const $crate::ffi::ngx_module_t; $crate::count!($( $mod, )+) + 1] = [
             $( unsafe { &$mod } as *const $crate::ffi::ngx_module_t, )+
             ::core::ptr::null()
         ];
 
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         #[allow(non_upper_case_globals)]
         pub static mut ngx_module_names: [*const ::core::ffi::c_char; $crate::count!($( $mod, )+) + 1] = [
             $( concat!(stringify!($mod), "\0").as_ptr() as *const ::core::ffi::c_char, )+
             ::core::ptr::null()
         ];
 
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         #[allow(non_upper_case_globals)]
         pub static mut ngx_module_order: [*const ::core::ffi::c_char; 1] = [
             ::core::ptr::null()

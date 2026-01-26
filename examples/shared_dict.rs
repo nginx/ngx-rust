@@ -88,7 +88,7 @@ ngx::ngx_modules!(ngx_http_shared_dict_module);
 
 #[used]
 #[allow(non_upper_case_globals)]
-#[cfg_attr(not(feature = "export-modules"), no_mangle)]
+#[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_shared_dict_module: ngx_module_t = ngx_module_t {
     ctx: ptr::addr_of!(NGX_HTTP_SHARED_DICT_MODULE_CTX) as _,
     commands: unsafe { ptr::addr_of_mut!(NGX_HTTP_SHARED_DICT_COMMANDS[0]) },

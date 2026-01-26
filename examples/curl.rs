@@ -63,7 +63,7 @@ ngx::ngx_modules!(ngx_http_curl_module);
 
 #[used]
 #[allow(non_upper_case_globals)]
-#[cfg_attr(not(feature = "export-modules"), no_mangle)]
+#[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_curl_module: ngx_module_t = ngx_module_t {
     ctx: std::ptr::addr_of!(NGX_HTTP_CURL_MODULE_CTX) as _,
     commands: unsafe { &NGX_HTTP_CURL_COMMANDS[0] as *const _ as *mut _ },
