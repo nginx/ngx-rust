@@ -10,9 +10,7 @@
 use ::core::alloc::Layout;
 use ::core::mem;
 use ::core::ptr::{self, NonNull};
-
 pub use allocator_api2::alloc::{AllocError, Allocator};
-
 #[cfg(feature = "alloc")]
 pub use allocator_api2::{alloc::Global, boxed::Box, unsize_box};
 

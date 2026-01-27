@@ -7,8 +7,8 @@ use core::str::FromStr;
 
 use crate::core::*;
 use crate::ffi::*;
-use crate::http::status::*;
 use crate::http::HttpPhase;
+use crate::http::status::*;
 
 /// Define a static request handler.
 ///
@@ -407,8 +407,8 @@ impl Request {
             sub_ptr as *const ngx_http_post_subrequest_t as *mut ngx_http_post_subrequest_t;
         unsafe {
             (*post_subreq).handler = Some(post_callback);
-            (*post_subreq).data = self.get_module_ctx_ptr(module); // WARN: safety! ensure that ctx
-                                                                   // is already set
+            // WARN: safety! ensure that ctx is already set
+            (*post_subreq).data = self.get_module_ctx_ptr(module);
         }
         // -------------
 
@@ -460,8 +460,8 @@ impl crate::http::HttpModuleConfExt for Request {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
         unsafe {
-            // SAFETY: main_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc and
-            // explicitly initialized by the module
+            // SAFETY: main_conf[module.ctx_index] is either NULL or allocated with ngx_p(c)alloc
+            // and explicitly initialized by the module
             NonNull::new((*self.0.main_conf.add(module.ctx_index)).cast())
         }
     }

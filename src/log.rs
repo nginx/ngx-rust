@@ -3,7 +3,7 @@ use core::fmt::{self, Write};
 use core::mem::MaybeUninit;
 use core::ptr::NonNull;
 
-use crate::ffi::{self, ngx_err_t, ngx_log_t, ngx_uint_t, NGX_MAX_ERROR_STR};
+use crate::ffi::{self, NGX_MAX_ERROR_STR, ngx_err_t, ngx_log_t, ngx_uint_t};
 
 /// This constant is set to `true` if NGINX is compiled with debug logging (`--with-debug`).
 pub const DEBUG: bool = cfg!(ngx_feature = "debug");

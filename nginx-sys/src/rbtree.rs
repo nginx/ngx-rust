@@ -23,7 +23,6 @@ macro_rules! ngx_rbtree_data {
 ///
 /// All of the pointers passed must be valid.
 /// `sentinel` is expected to be valid for the whole lifetime of the `tree`.
-///
 pub unsafe fn ngx_rbtree_init(
     tree: *mut ngx_rbtree_t,
     sentinel: *mut ngx_rbtree_node_t,

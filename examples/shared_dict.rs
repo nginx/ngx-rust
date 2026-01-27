@@ -1,17 +1,16 @@
 #![no_std]
 use ::core::ffi::{c_char, c_void};
 use ::core::{mem, ptr};
-
 use nginx_sys::{
+    NGX_CONF_TAKE2, NGX_HTTP_DELETE, NGX_HTTP_MAIN_CONF, NGX_HTTP_MAIN_CONF_OFFSET,
+    NGX_HTTP_MODULE, NGX_HTTP_VAR_CHANGEABLE, NGX_HTTP_VAR_NOCACHEABLE, NGX_LOG_EMERG,
     ngx_command_t, ngx_conf_t, ngx_http_add_variable, ngx_http_compile_complex_value_t,
     ngx_http_complex_value, ngx_http_complex_value_t, ngx_http_module_t, ngx_http_request_t,
     ngx_http_variable_t, ngx_http_variable_value_t, ngx_int_t, ngx_module_t, ngx_parse_size,
-    ngx_shared_memory_add, ngx_shm_zone_t, ngx_str_t, ngx_uint_t, NGX_CONF_TAKE2, NGX_HTTP_DELETE,
-    NGX_HTTP_MAIN_CONF, NGX_HTTP_MAIN_CONF_OFFSET, NGX_HTTP_MODULE, NGX_HTTP_VAR_CHANGEABLE,
-    NGX_HTTP_VAR_NOCACHEABLE, NGX_LOG_EMERG,
+    ngx_shared_memory_add, ngx_shm_zone_t, ngx_str_t, ngx_uint_t,
 };
 use ngx::collections::RbTreeMap;
-use ngx::core::{NgxStr, NgxString, Pool, SlabPool, Status, NGX_CONF_ERROR, NGX_CONF_OK};
+use ngx::core::{NGX_CONF_ERROR, NGX_CONF_OK, NgxStr, NgxString, Pool, SlabPool, Status};
 use ngx::http::{HttpModule, HttpModuleMainConf};
 use ngx::{ngx_conf_log_error, ngx_log_debug, ngx_string};
 

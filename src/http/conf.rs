@@ -211,7 +211,6 @@ pub unsafe trait HttpModuleLocationConf: HttpModule {
 
 mod core {
     use crate::allocator::AllocError;
-
     use crate::{
         ffi::{
             ngx_http_core_loc_conf_t, ngx_http_core_main_conf_t, ngx_http_core_module,
@@ -292,7 +291,7 @@ mod core {
     }
 }
 
-pub use core::{add_phase_handler, HttpPhase, NgxHttpCoreModule};
+pub use core::{HttpPhase, NgxHttpCoreModule, add_phase_handler};
 
 #[cfg(ngx_feature = "http_ssl")]
 mod ssl {

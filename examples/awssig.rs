@@ -3,9 +3,9 @@ use std::ffi::{c_char, c_void};
 use http::HeaderMap;
 use ngx::core;
 use ngx::ffi::{
-    ngx_command_t, ngx_conf_t, ngx_http_module_t, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t,
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE,
-    NGX_HTTP_SRV_CONF, NGX_LOG_EMERG,
+    NGX_HTTP_SRV_CONF, NGX_LOG_EMERG, ngx_command_t, ngx_conf_t, ngx_http_module_t, ngx_int_t,
+    ngx_module_t, ngx_str_t, ngx_uint_t,
 };
 use ngx::http::*;
 use ngx::{ngx_conf_log_error, ngx_log_debug_http, ngx_string};
@@ -262,11 +262,7 @@ impl HttpRequestHandler for AwsSigV4HeaderHandler {
         // get Module Config from request
         let conf = Module::location_conf(request).expect("module conf");
         ngx_log_debug_http!(request, "AWS signature V4 module {}", {
-            if conf.enable {
-                "enabled"
-            } else {
-                "disabled"
-            }
+            if conf.enable { "enabled" } else { "disabled" }
         });
         if !conf.enable {
             return core::Status::NGX_DECLINED;

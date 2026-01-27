@@ -80,8 +80,7 @@ impl SchedulerInner {
             // This handler always receives a non-null pointer to an event embedded into a
             // UnsafeCell<SchedulerInner> instance. We modify the contents of the `UnsafeCell`,
             // but we ensured that:
-            //  - we access the cell correctly, as documented in
-            //    https://doc.rust-lang.org/stable/std/cell/struct.UnsafeCell.html#memory-layout
+            //  - we access the cell correctly, as documented in https://doc.rust-lang.org/stable/std/cell/struct.UnsafeCell.html#memory-layout
             //  - the access is unique due to being single-threaded
             //  - the reference is dropped before we start processing queued runnables.
             let cell: NonNull<UnsafeCell<Self>> =

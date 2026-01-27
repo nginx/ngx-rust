@@ -32,7 +32,6 @@ const NGX_RWLOCK_WLOCK: usize = usize::MAX;
 type NgxAtomic = atomic::AtomicUsize;
 
 /// Raw lock type.
-///
 pub struct RawSpinlock(NgxAtomic);
 
 /// Reader-writer lock over an atomic variable, based on the nginx rwlock implementation.

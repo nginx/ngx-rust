@@ -4,14 +4,15 @@ use core::mem;
 use core::ptr::{self, NonNull};
 
 use nginx_sys::{
-    ngx_buf_t, ngx_create_temp_buf, ngx_palloc, ngx_pcalloc, ngx_pfree, ngx_pmemalign, ngx_pnalloc,
-    ngx_pool_cleanup_add, ngx_pool_t, NGX_ALIGNMENT,
+    NGX_ALIGNMENT, ngx_buf_t, ngx_create_temp_buf, ngx_palloc, ngx_pcalloc, ngx_pfree,
+    ngx_pmemalign, ngx_pnalloc, ngx_pool_cleanup_add, ngx_pool_t,
 };
 
-use crate::allocator::{dangling_for_layout, AllocError, Allocator};
+use crate::allocator::{AllocError, Allocator, dangling_for_layout};
 use crate::core::buffer::{Buffer, MemoryBuffer, TemporaryBuffer};
 
-/// Non-owning wrapper for an [`ngx_pool_t`] pointer, providing methods for working with memory pools.
+/// Non-owning wrapper for an [`ngx_pool_t`] pointer, providing methods for working with memory
+/// pools.
 ///
 /// See <https://nginx.org/en/docs/dev/development_guide.html#pool>
 #[derive(Clone, Debug)]

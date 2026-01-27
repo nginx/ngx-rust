@@ -1,9 +1,8 @@
+#[cfg(feature = "alloc")]
+use alloc::{borrow::Cow, string::String};
 use core::cmp;
 use core::fmt;
 use core::str::{self, Utf8Error};
-
-#[cfg(feature = "alloc")]
-use alloc::{borrow::Cow, string::String};
 
 use crate::ffi::{ngx_str_t, u_char};
 
@@ -207,7 +206,6 @@ mod _alloc {
     use core::ptr;
 
     use super::*;
-
     use crate::allocator::{self, Allocator};
     use crate::collections::{TryReserveError, Vec};
 

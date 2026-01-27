@@ -15,6 +15,11 @@ use core::pin::Pin;
 use core::ptr::NonNull;
 use core::task::{Context, Poll, Waker};
 
+use nginx_sys::{
+    NGX_RESOLVE_FORMERR, NGX_RESOLVE_NOTIMP, NGX_RESOLVE_NXDOMAIN, NGX_RESOLVE_REFUSED,
+    NGX_RESOLVE_SERVFAIL, NGX_RESOLVE_TIMEDOUT,
+};
+
 use crate::{
     allocator::Box,
     collections::Vec,
@@ -23,10 +28,6 @@ use crate::{
         ngx_addr_t, ngx_msec_t, ngx_resolve_name, ngx_resolve_start, ngx_resolver_ctx_t,
         ngx_resolver_t, ngx_str_t,
     },
-};
-use nginx_sys::{
-    NGX_RESOLVE_FORMERR, NGX_RESOLVE_NOTIMP, NGX_RESOLVE_NXDOMAIN, NGX_RESOLVE_REFUSED,
-    NGX_RESOLVE_SERVFAIL, NGX_RESOLVE_TIMEDOUT,
 };
 
 /// Error type for all uses of `Resolver`.
