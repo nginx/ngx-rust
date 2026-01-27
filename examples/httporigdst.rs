@@ -1,6 +1,6 @@
 use core::ffi::{c_int, c_void};
 use core::mem;
-use core::ptr::{self, NonNull, addr_of};
+use core::ptr::{self, NonNull};
 
 use ngx::core::{Pool, Status};
 use ngx::ffi::{
@@ -98,7 +98,7 @@ ngx::ngx_modules!(ngx_http_orig_dst_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_orig_dst_module: ngx_module_t = ngx_module_t {
-    ctx: ptr::addr_of!(NGX_HTTP_ORIG_DST_MODULE_CTX) as _,
+    ctx: &raw const NGX_HTTP_ORIG_DST_MODULE_CTX as _,
     commands: ptr::null_mut(),
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
@@ -173,7 +173,7 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
     let mut ip: Vec<u8> = vec![0; IPV4_STRLEN];
     let e = unsafe {
         ngx_sock_ntop(
-            ptr::addr_of_mut!(addr) as *mut sockaddr,
+            (&raw mut addr).cast(),
             mem::size_of::<sockaddr>() as u32,
             ip.as_mut_ptr(),
             IPV4_STRLEN,
@@ -189,7 +189,7 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
     }
     ip.truncate(e);
 
-    let port = unsafe { ngx_inet_get_port(ptr::addr_of_mut!(addr) as *mut sockaddr) };
+    let port = unsafe { ngx_inet_get_port((&raw mut addr).cast()) };
 
     Ok((String::from_utf8(ip).unwrap(), port))
 }
@@ -197,8 +197,7 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
 http_variable_get!(
     ngx_http_orig_dst_addr_variable,
     |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request
-            .get_module_ctx::<NgxHttpOrigDstCtx>(unsafe { &*addr_of!(ngx_http_orig_dst_module) });
+        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(Module::module());
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             unsafe { obj.bind_addr(v) };
@@ -234,9 +233,7 @@ http_variable_get!(
                 );
                 unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
                 unsafe { (*new_ctx).bind_addr(v) };
-                request.set_module_ctx(new_ctx as *mut c_void, unsafe {
-                    &*addr_of!(ngx_http_orig_dst_module)
-                });
+                request.set_module_ctx(new_ctx as *mut c_void, Module::module());
             }
         }
         Status::NGX_OK
@@ -246,8 +243,7 @@ http_variable_get!(
 http_variable_get!(
     ngx_http_orig_dst_port_variable,
     |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request
-            .get_module_ctx::<NgxHttpOrigDstCtx>(unsafe { &*addr_of!(ngx_http_orig_dst_module) });
+        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(Module::module());
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             unsafe { obj.bind_port(v) };
@@ -283,9 +279,7 @@ http_variable_get!(
                 );
                 unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
                 unsafe { (*new_ctx).bind_port(v) };
-                request.set_module_ctx(new_ctx as *mut c_void, unsafe {
-                    &*addr_of!(ngx_http_orig_dst_module)
-                });
+                request.set_module_ctx(new_ctx as *mut c_void, Module::module());
             }
         }
         Status::NGX_OK

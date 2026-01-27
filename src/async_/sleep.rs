@@ -1,7 +1,7 @@
 use core::future::Future;
 use core::mem;
 use core::pin::Pin;
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 use core::task::{self, Poll};
 use core::time::Duration;
 
@@ -88,7 +88,7 @@ impl TimerEvent {
 
         let mut ev: ngx_event_t = unsafe { mem::zeroed() };
         // The data is only used for `ngx_event_ident` and will not be mutated.
-        ev.data = ptr::addr_of!(IDENT).cast_mut().cast();
+        ev.data = (&raw const IDENT).cast_mut().cast();
         ev.handler = Some(Self::timer_handler);
         ev.log = log.as_ptr();
         ev.set_cancelable(1);
@@ -114,7 +114,7 @@ impl TimerEvent {
             }
             Poll::Pending
         } else {
-            unsafe { ngx_add_timer(ptr::addr_of_mut!(self.event), duration) };
+            unsafe { ngx_add_timer(&raw mut self.event, duration) };
             self.waker = Some(context.waker().clone());
             Poll::Pending
         }
@@ -132,7 +132,7 @@ impl TimerEvent {
 impl Drop for TimerEvent {
     fn drop(&mut self) {
         if self.event.timer_set() != 0 {
-            unsafe { ngx_del_timer(ptr::addr_of_mut!(self.event)) };
+            unsafe { ngx_del_timer(&raw mut self.event) };
         }
     }
 }

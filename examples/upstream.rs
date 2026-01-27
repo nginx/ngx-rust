@@ -107,7 +107,7 @@ ngx::ngx_modules!(ngx_http_upstream_custom_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_upstream_custom_module: ngx_module_t = ngx_module_t {
-    ctx: ptr::addr_of!(NGX_HTTP_UPSTREAM_CUSTOM_CTX) as _,
+    ctx: &raw const NGX_HTTP_UPSTREAM_CUSTOM_CTX as _,
     commands: unsafe { &raw mut NGX_HTTP_UPSTREAM_CUSTOM_COMMANDS[0] },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()

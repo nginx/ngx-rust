@@ -283,7 +283,7 @@ pub unsafe fn ngx_list_init(
         }
         (*list).part.nelts = 0;
         (*list).part.next = ptr::null_mut();
-        (*list).last = ptr::addr_of_mut!((*list).part);
+        (*list).last = &raw mut (*list).part;
         (*list).size = size;
         (*list).nalloc = n;
         (*list).pool = pool;

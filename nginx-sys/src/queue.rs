@@ -155,7 +155,7 @@ mod tests {
                 value,
                 queue: Default::default(),
             });
-            unsafe { ngx_queue_init(ptr::addr_of_mut!(x.queue)) };
+            unsafe { ngx_queue_init(&raw mut x.queue) };
             Box::into_raw(x)
         }
 
@@ -169,7 +169,7 @@ mod tests {
     impl Drop for TestData {
         fn drop(&mut self) {
             if !self.queue.next.is_null() && !self.queue.is_empty() {
-                unsafe { ngx_queue_remove(ptr::addr_of_mut!(self.queue)) };
+                unsafe { ngx_queue_remove(&raw mut self.queue) };
             }
         }
     }
@@ -234,49 +234,45 @@ mod tests {
             // Initialize and fill the queue
 
             let mut h1 = ngx_queue_t::default();
-            ngx_queue_init(ptr::addr_of_mut!(h1));
+            ngx_queue_init(&raw mut h1);
 
             let mut h2 = ngx_queue_t::default();
-            ngx_queue_init(ptr::addr_of_mut!(h2));
+            ngx_queue_init(&raw mut h2);
 
             for i in 1..=5 {
                 let elem = TestData::new(i);
-                ngx_queue_insert_before(ptr::addr_of_mut!(h1), ptr::addr_of_mut!((*elem).queue));
+                ngx_queue_insert_before(&raw mut h1, &raw mut (*elem).queue);
 
                 let elem = TestData::new(i);
-                ngx_queue_insert_after(ptr::addr_of_mut!(h2), ptr::addr_of_mut!((*elem).queue));
+                ngx_queue_insert_after(&raw mut h2, &raw mut (*elem).queue);
             }
 
             // Iterate and test the values
 
-            assert!(cmp(ptr::addr_of_mut!(h1), &[1, 2, 3, 4, 5]));
-            assert!(cmp(ptr::addr_of_mut!(h2), &[5, 4, 3, 2, 1]));
+            assert!(cmp(&raw mut h1, &[1, 2, 3, 4, 5]));
+            assert!(cmp(&raw mut h2, &[5, 4, 3, 2, 1]));
 
             // Move nodes from h2 to h1
 
             // h2 still points to the subrange of h1 after this operation
-            ngx_queue_add(ptr::addr_of_mut!(h1), ptr::addr_of_mut!(h2));
+            ngx_queue_add(&raw mut h1, &raw mut h2);
 
-            assert!(cmp(ptr::addr_of_mut!(h1), &[1, 2, 3, 4, 5, 5, 4, 3, 2, 1]));
+            assert!(cmp(&raw mut h1, &[1, 2, 3, 4, 5, 5, 4, 3, 2, 1]));
 
-            ngx_queue_split(
-                ptr::addr_of_mut!(h1),
-                (*h2.next).next,
-                ptr::addr_of_mut!(h2),
-            );
+            ngx_queue_split(&raw mut h1, (*h2.next).next, &raw mut h2);
 
-            assert!(cmp(ptr::addr_of_mut!(h1), &[1, 2, 3, 4, 5, 5]));
-            assert!(cmp(ptr::addr_of_mut!(h2), &[4, 3, 2, 1]));
+            assert!(cmp(&raw mut h1, &[1, 2, 3, 4, 5, 5]));
+            assert!(cmp(&raw mut h2, &[4, 3, 2, 1]));
 
             // Cleanup
 
-            for q in Iter::new(ptr::addr_of_mut!(h1)) {
+            for q in Iter::new(&raw mut h1) {
                 let td = ngx_queue_data!(q, TestData, queue);
                 TestData::free(td);
             }
             assert!(h1.is_empty());
 
-            for q in Iter::new(ptr::addr_of_mut!(h2)) {
+            for q in Iter::new(&raw mut h2) {
                 let td = ngx_queue_data!(q, TestData, queue);
                 TestData::free(td);
             }
