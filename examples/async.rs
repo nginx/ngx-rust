@@ -3,7 +3,7 @@ extern crate alloc;
 use alloc::sync::Arc;
 use core::ffi::{c_char, c_void};
 use core::mem;
-use core::ptr::{self, addr_of, addr_of_mut};
+use core::ptr;
 use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use core::time::Duration;
 use std::sync::OnceLock;
@@ -76,7 +76,7 @@ ngx::ngx_modules!(ngx_http_async_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_async_module: ngx_module_t = ngx_module_t {
-    ctx: ptr::addr_of!(NGX_HTTP_ASYNC_MODULE_CTX) as _,
+    ctx: &raw const NGX_HTTP_ASYNC_MODULE_CTX as _,
     commands: unsafe { &raw mut NGX_HTTP_ASYNC_COMMANDS[0] },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
@@ -97,12 +97,12 @@ unsafe extern "C" fn check_async_work_done(event: *mut ngx_event_t) {
 
     if unsafe { (*ctx).done.load(Ordering::Relaxed) } {
         // Triggering async_access_handler again
-        unsafe { ngx_post_event((*c).write, addr_of_mut!(ngx_posted_events)) };
+        unsafe { ngx_post_event((*c).write, &raw mut ngx_posted_events) };
     } else {
         // this doesn't have have good performance but works as a simple thread-safe example and
         // doesn't causes segfault. The best method that provides both thread-safety and
         // performance requires an nginx patch.
-        unsafe { ngx_post_event(event, addr_of_mut!(ngx_posted_next_events)) };
+        unsafe { ngx_post_event(event, &raw mut ngx_posted_next_events) };
     }
 }
 
@@ -149,9 +149,7 @@ impl HttpRequestHandler for AsyncAccessHandler {
             return Status::NGX_DECLINED;
         }
 
-        if let Some(ctx) =
-            unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_async_module)) }
-        {
+        if let Some(ctx) = request.get_module_ctx::<RequestCTX>(Module::module()) {
             if !ctx.done.load(Ordering::Relaxed) {
                 return Status::NGX_AGAIN;
             }
@@ -163,7 +161,7 @@ impl HttpRequestHandler for AsyncAccessHandler {
         if ctx.is_null() {
             return Status::NGX_ERROR;
         }
-        request.set_module_ctx(ctx.cast(), unsafe { &*addr_of!(ngx_http_async_module) });
+        request.set_module_ctx(ctx.cast(), Module::module());
 
         let ctx = unsafe { &mut *ctx };
         ctx.event.handler = Some(check_async_work_done);

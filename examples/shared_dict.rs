@@ -91,8 +91,8 @@ ngx::ngx_modules!(ngx_http_shared_dict_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_shared_dict_module: ngx_module_t = ngx_module_t {
-    ctx: ptr::addr_of!(NGX_HTTP_SHARED_DICT_MODULE_CTX) as _,
-    commands: unsafe { ptr::addr_of_mut!(NGX_HTTP_SHARED_DICT_COMMANDS[0]) },
+    ctx: &raw const NGX_HTTP_SHARED_DICT_MODULE_CTX as _,
+    commands: unsafe { &raw mut NGX_HTTP_SHARED_DICT_COMMANDS[0] },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
 };
@@ -131,7 +131,7 @@ extern "C" fn ngx_http_shared_dict_add_zone(
     debug_assert!(!cf.args.is_null() && unsafe { (*cf.args).nelts >= 3 });
     let args = unsafe { (*cf.args).as_slice_mut() };
 
-    let name: ngx_str_t = args[1];
+    let mut name: ngx_str_t = args[1];
     let size = unsafe { ngx_parse_size(&raw mut args[2]) };
     if size == -1 {
         return NGX_CONF_ERROR;
@@ -140,9 +140,9 @@ extern "C" fn ngx_http_shared_dict_add_zone(
     smcf.shm_zone = unsafe {
         ngx_shared_memory_add(
             cf,
-            ptr::addr_of!(name).cast_mut(),
+            &raw mut name,
             size as usize,
-            ptr::addr_of_mut!(ngx_http_shared_dict_module).cast(),
+            (&raw mut ngx_http_shared_dict_module).cast(),
         )
     };
 

@@ -51,7 +51,7 @@ unsafe impl NgxQueueEntry for ngx_queue_t {
 ///
 /// Example:
 /// ```rust,no_run
-/// # use core::ptr::{NonNull, addr_of_mut};
+/// # use core::ptr::NonNull;
 /// # use nginx_sys::{ngx_event_t, ngx_posted_events, ngx_queue_data, ngx_queue_t};
 /// # use ngx::collections::queue::{NgxQueue, NgxQueueEntry};
 /// // We need a wrapper type to define [NgxQueueEntry] on.
@@ -73,7 +73,7 @@ unsafe impl NgxQueueEntry for ngx_queue_t {
 /// // `ngx_event_t.queue`.
 /// // NGINX is single-threaded, so we get exclusive access to the static.
 /// let posted: &mut NgxQueue<PostedEvent> =
-///         unsafe { NgxQueue::from_ptr_mut(addr_of_mut!(ngx_posted_events)) };
+///         unsafe { NgxQueue::from_ptr_mut(&raw mut ngx_posted_events) };
 /// ```
 ///
 /// See <https://nginx.org/en/docs/dev/development_guide.html#queue>.

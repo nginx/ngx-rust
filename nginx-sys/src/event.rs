@@ -30,10 +30,7 @@ pub unsafe fn ngx_add_timer(ev: *mut ngx_event_t, timer: ngx_msec_t) {
 
         (*ev).timer.key = key;
 
-        ngx_rbtree_insert(
-            ptr::addr_of_mut!(ngx_event_timer_rbtree),
-            ptr::addr_of_mut!((*ev).timer),
-        );
+        ngx_rbtree_insert(&raw mut ngx_event_timer_rbtree, &raw mut (*ev).timer);
 
         (*ev).set_timer_set(1);
     }
@@ -47,10 +44,7 @@ pub unsafe fn ngx_add_timer(ev: *mut ngx_event_t, timer: ngx_msec_t) {
 #[inline]
 pub unsafe fn ngx_del_timer(ev: *mut ngx_event_t) {
     unsafe {
-        ngx_rbtree_delete(
-            ptr::addr_of_mut!(ngx_event_timer_rbtree),
-            ptr::addr_of_mut!((*ev).timer),
-        );
+        ngx_rbtree_delete(&raw mut ngx_event_timer_rbtree, &raw mut (*ev).timer);
 
         (*ev).timer.left = ptr::null_mut();
         (*ev).timer.right = ptr::null_mut();
@@ -71,7 +65,7 @@ pub unsafe fn ngx_post_event(ev: *mut ngx_event_t, q: *mut ngx_queue_t) {
     unsafe {
         if (*ev).posted() == 0 {
             (*ev).set_posted(1);
-            ngx_queue_insert_before(q, ptr::addr_of_mut!((*ev).queue));
+            ngx_queue_insert_before(q, &raw mut (*ev).queue);
         }
     }
 }
@@ -86,6 +80,6 @@ pub unsafe fn ngx_post_event(ev: *mut ngx_event_t, q: *mut ngx_queue_t) {
 pub unsafe fn ngx_delete_posted_event(ev: *mut ngx_event_t) {
     unsafe {
         (*ev).set_posted(0);
-        ngx_queue_remove(ptr::addr_of_mut!((*ev).queue));
+        ngx_queue_remove(&raw mut (*ev).queue);
     }
 }

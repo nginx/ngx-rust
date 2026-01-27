@@ -3,7 +3,7 @@
 //! See <https://nginx.org/en/docs/dev/development_guide.html#shared_memory>.
 use core::alloc::Layout;
 use core::cmp;
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 
 use nginx_sys::{
     ngx_shm_zone_t, ngx_shmtx_lock, ngx_shmtx_unlock, ngx_slab_alloc_locked, ngx_slab_free_locked,
@@ -105,7 +105,7 @@ impl SlabPool {
     #[inline]
     pub fn lock(&self) -> LockedSlabPool {
         let shpool = self.0.as_ptr();
-        unsafe { ngx_shmtx_lock(ptr::addr_of_mut!((*shpool).mutex)) };
+        unsafe { ngx_shmtx_lock(&raw mut (*shpool).mutex) };
         LockedSlabPool(self.0)
     }
 }
