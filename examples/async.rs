@@ -6,9 +6,9 @@ use std::time::Instant;
 
 use ngx::core;
 use ngx::ffi::{
+    NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE, NGX_LOG_EMERG,
     ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_t, ngx_http_module_t, ngx_int_t,
     ngx_module_t, ngx_post_event, ngx_posted_events, ngx_posted_next_events, ngx_str_t, ngx_uint_t,
-    NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE, NGX_LOG_EMERG,
 };
 use ngx::http::{self, HttpModule, HttpModuleLocationConf, HttpRequestHandler, MergeConfigError};
 use ngx::{ngx_conf_log_error, ngx_log_debug_http, ngx_string};
@@ -176,8 +176,8 @@ impl HttpRequestHandler for AsyncAccessHandler {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             let req = unsafe { http::Request::from_ngx_http_request(req.load(Ordering::Relaxed)) };
             // not really thread safe, we should apply all these operation in nginx thread
-            // but this is just an example. proper way would be storing these headers in the request ctx
-            // and apply them when we get back to the nginx thread.
+            // but this is just an example. proper way would be storing these headers in the request
+            // ctx and apply them when we get back to the nginx thread.
             req.add_header_out(
                 "X-Async-Time",
                 start.elapsed().as_millis().to_string().as_str(),

@@ -120,8 +120,8 @@ static CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let base_dir = env::var("OUT_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| env::current_dir().expect("Failed to get current directory"));
-    // Choose `.cache` relative to the OUT_DIR of the caller (nginx-sys) as the default cache directory
-    // Environment variable `CACHE_DIR` overrides this
+    // Choose `.cache` relative to the OUT_DIR of the caller (nginx-sys) as the default cache
+    // directory. Environment variable `CACHE_DIR` overrides this.
     // Recommendation: set env "CACHE_DIR = { value = ".cache", relative = true }" in
     // `.cargo/config.toml` in your project
     let cache_dir = env::var("CACHE_DIR")

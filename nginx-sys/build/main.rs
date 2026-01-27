@@ -2,7 +2,7 @@ extern crate bindgen;
 
 use std::env;
 use std::error::Error as StdError;
-use std::fs::{read_to_string, File};
+use std::fs::{File, read_to_string};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 

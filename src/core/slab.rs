@@ -10,7 +10,7 @@ use nginx_sys::{
     ngx_slab_pool_t,
 };
 
-use crate::allocator::{dangling_for_layout, AllocError, Allocator};
+use crate::allocator::{AllocError, Allocator, dangling_for_layout};
 
 /// Non-owning wrapper for an [`ngx_slab_pool_t`] pointer, providing methods for working with
 /// shared memory slab pools.
