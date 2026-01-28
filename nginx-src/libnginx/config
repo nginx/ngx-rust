@@ -1,0 +1,7 @@
+
+# Copyright (C) Nginx, Inc.
+
+
+ngx_addon_name="libnginx"
+
+CFLAGS="$CFLAGS $ngx_pic_opt"
