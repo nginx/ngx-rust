@@ -1,6 +1,7 @@
-use std::ffi::{c_char, c_void};
+use core::ffi::{c_char, c_void};
+use core::ptr;
 
-use ngx::core;
+use ngx::core::Status;
 use ngx::ffi::{
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE, NGX_LOG_EMERG,
     ngx_command_t, ngx_conf_t, ngx_http_module_t, ngx_int_t, ngx_module_t, ngx_str_t, ngx_uint_t,
@@ -19,7 +20,7 @@ impl http::HttpModule for Module {
         // SAFETY: this function is called with non-NULL cf always
         let cf = unsafe { &mut *cf };
         http::add_phase_handler::<CurlRequestHandler>(cf)
-            .map_or(core::Status::NGX_ERROR, |_| core::Status::NGX_OK)
+            .map_or(Status::NGX_ERROR, |_| Status::NGX_OK)
             .into()
     }
 }
@@ -40,7 +41,7 @@ static mut NGX_HTTP_CURL_COMMANDS: [ngx_command_t; 2] = [
         set: Some(ngx_http_curl_commands_set_enable),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t::empty(),
 ];
@@ -65,7 +66,7 @@ ngx::ngx_modules!(ngx_http_curl_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_curl_module: ngx_module_t = ngx_module_t {
-    ctx: std::ptr::addr_of!(NGX_HTTP_CURL_MODULE_CTX) as _,
+    ctx: ptr::addr_of!(NGX_HTTP_CURL_MODULE_CTX) as _,
     commands: unsafe { &NGX_HTTP_CURL_COMMANDS[0] as *const _ as *mut _ },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
@@ -84,7 +85,7 @@ struct CurlRequestHandler;
 
 impl HttpRequestHandler for CurlRequestHandler {
     const PHASE: ngx::http::HttpPhase = ngx::http::HttpPhase::Access;
-    type Output = core::Status;
+    type Output = Status;
 
     fn handler(request: &mut http::Request) -> Self::Output {
         let co = Module::location_conf(request).expect("module config is none");
@@ -99,10 +100,10 @@ impl HttpRequestHandler for CurlRequestHandler {
                 {
                     http::HTTPStatus::FORBIDDEN.into()
                 } else {
-                    core::Status::NGX_DECLINED
+                    Status::NGX_DECLINED
                 }
             }
-            false => core::Status::NGX_DECLINED,
+            false => Status::NGX_DECLINED,
         }
     }
 }

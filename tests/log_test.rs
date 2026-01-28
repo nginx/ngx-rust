@@ -11,7 +11,7 @@ use std::process::Output;
 const NGINX_BINARY_NAME: &str = "nginx";
 
 /// Convert a CStr to a PathBuf
-pub fn cstr_to_path(val: &std::ffi::CStr) -> Option<PathBuf> {
+pub fn cstr_to_path(val: &core::ffi::CStr) -> Option<PathBuf> {
     if val.is_empty() {
         return None;
     }

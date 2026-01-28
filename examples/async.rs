@@ -1,10 +1,15 @@
-use std::ffi::{c_char, c_void};
-use std::ptr::{addr_of, addr_of_mut};
-use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
-use std::sync::{Arc, OnceLock};
+extern crate alloc;
+
+use alloc::sync::Arc;
+use core::ffi::{c_char, c_void};
+use core::mem;
+use core::ptr::{self, addr_of, addr_of_mut};
+use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use core::time::Duration;
+use std::sync::OnceLock;
 use std::time::Instant;
 
-use ngx::core;
+use ngx::core::Status;
 use ngx::ffi::{
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE, NGX_LOG_EMERG,
     ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_t, ngx_http_module_t, ngx_int_t,
@@ -25,7 +30,7 @@ impl http::HttpModule for Module {
         // SAFETY: this function is called with non-NULL cf always
         let cf = unsafe { &mut *cf };
         http::add_phase_handler::<AsyncAccessHandler>(cf)
-            .map_or(core::Status::NGX_ERROR, |_| core::Status::NGX_OK)
+            .map_or(Status::NGX_ERROR, |_| Status::NGX_OK)
             .into()
     }
 }
@@ -46,7 +51,7 @@ static mut NGX_HTTP_ASYNC_COMMANDS: [ngx_command_t; 2] = [
         set: Some(ngx_http_async_commands_set_enable),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t::empty(),
 ];
@@ -71,7 +76,7 @@ ngx::ngx_modules!(ngx_http_async_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_async_module: ngx_module_t = ngx_module_t {
-    ctx: std::ptr::addr_of!(NGX_HTTP_ASYNC_MODULE_CTX) as _,
+    ctx: ptr::addr_of!(NGX_HTTP_ASYNC_MODULE_CTX) as _,
     commands: unsafe { &NGX_HTTP_ASYNC_COMMANDS[0] as *const _ as *mut _ },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
@@ -111,7 +116,7 @@ impl Default for RequestCTX {
     fn default() -> Self {
         Self {
             done: AtomicBool::new(false).into(),
-            event: unsafe { std::mem::zeroed() },
+            event: unsafe { mem::zeroed() },
             task: Default::default(),
         }
     }
@@ -133,7 +138,7 @@ struct AsyncAccessHandler;
 
 impl HttpRequestHandler for AsyncAccessHandler {
     const PHASE: ngx::http::HttpPhase = ngx::http::HttpPhase::Access;
-    type Output = core::Status;
+    type Output = Status;
 
     fn handler(request: &mut http::Request) -> Self::Output {
         let co = Module::location_conf(request).expect("module config is none");
@@ -141,22 +146,22 @@ impl HttpRequestHandler for AsyncAccessHandler {
         ngx_log_debug_http!(request, "async module enabled: {}", co.enable);
 
         if !co.enable {
-            return core::Status::NGX_DECLINED;
+            return Status::NGX_DECLINED;
         }
 
         if let Some(ctx) =
             unsafe { request.get_module_ctx::<RequestCTX>(&*addr_of!(ngx_http_async_module)) }
         {
             if !ctx.done.load(Ordering::Relaxed) {
-                return core::Status::NGX_AGAIN;
+                return Status::NGX_AGAIN;
             }
 
-            return core::Status::NGX_OK;
+            return Status::NGX_OK;
         }
 
         let ctx = request.pool().allocate(RequestCTX::default());
         if ctx.is_null() {
-            return core::Status::NGX_ERROR;
+            return Status::NGX_ERROR;
         }
         request.set_module_ctx(ctx.cast(), unsafe { &*addr_of!(ngx_http_async_module) });
 
@@ -173,7 +178,7 @@ impl HttpRequestHandler for AsyncAccessHandler {
         let rt = ngx_http_async_runtime();
         ctx.task = Some(rt.spawn(async move {
             let start = Instant::now();
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            tokio::time::sleep(Duration::from_secs(2)).await;
             let req = unsafe { http::Request::from_ngx_http_request(req.load(Ordering::Relaxed)) };
             // not really thread safe, we should apply all these operation in nginx thread
             // but this is just an example. proper way would be storing these headers in the request
@@ -190,7 +195,7 @@ impl HttpRequestHandler for AsyncAccessHandler {
             // and use the same trick as the thread pool)
         }));
 
-        core::Status::NGX_AGAIN
+        Status::NGX_AGAIN
     }
 }
 
