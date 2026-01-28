@@ -25,7 +25,7 @@ impl HttpModule for HttpSharedDictModule {
 
     unsafe extern "C" fn preconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
         for mut v in unsafe { NGX_HTTP_SHARED_DICT_VARS } {
-            let var = NonNull::new(unsafe { ngx_http_add_variable(cf, &mut v.name, v.flags) });
+            let var = NonNull::new(unsafe { ngx_http_add_variable(cf, &raw mut v.name, v.flags) });
             if var.is_none() {
                 return Status::NGX_ERROR.into();
             }
@@ -132,7 +132,7 @@ extern "C" fn ngx_http_shared_dict_add_zone(
     let args = unsafe { (*cf.args).as_slice_mut() };
 
     let name: ngx_str_t = args[1];
-    let size = unsafe { ngx_parse_size(&mut args[2]) };
+    let size = unsafe { ngx_parse_size(&raw mut args[2]) };
     if size == -1 {
         return NGX_CONF_ERROR;
     }
@@ -215,10 +215,10 @@ extern "C" fn ngx_http_shared_dict_add_variable(
 
     let mut ccv: ngx_http_compile_complex_value_t = unsafe { mem::zeroed() };
     ccv.cf = cf;
-    ccv.value = &mut args[1];
+    ccv.value = &raw mut args[1];
     ccv.complex_value = key;
 
-    if unsafe { nginx_sys::ngx_http_compile_complex_value(&mut ccv) } != Status::NGX_OK.into() {
+    if unsafe { nginx_sys::ngx_http_compile_complex_value(&raw mut ccv) } != Status::NGX_OK.into() {
         return NGX_CONF_ERROR;
     }
 
@@ -235,7 +235,7 @@ extern "C" fn ngx_http_shared_dict_add_variable(
     let var = unsafe {
         ngx_http_add_variable(
             cf,
-            &mut name,
+            &raw mut name,
             (NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE) as ngx_uint_t,
         )
     };
@@ -262,7 +262,7 @@ extern "C" fn ngx_http_shared_dict_get_variable(
     let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
 
     let mut key = ngx_str_t::empty();
-    if unsafe { ngx_http_complex_value(r, data as _, &mut key) } != Status::NGX_OK.into() {
+    if unsafe { ngx_http_complex_value(r, data as _, &raw mut key) } != Status::NGX_OK.into() {
         return Status::NGX_ERROR.into();
     }
 
@@ -311,7 +311,7 @@ extern "C" fn ngx_http_shared_dict_set_variable(
     let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
     let mut key = ngx_str_t::empty();
 
-    if unsafe { ngx_http_complex_value(r, data as _, &mut key) } != Status::NGX_OK.into() {
+    if unsafe { ngx_http_complex_value(r, data as _, &raw mut key) } != Status::NGX_OK.into() {
         return;
     }
 

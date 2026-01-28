@@ -163,13 +163,13 @@ pub struct Request(ngx_http_request_t);
 
 impl<'a> From<&'a Request> for *const ngx_http_request_t {
     fn from(request: &'a Request) -> Self {
-        &request.0 as *const _
+        &raw const request.0
     }
 }
 
 impl<'a> From<&'a mut Request> for *mut ngx_http_request_t {
     fn from(request: &'a mut Request) -> Self {
-        &request.0 as *const _ as *mut _
+        &raw mut request.0
     }
 }
 
@@ -268,7 +268,7 @@ impl Request {
         // a valid Nginx string is stored in `value` if it successfully returns.
         unsafe {
             let mut value = ngx_str_t::default();
-            if ngx_http_complex_value(r, val, &mut value) != NGX_OK as ngx_int_t {
+            if ngx_http_complex_value(r, val, &raw mut value) != NGX_OK as ngx_int_t {
                 return None;
             }
             Some(NgxStr::from_ngx_str(value))
@@ -279,7 +279,7 @@ impl Request {
     ///
     /// [request body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
     pub fn discard_request_body(&mut self) -> Status {
-        unsafe { Status(ngx_http_discard_request_body(&mut self.0)) }
+        unsafe { Status(ngx_http_discard_request_body(&raw mut self.0)) }
     }
 
     /// Client HTTP [User-Agent].
@@ -303,7 +303,7 @@ impl Request {
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
     pub fn add_header_in(&mut self, key: &str, value: &str) -> Option<()> {
         let table: *mut ngx_table_elt_t =
-            unsafe { ngx_list_push(&mut self.0.headers_in.headers) as _ };
+            unsafe { ngx_list_push(&raw mut self.0.headers_in.headers).cast() };
         unsafe { add_to_ngx_table(table, self.0.pool, key, value) }
     }
 
@@ -312,7 +312,7 @@ impl Request {
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
     pub fn add_header_out(&mut self, key: &str, value: &str) -> Option<()> {
         let table: *mut ngx_table_elt_t =
-            unsafe { ngx_list_push(&mut self.0.headers_out.headers) as _ };
+            unsafe { ngx_list_push(&raw mut self.0.headers_out.headers).cast() };
         unsafe { add_to_ngx_table(table, self.0.pool, key, value) }
     }
 
@@ -327,7 +327,7 @@ impl Request {
     ///
     /// Do not call this function until all output headers are set.
     pub fn send_header(&mut self) -> Status {
-        unsafe { Status(ngx_http_send_header(&mut self.0)) }
+        unsafe { Status(ngx_http_send_header(&raw mut self.0)) }
     }
 
     /// Flag indicating that the output does not require a body.
@@ -359,7 +359,7 @@ impl Request {
     ///
     /// [response body]: https://nginx.org/en/docs/dev/development_guide.html#http_request_body
     pub fn output_filter(&mut self, body: &mut ngx_chain_t) -> Status {
-        unsafe { Status(ngx_http_output_filter(&mut self.0, body)) }
+        unsafe { Status(ngx_http_output_filter(&raw mut self.0, body)) }
     }
 
     /// Perform internal redirect to a location
@@ -418,7 +418,7 @@ impl Request {
                 (self as *const Request as *mut Request).cast(),
                 uri_ptr,
                 core::ptr::null_mut(),
-                &mut psr as *mut _,
+                &raw mut psr,
                 sub_ptr as *mut _,
                 NGX_HTTP_SUBREQUEST_WAITED as _,
             )

@@ -77,7 +77,7 @@ ngx::ngx_modules!(ngx_http_async_module);
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_async_module: ngx_module_t = ngx_module_t {
     ctx: ptr::addr_of!(NGX_HTTP_ASYNC_MODULE_CTX) as _,
-    commands: unsafe { &NGX_HTTP_ASYNC_COMMANDS[0] as *const _ as *mut _ },
+    commands: unsafe { &raw mut NGX_HTTP_ASYNC_COMMANDS[0] },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
 };
@@ -129,7 +129,7 @@ impl Drop for RequestCTX {
         }
 
         if self.event.posted() != 0 {
-            unsafe { ngx::ffi::ngx_delete_posted_event(&mut self.event) };
+            unsafe { ngx::ffi::ngx_delete_posted_event(&raw mut self.event) };
         }
     }
 }
@@ -169,7 +169,7 @@ impl HttpRequestHandler for AsyncAccessHandler {
         ctx.event.handler = Some(check_async_work_done);
         ctx.event.data = request.connection().cast();
         ctx.event.log = unsafe { (*request.connection()).log };
-        unsafe { ngx_post_event(&mut ctx.event, addr_of_mut!(ngx_posted_next_events)) };
+        unsafe { ngx_post_event(&raw mut ctx.event, &raw mut ngx_posted_next_events) };
 
         // Request is no longer needed and can be converted to something movable to the async block
         let req = AtomicPtr::new(request.into());

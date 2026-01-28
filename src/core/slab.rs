@@ -149,6 +149,6 @@ unsafe impl Allocator for LockedSlabPool {
 impl Drop for LockedSlabPool {
     fn drop(&mut self) {
         let shpool = unsafe { self.0.as_mut() };
-        unsafe { ngx_shmtx_unlock(&mut shpool.mutex) }
+        unsafe { ngx_shmtx_unlock(&raw mut shpool.mutex) }
     }
 }
