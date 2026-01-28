@@ -6,8 +6,9 @@
  * The NGINX authors are grateful to @gabihodoroaga for their contributions
  * to the community at large.
  */
-use std::ffi::{c_char, c_void};
-use std::mem;
+use core::ffi::{c_char, c_void};
+use core::mem;
+use core::ptr;
 
 use ngx::core::{Pool, Status};
 use ngx::ffi::{
@@ -69,7 +70,7 @@ impl Default for UpstreamPeerData {
             client_connection: None,
             original_get_peer: None,
             original_free_peer: None,
-            data: std::ptr::null_mut(),
+            data: ptr::null_mut(),
         }
     }
 }
@@ -92,7 +93,7 @@ static mut NGX_HTTP_UPSTREAM_CUSTOM_COMMANDS: [ngx_command_t; 2] = [
         set: Some(ngx_http_upstream_commands_set_custom),
         conf: NGX_HTTP_SRV_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t::empty(),
 ];
@@ -106,7 +107,7 @@ ngx::ngx_modules!(ngx_http_upstream_custom_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_upstream_custom_module: ngx_module_t = ngx_module_t {
-    ctx: std::ptr::addr_of!(NGX_HTTP_UPSTREAM_CUSTOM_CTX) as _,
+    ctx: ptr::addr_of!(NGX_HTTP_UPSTREAM_CUSTOM_CTX) as _,
     commands: unsafe { &NGX_HTTP_UPSTREAM_CUSTOM_COMMANDS[0] as *const _ as *mut _ },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
@@ -331,7 +332,7 @@ impl HttpModule for Module {
                 cf,
                 "CUSTOM UPSTREAM could not allocate memory for config"
             );
-            return std::ptr::null_mut();
+            return ptr::null_mut();
         }
 
         unsafe { (*conf).max = NGX_CONF_UNSET as u32 };

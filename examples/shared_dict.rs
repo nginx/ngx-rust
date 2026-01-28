@@ -1,6 +1,8 @@
 #![no_std]
-use ::core::ffi::{c_char, c_void};
-use ::core::{mem, ptr};
+use core::ffi::{c_char, c_void};
+use core::mem;
+use core::ptr::{self, NonNull};
+
 use nginx_sys::{
     NGX_CONF_TAKE2, NGX_HTTP_DELETE, NGX_HTTP_MAIN_CONF, NGX_HTTP_MAIN_CONF_OFFSET,
     NGX_HTTP_MODULE, NGX_HTTP_VAR_CHANGEABLE, NGX_HTTP_VAR_NOCACHEABLE, NGX_LOG_EMERG,
@@ -23,7 +25,7 @@ impl HttpModule for HttpSharedDictModule {
 
     unsafe extern "C" fn preconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
         for mut v in unsafe { NGX_HTTP_SHARED_DICT_VARS } {
-            let var = ptr::NonNull::new(unsafe { ngx_http_add_variable(cf, &mut v.name, v.flags) });
+            let var = NonNull::new(unsafe { ngx_http_add_variable(cf, &mut v.name, v.flags) });
             if var.is_none() {
                 return Status::NGX_ERROR.into();
             }

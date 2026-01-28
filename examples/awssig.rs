@@ -1,7 +1,8 @@
-use std::ffi::{c_char, c_void};
+use core::ffi::{c_char, c_void};
+use core::ptr;
 
 use http::HeaderMap;
-use ngx::core;
+use ngx::core::Status;
 use ngx::ffi::{
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE,
     NGX_HTTP_SRV_CONF, NGX_LOG_EMERG, ngx_command_t, ngx_conf_t, ngx_http_module_t, ngx_int_t,
@@ -21,7 +22,7 @@ impl HttpModule for Module {
         // SAFETY: this function is called with non-NULL cf always
         let cf = unsafe { &mut *cf };
         ngx::http::add_phase_handler::<AwsSigV4HeaderHandler>(cf)
-            .map_or(core::Status::NGX_ERROR, |_| core::Status::NGX_OK)
+            .map_or(Status::NGX_ERROR, |_| Status::NGX_OK)
             .into()
     }
 }
@@ -46,7 +47,7 @@ static mut NGX_HTTP_AWSSIGV4_COMMANDS: [ngx_command_t; 6] = [
         set: Some(ngx_http_awssigv4_commands_set_enable),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t {
         name: ngx_string!("awssigv4_access_key"),
@@ -54,7 +55,7 @@ static mut NGX_HTTP_AWSSIGV4_COMMANDS: [ngx_command_t; 6] = [
         set: Some(ngx_http_awssigv4_commands_set_access_key),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t {
         name: ngx_string!("awssigv4_secret_key"),
@@ -62,7 +63,7 @@ static mut NGX_HTTP_AWSSIGV4_COMMANDS: [ngx_command_t; 6] = [
         set: Some(ngx_http_awssigv4_commands_set_secret_key),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t {
         name: ngx_string!("awssigv4_s3_bucket"),
@@ -70,7 +71,7 @@ static mut NGX_HTTP_AWSSIGV4_COMMANDS: [ngx_command_t; 6] = [
         set: Some(ngx_http_awssigv4_commands_set_s3_bucket),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t {
         name: ngx_string!("awssigv4_s3_endpoint"),
@@ -78,7 +79,7 @@ static mut NGX_HTTP_AWSSIGV4_COMMANDS: [ngx_command_t; 6] = [
         set: Some(ngx_http_awssigv4_commands_set_s3_endpoint),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
-        post: std::ptr::null_mut(),
+        post: ptr::null_mut(),
     },
     ngx_command_t::empty(),
 ];
@@ -103,7 +104,7 @@ ngx::ngx_modules!(ngx_http_awssigv4_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_awssigv4_module: ngx_module_t = ngx_module_t {
-    ctx: std::ptr::addr_of!(NGX_HTTP_AWSSIGV4_MODULE_CTX) as _,
+    ctx: ptr::addr_of!(NGX_HTTP_AWSSIGV4_MODULE_CTX) as _,
     commands: unsafe { &NGX_HTTP_AWSSIGV4_COMMANDS[0] as *const _ as *mut _ },
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
@@ -256,7 +257,7 @@ struct AwsSigV4HeaderHandler;
 
 impl HttpRequestHandler for AwsSigV4HeaderHandler {
     const PHASE: HttpPhase = HttpPhase::PreContent;
-    type Output = core::Status;
+    type Output = Status;
 
     fn handler(request: &mut Request) -> Self::Output {
         // get Module Config from request
@@ -265,7 +266,7 @@ impl HttpRequestHandler for AwsSigV4HeaderHandler {
             if conf.enable { "enabled" } else { "disabled" }
         });
         if !conf.enable {
-            return core::Status::NGX_DECLINED;
+            return Status::NGX_DECLINED;
         }
 
         // TODO: build url properly from the original URL from client
@@ -277,7 +278,7 @@ impl HttpRequestHandler for AwsSigV4HeaderHandler {
         let datetime = chrono::Utc::now();
         let uri = match request.unparsed_uri().to_str() {
             Ok(v) => format!("https://{}.{}{}", conf.s3_bucket, conf.s3_endpoint, v),
-            Err(_) => return core::Status::NGX_DECLINED,
+            Err(_) => return Status::NGX_DECLINED,
         };
 
         let datetime_now = datetime.format("%Y%m%dT%H%M%SZ");
@@ -292,13 +293,13 @@ impl HttpRequestHandler for AwsSigV4HeaderHandler {
                 if let Ok(name) = name.to_str() {
                     if name.to_lowercase() == "host" {
                         let Ok(value) = http::HeaderValue::from_bytes(value.as_bytes()) else {
-                            return core::Status::NGX_DECLINED;
+                            return Status::NGX_DECLINED;
                         };
 
                         headers.insert(http::header::HOST, value);
                     }
                 } else {
-                    return core::Status::NGX_DECLINED;
+                    return Status::NGX_DECLINED;
                 }
             }
             headers.insert("X-Amz-Date", datetime_now.parse().unwrap());
@@ -331,6 +332,6 @@ impl HttpRequestHandler for AwsSigV4HeaderHandler {
             ngx_log_debug_http!(request, "headers_in  {name}: {value}",);
         }
 
-        core::Status::NGX_OK
+        Status::NGX_OK
     }
 }

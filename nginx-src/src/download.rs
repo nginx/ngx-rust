@@ -1,6 +1,6 @@
 extern crate duct;
 
-use std::error::Error as StdError;
+use core::error::Error as StdError;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};

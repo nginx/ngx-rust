@@ -14,7 +14,7 @@ fn test_os_symbols() {
 
 #[test]
 fn test_feature_symbols() {
-    let ev: ffi::ngx_event_t = unsafe { std::mem::zeroed() };
+    let ev: ffi::ngx_event_t = unsafe { core::mem::zeroed() };
 
     assert_eq!(ev.available, 0);
 

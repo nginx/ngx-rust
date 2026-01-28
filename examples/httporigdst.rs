@@ -1,7 +1,8 @@
-use std::ffi::{c_int, c_void};
-use std::ptr::{NonNull, addr_of};
+use core::ffi::{c_int, c_void};
+use core::mem;
+use core::ptr::{self, NonNull, addr_of};
 
-use ngx::core;
+use ngx::core::{Pool, Status};
 use ngx::ffi::{
     INET_ADDRSTRLEN, NGX_HTTP_MODULE, in_port_t, ngx_conf_t, ngx_connection_local_sockaddr,
     ngx_http_add_variable, ngx_http_module_t, ngx_http_variable_t, ngx_inet_get_port, ngx_int_t,
@@ -19,10 +20,10 @@ struct NgxHttpOrigDstCtx {
 }
 
 impl NgxHttpOrigDstCtx {
-    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &core::Pool) -> core::Status {
+    pub fn save(&mut self, addr: &str, port: in_port_t, pool: &Pool) -> Status {
         let addr_data = pool.alloc_unaligned(addr.len());
         if addr_data.is_null() {
-            return core::Status::NGX_ERROR;
+            return Status::NGX_ERROR;
         }
         unsafe { libc::memcpy(addr_data, addr.as_ptr() as *const c_void, addr.len()) };
         self.orig_dst_addr.len = addr.len();
@@ -31,7 +32,7 @@ impl NgxHttpOrigDstCtx {
         let port_str = port.to_string();
         let port_data = pool.alloc_unaligned(port_str.len());
         if port_data.is_null() {
-            return core::Status::NGX_ERROR;
+            return Status::NGX_ERROR;
         }
         unsafe {
             libc::memcpy(
@@ -43,7 +44,7 @@ impl NgxHttpOrigDstCtx {
         self.orig_dst_port.len = port_str.len();
         self.orig_dst_port.data = port_data as *mut u8;
 
-        core::Status::NGX_OK
+        Status::NGX_OK
     }
 
     pub unsafe fn bind_addr(&self, v: *mut ngx_variable_value_t) {
@@ -97,8 +98,8 @@ ngx::ngx_modules!(ngx_http_orig_dst_module);
 #[allow(non_upper_case_globals)]
 #[cfg_attr(not(feature = "export-modules"), unsafe(no_mangle))]
 pub static mut ngx_http_orig_dst_module: ngx_module_t = ngx_module_t {
-    ctx: std::ptr::addr_of!(NGX_HTTP_ORIG_DST_MODULE_CTX) as _,
-    commands: std::ptr::null_mut(),
+    ctx: ptr::addr_of!(NGX_HTTP_ORIG_DST_MODULE_CTX) as _,
+    commands: ptr::null_mut(),
     type_: NGX_HTTP_MODULE as _,
     ..ngx_module_t::default()
 };
@@ -128,21 +129,17 @@ static mut NGX_HTTP_ORIG_DST_VARS: [ngx_http_variable_t; 2] = [
     },
 ];
 
-unsafe fn ngx_get_origdst(
-    request: &mut http::Request,
-) -> Result<(String, in_port_t), core::Status> {
+unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_port_t), Status> {
     let c = request.connection();
 
     if unsafe { (*c).type_ } != libc::SOCK_STREAM {
         ngx_log_debug_http!(request, "httporigdst: connection is not type SOCK_STREAM");
-        return Err(core::Status::NGX_DECLINED);
+        return Err(Status::NGX_DECLINED);
     }
 
-    if unsafe { ngx_connection_local_sockaddr(c, std::ptr::null_mut(), 0) }
-        != core::Status::NGX_OK.into()
-    {
+    if unsafe { ngx_connection_local_sockaddr(c, ptr::null_mut(), 0) } != Status::NGX_OK.into() {
         ngx_log_debug_http!(request, "httporigdst: no local sockaddr from connection");
-        return Err(core::Status::NGX_ERROR);
+        return Err(Status::NGX_ERROR);
     }
 
     let level: c_int;
@@ -154,12 +151,12 @@ unsafe fn ngx_get_origdst(
         }
         _ => {
             ngx_log_debug_http!(request, "httporigdst: only support IPv4");
-            return Err(core::Status::NGX_DECLINED);
+            return Err(Status::NGX_DECLINED);
         }
     }
 
-    let mut addr: sockaddr_storage = unsafe { std::mem::zeroed() };
-    let mut addrlen: libc::socklen_t = std::mem::size_of_val(&addr) as libc::socklen_t;
+    let mut addr: sockaddr_storage = unsafe { mem::zeroed() };
+    let mut addrlen: libc::socklen_t = mem::size_of_val(&addr) as libc::socklen_t;
     let rc = unsafe {
         libc::getsockopt(
             (*c).fd,
@@ -171,13 +168,13 @@ unsafe fn ngx_get_origdst(
     };
     if rc == -1 {
         ngx_log_debug_http!(request, "httporigdst: getsockopt failed");
-        return Err(core::Status::NGX_DECLINED);
+        return Err(Status::NGX_DECLINED);
     }
     let mut ip: Vec<u8> = vec![0; IPV4_STRLEN];
     let e = unsafe {
         ngx_sock_ntop(
-            std::ptr::addr_of_mut!(addr) as *mut sockaddr,
-            std::mem::size_of::<sockaddr>() as u32,
+            ptr::addr_of_mut!(addr) as *mut sockaddr,
+            mem::size_of::<sockaddr>() as u32,
             ip.as_mut_ptr(),
             IPV4_STRLEN,
             0,
@@ -188,11 +185,11 @@ unsafe fn ngx_get_origdst(
             request,
             "httporigdst: ngx_sock_ntop failed to convert sockaddr"
         );
-        return Err(core::Status::NGX_ERROR);
+        return Err(Status::NGX_ERROR);
     }
     ip.truncate(e);
 
-    let port = unsafe { ngx_inet_get_port(std::ptr::addr_of_mut!(addr) as *mut sockaddr) };
+    let port = unsafe { ngx_inet_get_port(ptr::addr_of_mut!(addr) as *mut sockaddr) };
 
     Ok((String::from_utf8(ip).unwrap(), port))
 }
@@ -205,7 +202,7 @@ http_variable_get!(
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             unsafe { obj.bind_addr(v) };
-            return core::Status::NGX_OK;
+            return Status::NGX_OK;
         }
         // lazy initialization:
         //   get original dest information
@@ -226,7 +223,7 @@ http_variable_get!(
                     .allocate::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
-                    return core::Status::NGX_ERROR;
+                    return Status::NGX_ERROR;
                 }
 
                 ngx_log_debug_http!(
@@ -242,7 +239,7 @@ http_variable_get!(
                 });
             }
         }
-        core::Status::NGX_OK
+        Status::NGX_OK
     }
 );
 
@@ -254,7 +251,7 @@ http_variable_get!(
         if let Some(obj) = ctx {
             ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
             unsafe { obj.bind_port(v) };
-            return core::Status::NGX_OK;
+            return Status::NGX_OK;
         }
         // lazy initialization:
         //   get original dest information
@@ -275,7 +272,7 @@ http_variable_get!(
                     .allocate::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
-                    return core::Status::NGX_ERROR;
+                    return Status::NGX_ERROR;
                 }
 
                 ngx_log_debug_http!(
@@ -291,7 +288,7 @@ http_variable_get!(
                 });
             }
         }
-        core::Status::NGX_OK
+        Status::NGX_OK
     }
 );
 
@@ -307,13 +304,13 @@ impl HttpModule for Module {
         for mut v in unsafe { NGX_HTTP_ORIG_DST_VARS } {
             let var = NonNull::new(unsafe { ngx_http_add_variable(cf, &mut v.name, v.flags) });
             if var.is_none() {
-                return core::Status::NGX_ERROR.into();
+                return Status::NGX_ERROR.into();
             }
             let mut var = var.unwrap();
             let var = unsafe { var.as_mut() };
             var.get_handler = v.get_handler;
             var.data = v.data;
         }
-        core::Status::NGX_OK.into()
+        Status::NGX_OK.into()
     }
 }
