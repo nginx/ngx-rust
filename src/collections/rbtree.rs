@@ -90,12 +90,12 @@ where
 
     /// Appends a node to the tree.
     pub fn insert(&mut self, node: &mut T) {
-        unsafe { ngx_rbtree_insert(&mut self.inner, node.to_rbtree_node()) };
+        unsafe { ngx_rbtree_insert(&raw mut self.inner, node.to_rbtree_node()) };
     }
 
     /// Removes the specified node from the tree.
     pub fn remove(&mut self, node: &mut T) {
-        unsafe { ngx_rbtree_delete(&mut self.inner, node.to_rbtree_node()) };
+        unsafe { ngx_rbtree_delete(&raw mut self.inner, node.to_rbtree_node()) };
     }
 
     /// Returns an iterator over the nodes of the tree.
@@ -275,7 +275,7 @@ where
             unsafe {
                 let mut data = MapEntry::<K, V>::from_rbtree_node(node);
 
-                ngx_rbtree_delete(&mut self.tree.inner, &mut data.as_mut().node);
+                ngx_rbtree_delete(&raw mut self.tree.inner, &raw mut data.as_mut().node);
                 ptr::drop_in_place(data.as_mut());
                 self.allocator().deallocate(data.cast(), layout)
             }
@@ -323,7 +323,7 @@ where
 
         unsafe {
             ngx_rbtree_init(
-                &mut this.tree.inner,
+                &raw mut this.tree.inner,
                 this.sentinel.as_ptr(),
                 Some(Self::insert),
             )

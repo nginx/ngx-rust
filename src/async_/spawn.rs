@@ -29,7 +29,7 @@ impl Scheduler {
     pub fn schedule(&self, runnable: Runnable) {
         // SAFETY: the cell is not empty, and we have exclusive access due to being a
         // single-threaded application.
-        let inner = unsafe { &mut *UnsafeCell::raw_get(&self.0) };
+        let inner = unsafe { &mut *UnsafeCell::raw_get(&raw const self.0) };
         inner.send(runnable)
     }
 }
@@ -69,7 +69,7 @@ impl SchedulerInner {
         // FIXME: VecDeque::push could panic on an allocation failure, switch to a datastructure
         // which will not and propagate the failure.
         self.queue.push_back(runnable);
-        unsafe { ngx_post_event(&mut self.event, ptr::addr_of_mut!(ngx_posted_next_events)) }
+        unsafe { ngx_post_event(&raw mut self.event, &raw mut ngx_posted_next_events) }
     }
 
     /// This event handler is called by ngx_event_process_posted at the end of
@@ -109,11 +109,11 @@ impl SchedulerInner {
 impl Drop for SchedulerInner {
     fn drop(&mut self) {
         if self.event.posted() != 0 {
-            unsafe { ngx_delete_posted_event(&mut self.event) };
+            unsafe { ngx_delete_posted_event(&raw mut self.event) };
         }
 
         if self.event.timer_set() != 0 {
-            unsafe { ngx_del_timer(&mut self.event) };
+            unsafe { ngx_del_timer(&raw mut self.event) };
         }
     }
 }

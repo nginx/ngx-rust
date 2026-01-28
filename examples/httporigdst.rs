@@ -162,8 +162,8 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
             (*c).fd,
             level,
             optname,
-            &mut addr as *mut _ as *mut _,
-            &mut addrlen as *mut u32,
+            (&raw mut addr).cast(),
+            &raw mut addrlen,
         )
     };
     if rc == -1 {
@@ -302,7 +302,7 @@ impl HttpModule for Module {
     // static ngx_int_t ngx_http_orig_dst_add_variables(ngx_conf_t *cf)
     unsafe extern "C" fn preconfiguration(cf: *mut ngx_conf_t) -> ngx_int_t {
         for mut v in unsafe { NGX_HTTP_ORIG_DST_VARS } {
-            let var = NonNull::new(unsafe { ngx_http_add_variable(cf, &mut v.name, v.flags) });
+            let var = NonNull::new(unsafe { ngx_http_add_variable(cf, &raw mut v.name, v.flags) });
             if var.is_none() {
                 return Status::NGX_ERROR.into();
             }

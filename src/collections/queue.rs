@@ -110,25 +110,25 @@ where
 
     /// Returns `true` if the queue contains no elements.
     pub fn is_empty(&self) -> bool {
-        self.head.prev.is_null() || unsafe { ngx_queue_empty(&self.head) }
+        self.head.prev.is_null() || unsafe { ngx_queue_empty(&raw const self.head) }
     }
 
     /// Appends an element to the end of the queue.
     pub fn push_back(&mut self, entry: &mut T) {
         if self.head.prev.is_null() {
-            unsafe { ngx_queue_init(&mut self.head) }
+            unsafe { ngx_queue_init(&raw mut self.head) }
         }
 
-        unsafe { ngx_queue_insert_before(&mut self.head, entry.to_queue()) }
+        unsafe { ngx_queue_insert_before(&raw mut self.head, entry.to_queue()) }
     }
 
     /// Appends an element to the beginning of the queue.
     pub fn push_front(&mut self, entry: &mut T) {
         if self.head.prev.is_null() {
-            unsafe { ngx_queue_init(&mut self.head) }
+            unsafe { ngx_queue_init(&raw mut self.head) }
         }
 
-        unsafe { ngx_queue_insert_after(&mut self.head, entry.to_queue()) }
+        unsafe { ngx_queue_insert_after(&raw mut self.head, entry.to_queue()) }
     }
 
     /// Returns an iterator over the entries of the queue.
@@ -388,8 +388,8 @@ impl<T> QueueEntry<T> {
         unsafe {
             let u = p.cast::<mem::MaybeUninit<Self>>().as_mut();
             // does not read the uninitialized data
-            ngx_queue_init(&mut u.assume_init_mut().queue);
-            ptr::write(&mut u.assume_init_mut().item, item);
+            ngx_queue_init(&raw mut u.assume_init_mut().queue);
+            ptr::write(&raw mut u.assume_init_mut().item, item);
         }
 
         Ok(p)
