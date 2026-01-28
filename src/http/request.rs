@@ -8,6 +8,7 @@ use core::str::FromStr;
 use crate::core::*;
 use crate::ffi::*;
 use crate::http::status::*;
+use crate::http::HttpPhase;
 
 /// Define a static request handler.
 ///
@@ -83,6 +84,80 @@ macro_rules! http_variable_get {
             status.0
         }
     };
+}
+
+/// Trait for converting handler return types into `ngx_int_t`.
+/// Any desired error handling / logging logic can be implemented
+/// in the `into_handler_status` method.
+///
+/// There are predefined implementations for `ngx_int_t`, [`Status`], [`HTTPStatus`],
+/// [`Option`] with value type implementing [`IntoHandlerStatus`].
+pub trait IntoHandlerStatus
+where
+    Self: Sized,
+{
+    /// Convert the handler return type into an `ngx_int_t`.
+    fn into_handler_status(self, _r: &Request) -> ngx_int_t;
+}
+
+impl<T> IntoHandlerStatus for Option<T>
+where
+    T: IntoHandlerStatus,
+{
+    #[inline]
+    fn into_handler_status(self, r: &Request) -> ngx_int_t {
+        self.map(|val| val.into_handler_status(r))
+            .unwrap_or(NGX_ERROR as _)
+    }
+}
+
+impl IntoHandlerStatus for ngx_int_t {
+    #[inline]
+    fn into_handler_status(self, _r: &Request) -> ngx_int_t {
+        self
+    }
+}
+
+impl IntoHandlerStatus for Status {
+    #[inline]
+    fn into_handler_status(self, _r: &Request) -> ngx_int_t {
+        self.0
+    }
+}
+
+impl IntoHandlerStatus for HTTPStatus {
+    #[inline]
+    fn into_handler_status(self, _r: &Request) -> ngx_int_t {
+        self.0 as _
+    }
+}
+
+/// Trait for static request handler.
+pub trait HttpRequestHandler {
+    /// The phase in which the handler is invoked.
+    const PHASE: HttpPhase;
+    /// The return type of the handler.
+    type Output: IntoHandlerStatus;
+    /// The handler function.
+    fn handler(request: &mut Request) -> Self::Output;
+    /// Handler name for logging purposes.
+    /// [`core::any::type_name`] is used by default.
+    fn name() -> &'static str {
+        core::any::type_name::<Self>()
+    }
+}
+
+/// The C-compatible handler wrapper function.
+///
+/// # Safety
+///
+/// The caller has provided a valid non-null pointer to an [`ngx_http_request_t`].
+pub(crate) unsafe extern "C" fn raw_handler<H>(r: *mut ngx_http_request_t) -> ngx_int_t
+where
+    H: HttpRequestHandler,
+{
+    let r = unsafe { Request::from_ngx_http_request(r) };
+    H::handler(r).into_handler_status(r)
 }
 
 /// Wrapper struct for an [`ngx_http_request_t`] pointer, providing methods for working with HTTP
