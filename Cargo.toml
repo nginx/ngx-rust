@@ -4,6 +4,11 @@ members = [
     "nginx-sys",
     "examples",
 ]
+# cargo is not smart enough to emit resolver = "2" when publishing
+# nginx-src with lower edition. We have to downgrade it globally.
+#
+# NOTE: this disables MSRV-aware dependency resolution.
+resolver = "2"
 
 [workspace.package]
 edition = "2024"

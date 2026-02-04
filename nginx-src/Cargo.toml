@@ -15,10 +15,10 @@ exclude = [
     "!/nginx/docs/html",
     "!/nginx/docs/man",
 ]
-edition.workspace = true
+edition = "2021"
 homepage.workspace = true
 repository.workspace = true
-rust-version.workspace = true
+rust-version = "1.81.0"
 
 [dependencies]
 duct = "1"
