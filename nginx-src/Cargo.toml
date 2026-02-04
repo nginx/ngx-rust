@@ -1,9 +1,9 @@
 [package]
 name = "nginx-src"
 # Version format: <NGINX major>.<NGINX minor>.<crate patch>+<NGINX version>
-version = "1.28.3+1.28.1"
+version = "1.28.4+1.28.2"
 # Crate sources are licensed under Apache-2.0, with exception of the
-# NGINX submodlue that is redistributed under BSD-2-Clause.
+# NGINX submodule that is redistributed under BSD-2-Clause.
 license = "Apache-2.0 AND BSD-2-Clause"
 description = "Source of NGINX"
 keywords = ["nginx", "module", "sys"]
