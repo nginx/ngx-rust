@@ -1,3 +1,6 @@
+#[cfg(feature = "async")]
+mod async_request;
+
 mod conf;
 mod module;
 mod request;
@@ -8,6 +11,9 @@ mod upstream;
 /// HTTP subrequest builder and handler.
 #[cfg(feature = "alloc")]
 pub mod subrequest;
+
+#[cfg(feature = "async")]
+pub use async_request::*;
 
 pub use conf::*;
 pub use module::*;

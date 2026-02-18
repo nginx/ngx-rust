@@ -433,6 +433,14 @@ impl Request {
         unsafe { Status(ngx_http_output_filter(&raw mut self.0, body)) }
     }
 
+    /// Get the output chain buffer.
+    pub fn get_out(&self) -> Option<&ngx_chain_t> {
+        if self.0.out.is_null() {
+            return None;
+        }
+        unsafe { Some(&*self.0.out) }
+    }
+
     /// Perform internal redirect to a location
     pub fn internal_redirect(&self, location: &str) -> Status {
         assert!(!location.is_empty(), "uri location is empty");
