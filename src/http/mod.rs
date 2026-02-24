@@ -5,6 +5,10 @@ mod request_context;
 mod status;
 mod upstream;
 
+/// HTTP subrequest builder and handler.
+#[cfg(feature = "alloc")]
+pub mod subrequest;
+
 pub use conf::*;
 pub use module::*;
 pub use request::*;
