@@ -11,6 +11,9 @@ use crate::{
     ngx_log_debug_http,
 };
 
+#[cfg(feature = "async")]
+pub use _async::*;
+
 /// A builder for creating subrequests.
 pub struct SubRequestBuilder {
     pool: Pool,
@@ -163,8 +166,8 @@ impl SubRequestBuilder {
             return Err(SubRequestError::CreationFailed);
         }
 
-        let sr = unsafe { Request::from_ngx_http_request(sr_ptr) };
         if let Some(modifier) = modifier {
+            let sr = unsafe { Request::from_ngx_http_request(sr_ptr) };
             modifier(sr).map_err(|e| SubRequestError::ModificationFailed(e.to_string()))
         } else {
             Ok(())
@@ -205,5 +208,136 @@ where
         (handler)(request, rc).into_handler_status(request)
     } else {
         rc
+    }
+}
+
+#[cfg(feature = "async")]
+impl SubRequestBuilder {
+    /// Builds and runs the subrequest asynchronously.
+    pub async fn build_async<'r, M, E, AH>(
+        mut self,
+        request: &'r mut Request,
+        modifier: Option<M>,
+        handler: AH,
+    ) -> Result<ngx_int_t, SubRequestError>
+    where
+        M: FnOnce(&mut Request) -> Result<(), E>,
+        E: Display,
+        AH: FnMut(&'r mut Request, ngx_int_t) -> ngx_int_t + Unpin,
+    {
+        let sr_args_ptr = self
+            .args
+            .as_mut()
+            .map_or(ptr::null_mut(), |args| args as *mut ngx_str_t);
+
+        let mut ctx = core::pin::pin!(AsyncSubRequest::<AH>::new(handler));
+
+        let mut psr = core::pin::pin!(ngx_http_post_subrequest_t {
+            handler: Some(AsyncSubRequest::<AH>::sr_handler),
+            data: ctx.as_mut().get_mut() as *mut _ as _,
+        });
+
+        let mut sr_ptr: *mut ngx_http_request_t = core::ptr::null_mut();
+
+        let rc = unsafe {
+            nginx_sys::ngx_http_subrequest(
+                request.as_mut() as *mut _ as _,
+                &raw mut self.uri,
+                sr_args_ptr,
+                &raw mut sr_ptr,
+                psr.as_mut().get_mut() as _,
+                self.flags as ngx_uint_t,
+            )
+        };
+        if rc != nginx_sys::NGX_OK as _ {
+            return Err(SubRequestError::CreationFailed);
+        }
+
+        if let Some(modifier) = modifier {
+            let sr = unsafe { Request::from_ngx_http_request(sr_ptr) };
+            modifier(sr).map_err(|e| SubRequestError::ModificationFailed(e.to_string()))?;
+        }
+
+        ctx.await
+    }
+}
+
+#[cfg(feature = "async")]
+mod _async {
+
+    use futures_util::task::noop_waker;
+
+    use super::*;
+
+    use core::pin::Pin;
+    use core::task::Waker;
+
+    use crate::ngx_log_debug_http;
+
+    /// An asynchronous subrequest structure.
+    pub struct AsyncSubRequest<'sr, H>
+    where
+        H: FnMut(&'sr mut Request, ngx_int_t) -> ngx_int_t + Unpin,
+    {
+        _phantom: core::marker::PhantomData<&'sr ()>,
+        handler: Option<H>,
+        waker: Waker,
+        rc: Option<ngx_int_t>,
+    }
+
+    impl<'sr, H> AsyncSubRequest<'sr, H>
+    where
+        H: FnMut(&'sr mut Request, ngx_int_t) -> ngx_int_t + Unpin,
+    {
+        pub(super) fn new(handler: H) -> Self {
+            Self {
+                _phantom: core::marker::PhantomData,
+                handler: Some(handler),
+                waker: noop_waker(),
+                rc: None,
+            }
+        }
+
+        pub(super) extern "C" fn sr_handler(
+            r: *mut ngx_http_request_t,
+            data: *mut c_void,
+            mut rc: ngx_int_t,
+        ) -> ngx_int_t {
+            let request = unsafe { Request::from_ngx_http_request(r) };
+            ngx_log_debug_http!(
+                request,
+                "async subrequest done rc:{} s:{}",
+                rc,
+                request.get_status().0
+            );
+
+            let this = unsafe { &mut *(data as *mut Self) };
+            this.rc = Some(rc);
+            if let Some(mut handler) = this.handler.take() {
+                rc = handler(request, rc);
+            }
+            this.waker.wake_by_ref();
+            rc
+        }
+    }
+
+    impl<'sr, H> core::future::Future for AsyncSubRequest<'sr, H>
+    where
+        H: FnMut(&'sr mut Request, ngx_int_t) -> ngx_int_t + Unpin,
+    {
+        type Output = Result<ngx_int_t, SubRequestError>;
+
+        fn poll(
+            mut self: Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> core::task::Poll<Self::Output> {
+            match self.rc {
+                None => {
+                    self.waker.clone_from(cx.waker());
+                    core::task::Poll::Pending
+                }
+                Some(rc) => core::task::Poll::Ready(Ok(rc)),
+            }
+        }
     }
 }

@@ -1,5 +1,7 @@
 #[cfg(feature = "async")]
 mod async_request;
+// #[cfg(feature = "async")]
+// mod async_subrequest;
 
 mod conf;
 mod module;
@@ -14,6 +16,8 @@ pub mod subrequest;
 
 #[cfg(feature = "async")]
 pub use async_request::*;
+// #[cfg(feature = "async")]
+// pub use async_subrequest::*;
 
 pub use conf::*;
 pub use module::*;
