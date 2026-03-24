@@ -1,6 +1,6 @@
-ARG NGX_VERSION=1.28.1
+ARG NGX_VERSION=1.28.3
 # NGINX official images are available for one specific release of Debian,
-# e.g `nginx:1.28.1-trixie`. Please see the list of tags on docker hub
+# e.g `nginx:1.28.3-trixie`. Please see the list of tags on Docker Hub
 # if you need to change NGX_VERSION.
 ARG DEBIAN_RELEASE=trixie
 
