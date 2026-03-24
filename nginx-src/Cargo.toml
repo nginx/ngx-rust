@@ -24,7 +24,7 @@ rust-version = "1.81.0"
 duct = "1"
 flate2 = "1"
 tar = "0.4"
-ureq = "3.0.10"
+ureq = "~3.2"
 
 [lints]
 workspace = true
