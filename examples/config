@@ -16,11 +16,14 @@ if [ $HTTP = YES ]; then
     ngx_rust_target_features=
 
     if :; then
-        ngx_module_name=ngx_http_async_module
-        ngx_module_libs="-lm"
-        ngx_rust_target_name=async
+        ngx_module_name=ngx_http_async_request_module
+        ngx_module_libs=
+        ngx_rust_target_name=async_request
+        ngx_rust_target_features=async
 
         ngx_rust_module
+
+        ngx_rust_target_features=
     fi
 
     if :; then
@@ -43,6 +46,14 @@ if [ $HTTP = YES ]; then
         ngx_module_name=ngx_http_shared_dict_module
         ngx_module_libs=
         ngx_rust_target_name=shared_dict
+
+        ngx_rust_module
+    fi
+
+    if :; then
+        ngx_module_name=ngx_http_subrequest_module
+        ngx_module_libs=
+        ngx_rust_target_name=subrequest
 
         ngx_rust_module
     fi
