@@ -9,6 +9,7 @@ use crate::core::*;
 use crate::ffi::*;
 use crate::http::HttpPhase;
 use crate::http::status::*;
+use crate::ngx_log_error;
 
 /// Define a static request handler.
 ///
@@ -85,7 +86,9 @@ macro_rules! http_variable_get {
 /// in the `into_handler_status` method.
 ///
 /// There are predefined implementations for `ngx_int_t`, [`Status`], [`HTTPStatus`],
-/// [`Option`] with value type implementing [`IntoHandlerStatus`].
+/// [`Option`] with value type implementing [`IntoHandlerStatus`],
+/// and [`Result`] with value type implementing [`IntoHandlerStatus`]
+/// and error type implementing [`core::fmt::Display`].
 pub trait IntoHandlerStatus
 where
     Self: Sized,
@@ -102,6 +105,23 @@ where
     fn into_handler_status(self, r: &Request) -> ngx_int_t {
         self.map(|val| val.into_handler_status(r))
             .unwrap_or(NGX_ERROR as _)
+    }
+}
+
+impl<T, E> IntoHandlerStatus for Result<T, E>
+where
+    T: IntoHandlerStatus,
+    E: core::fmt::Display,
+{
+    #[inline]
+    fn into_handler_status(self, r: &Request) -> ngx_int_t {
+        match self {
+            Ok(val) => val.into_handler_status(r),
+            Err(e) => {
+                ngx_log_error!(NGX_LOG_ERR, r.log(), "{e}");
+                NGX_ERROR as _
+            }
+        }
     }
 }
 
@@ -196,10 +216,44 @@ impl Request {
         unsafe { &mut *r.cast::<Request>() }
     }
 
+    /// Create a const [`Request`] from a const [`ngx_http_request_t`].
+    ///
+    /// # Safety
+    ///
+    /// The caller has provided a valid non-null pointer to a valid `ngx_http_request_t`
+    /// which shares the same representation as `Request`.
+    pub unsafe fn from_const_ngx_http_request<'a>(r: *const ngx_http_request_t) -> &'a Request {
+        unsafe { &*r.cast::<Request>() }
+    }
+
     /// Is this the main request (as opposed to a subrequest)?
     pub fn is_main(&self) -> bool {
         let main = self.0.main.cast();
         core::ptr::eq(self, main)
+    }
+
+    /// Get a mutable reference to the main request.
+    ///
+    /// If this is already the main request, returns `self`; otherwise returns
+    /// a mutable reference to the associated main request.
+    pub fn get_main_mut(&mut self) -> &mut Request {
+        if self.is_main() {
+            self
+        } else {
+            unsafe { Request::from_ngx_http_request(self.0.main) }
+        }
+    }
+
+    /// Get a reference to the main request.
+    ///
+    /// If this is already the main request, returns `self`; otherwise returns
+    /// a reference to the associated main request.
+    pub fn get_main(&self) -> &Request {
+        if self.is_main() {
+            self
+        } else {
+            unsafe { Request::from_const_ngx_http_request(self.0.main) }
+        }
     }
 
     /// Request pool.
@@ -249,6 +303,14 @@ impl Request {
         unsafe { ctx.as_ref() }
     }
 
+    /// Get mutable Module context
+    pub fn get_module_ctx_mut<T>(&mut self, module: &ngx_module_t) -> Option<&mut T> {
+        let ctx = self.get_module_ctx_ptr(module).cast::<T>();
+        // SAFETY: ctx is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { ctx.as_mut() }
+    }
+
     /// Sets the value as the module's context.
     ///
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
@@ -291,6 +353,15 @@ impl Request {
         } else {
             None
         }
+    }
+
+    /// Get HTTP status of response.
+    pub fn get_status(&self) -> HTTPStatus {
+        self.0
+            .headers_out
+            .status
+            .try_into()
+            .unwrap_or(HTTPStatus(0))
     }
 
     /// Set HTTP status of response.
