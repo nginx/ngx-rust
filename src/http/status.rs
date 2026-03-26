@@ -4,7 +4,7 @@ use crate::core::Status;
 use crate::ffi::*;
 
 /// Represents an HTTP status code.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HTTPStatus(pub ngx_uint_t);
 
 /// A possible error value when converting a `HTTPStatus` from a `u16` or `&str`
@@ -12,15 +12,7 @@ pub struct HTTPStatus(pub ngx_uint_t);
 /// This error indicates that the supplied input was not a valid number, was less
 /// than 100, or was greater than 599.
 #[derive(Debug)]
-pub struct InvalidHTTPStatusCode {
-    _priv: (),
-}
-
-impl InvalidHTTPStatusCode {
-    fn new() -> InvalidHTTPStatusCode {
-        InvalidHTTPStatusCode { _priv: () }
-    }
-}
+pub struct InvalidHTTPStatusCode;
 
 impl fmt::Display for InvalidHTTPStatusCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -48,35 +40,42 @@ impl From<HTTPStatus> for ngx_uint_t {
     }
 }
 
-impl fmt::Debug for HTTPStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
+impl TryFrom<usize> for HTTPStatus {
+    type Error = InvalidHTTPStatusCode;
+
+    #[inline]
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        if !(100..600).contains(&value) {
+            return Err(InvalidHTTPStatusCode);
+        }
+        Ok(HTTPStatus(value))
     }
 }
 
-impl HTTPStatus {
-    /// Convets a u16 to a status code.
+impl TryFrom<isize> for HTTPStatus {
+    type Error = InvalidHTTPStatusCode;
+
     #[inline]
-    pub fn from_u16(src: u16) -> Result<HTTPStatus, InvalidHTTPStatusCode> {
-        if !(100..600).contains(&src) {
-            return Err(InvalidHTTPStatusCode::new());
-        }
-
-        Ok(HTTPStatus(src.into()))
+    fn try_from(value: isize) -> Result<Self, Self::Error> {
+        let value: usize = value.try_into().map_err(|_| InvalidHTTPStatusCode)?;
+        Self::try_from(value)
     }
+}
 
-    /// Converts a &[u8] to a status code.
-    pub fn from_bytes(src: &[u8]) -> Result<HTTPStatus, InvalidHTTPStatusCode> {
-        if src.len() != 3 {
-            return Err(InvalidHTTPStatusCode::new());
+impl TryFrom<&[u8]> for HTTPStatus {
+    type Error = InvalidHTTPStatusCode;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() != 3 {
+            return Err(InvalidHTTPStatusCode);
         }
 
-        let a = src[0].wrapping_sub(b'0') as u16;
-        let b = src[1].wrapping_sub(b'0') as u16;
-        let c = src[2].wrapping_sub(b'0') as u16;
+        let a = value[0].wrapping_sub(b'0') as u16;
+        let b = value[1].wrapping_sub(b'0') as u16;
+        let c = value[2].wrapping_sub(b'0') as u16;
 
         if a == 0 || a > 5 || b > 9 || c > 9 {
-            return Err(InvalidHTTPStatusCode::new());
+            return Err(InvalidHTTPStatusCode);
         }
 
         let status = (a * 100) + (b * 10) + c;
