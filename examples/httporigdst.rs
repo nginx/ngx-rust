@@ -8,7 +8,7 @@ use ngx::ffi::{
     ngx_http_add_variable, ngx_http_module_t, ngx_http_variable_t, ngx_inet_get_port, ngx_int_t,
     ngx_module_t, ngx_sock_ntop, ngx_str_t, ngx_variable_value_t, sockaddr, sockaddr_storage,
 };
-use ngx::http::{self, HttpModule};
+use ngx::http::{self, HttpModule, RequestWithContext};
 use ngx::{http_variable_get, ngx_log_debug_http, ngx_string};
 
 const IPV4_STRLEN: usize = INET_ADDRSTRLEN as usize;
@@ -196,93 +196,65 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
 
 http_variable_get!(
     ngx_http_orig_dst_addr_variable,
-    |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(Module::module());
-        if let Some(obj) = ctx {
-            ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
-            unsafe { obj.bind_addr(v) };
-            return Status::NGX_OK;
-        }
-        // lazy initialization:
-        //   get original dest information
-        //   create context
-        //   set context
-        // bind address
-        ngx_log_debug_http!(request, "httporigdst: context not found, getting address");
-        let r = unsafe { ngx_get_origdst(request) };
-        match r {
-            Err(e) => {
-                return e;
+    |mut request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
+        let rctx: &mut RequestWithContext<Module, NgxHttpOrigDstCtx>;
+        (rctx, request) = RequestWithContext::from_request(request);
+        match rctx.get() {
+            Some(ctx) => {
+                ngx_log_debug_http!(request, "httporigdst: found context and binding variable");
+                unsafe { ctx.bind_addr(v) };
+                Status::NGX_OK
             }
-            Ok((ip, port)) => {
-                // create context,
-                // set context
-                let new_ctx = request
-                    .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
-
-                if new_ctx.is_null() {
-                    return Status::NGX_ERROR;
-                }
-
-                ngx_log_debug_http!(
-                    request,
-                    "httporigdst: saving ip - {:?}, port - {}",
-                    ip,
-                    port,
-                );
-                unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
-                unsafe { (*new_ctx).bind_addr(v) };
-                request.set_module_ctx(new_ctx as *mut c_void, Module::module());
+            None => {
+                ngx_log_debug_http!(request, "httporigdst: context not found, getting address");
+                unsafe { ngx_get_origdst(request) }.map_or_else(
+                    |e| e,
+                    |(ip, port)| {
+                        rctx.set(NgxHttpOrigDstCtx::default())
+                            .map_or(Status::NGX_ERROR, |ctx| {
+                                unsafe { ctx.bind_addr(v) };
+                                ngx_log_debug_http!(
+                                    request,
+                                    "httporigdst: saving ip - {ip}, port - {port}",
+                                );
+                                ctx.save(&ip, port, &request.pool())
+                            })
+                    },
+                )
             }
         }
-        Status::NGX_OK
     }
 );
 
 http_variable_get!(
     ngx_http_orig_dst_port_variable,
-    |request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
-        let ctx = request.get_module_ctx::<NgxHttpOrigDstCtx>(Module::module());
-        if let Some(obj) = ctx {
-            ngx_log_debug_http!(request, "httporigdst: found context and binding variable",);
-            unsafe { obj.bind_port(v) };
-            return Status::NGX_OK;
-        }
-        // lazy initialization:
-        //   get original dest information
-        //   create context
-        //   set context
-        // bind port
-        ngx_log_debug_http!(request, "httporigdst: context not found, getting address");
-        let r = unsafe { ngx_get_origdst(request) };
-        match r {
-            Err(e) => {
-                return e;
+    |mut request: &mut http::Request, v: *mut ngx_variable_value_t, _: usize| {
+        let rctx: &mut RequestWithContext<Module, NgxHttpOrigDstCtx>;
+        (rctx, request) = RequestWithContext::from_request(request);
+        match rctx.get() {
+            Some(ctx) => {
+                ngx_log_debug_http!(request, "httporigdst: found context and binding variable");
+                unsafe { ctx.bind_port(v) };
+                Status::NGX_OK
             }
-            Ok((ip, port)) => {
-                // create context,
-                // set context
-                let new_ctx = request
-                    .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
-
-                if new_ctx.is_null() {
-                    return Status::NGX_ERROR;
-                }
-
-                ngx_log_debug_http!(
-                    request,
-                    "httporigdst: saving ip - {:?}, port - {}",
-                    ip,
-                    port,
-                );
-                unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
-                unsafe { (*new_ctx).bind_port(v) };
-                request.set_module_ctx(new_ctx as *mut c_void, Module::module());
+            None => {
+                ngx_log_debug_http!(request, "httporigdst: context not found, getting address");
+                unsafe { ngx_get_origdst(request) }.map_or_else(
+                    |e| e,
+                    |(ip, port)| {
+                        rctx.set(NgxHttpOrigDstCtx::default())
+                            .map_or(Status::NGX_ERROR, |ctx| {
+                                unsafe { ctx.bind_port(v) };
+                                ngx_log_debug_http!(
+                                    request,
+                                    "httporigdst: saving ip - {ip}, port - {port}",
+                                );
+                                ctx.save(&ip, port, &request.pool())
+                            })
+                    },
+                )
             }
         }
-        Status::NGX_OK
     }
 );
 

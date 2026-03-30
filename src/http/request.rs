@@ -1,5 +1,4 @@
 use core::error;
-use core::ffi::c_void;
 use core::fmt;
 use core::ptr::NonNull;
 use core::slice;
@@ -236,28 +235,6 @@ impl Request {
         unsafe { (*self.connection()).log }
     }
 
-    /// Get Module context pointer
-    fn get_module_ctx_ptr(&self, module: &ngx_module_t) -> *mut c_void {
-        unsafe { *self.0.ctx.add(module.ctx_index) }
-    }
-
-    /// Get Module context
-    pub fn get_module_ctx<T>(&self, module: &ngx_module_t) -> Option<&T> {
-        let ctx = self.get_module_ctx_ptr(module).cast::<T>();
-        // SAFETY: ctx is either NULL or allocated with ngx_p(c)alloc and
-        // explicitly initialized by the module
-        unsafe { ctx.as_ref() }
-    }
-
-    /// Sets the value as the module's context.
-    ///
-    /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
-    pub fn set_module_ctx(&self, value: *mut c_void, module: &ngx_module_t) {
-        unsafe {
-            *self.0.ctx.add(module.ctx_index) = value;
-        };
-    }
-
     /// Get the value of a [complex value].
     ///
     /// [complex value]: https://nginx.org/en/docs/dev/development_guide.html#http_complex_values
@@ -384,65 +361,6 @@ impl Request {
         Status::NGX_DONE
     }
 
-    /// Send a subrequest
-    pub fn subrequest(
-        &self,
-        uri: &str,
-        module: &ngx_module_t,
-        post_callback: unsafe extern "C" fn(
-            *mut ngx_http_request_t,
-            *mut c_void,
-            ngx_int_t,
-        ) -> ngx_int_t,
-    ) -> Status {
-        let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.0.pool, uri) as *mut _ };
-        // -------------
-        // allocate memory and set values for ngx_http_post_subrequest_t
-        let sub_ptr = self
-            .pool()
-            .alloc(core::mem::size_of::<ngx_http_post_subrequest_t>());
-
-        // assert!(sub_ptr.is_null());
-        let post_subreq =
-            sub_ptr as *const ngx_http_post_subrequest_t as *mut ngx_http_post_subrequest_t;
-        unsafe {
-            (*post_subreq).handler = Some(post_callback);
-            // WARN: safety! ensure that ctx is already set
-            (*post_subreq).data = self.get_module_ctx_ptr(module);
-        }
-        // -------------
-
-        let mut psr: *mut ngx_http_request_t = core::ptr::null_mut();
-        let r = unsafe {
-            ngx_http_subrequest(
-                (self as *const Request as *mut Request).cast(),
-                uri_ptr,
-                core::ptr::null_mut(),
-                &raw mut psr,
-                sub_ptr as *mut _,
-                NGX_HTTP_SUBREQUEST_WAITED as _,
-            )
-        };
-
-        // previously call of ngx_http_subrequest() would ensure that the pointer is not null
-        // anymore
-        let sr = unsafe { &mut *psr };
-
-        /*
-         * allocate fake request body to avoid attempts to read it and to make
-         * sure real body file (if already read) won't be closed by upstream
-         */
-        sr.request_body =
-            self.pool()
-                .alloc(core::mem::size_of::<ngx_http_request_body_t>()) as *mut _;
-
-        if sr.request_body.is_null() {
-            return Status::NGX_ERROR;
-        }
-        sr.set_header_only(1 as _);
-        Status(r)
-    }
-
     /// Iterate over headers_in
     /// each header item is (&str, &str) (borrowed)
     pub fn headers_in_iterator(&self) -> NgxListIterator<'_> {
@@ -484,10 +402,6 @@ impl crate::http::HttpModuleConfExt for Request {
         }
     }
 }
-
-// trait OnSubRequestDone {
-
-// }
 
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

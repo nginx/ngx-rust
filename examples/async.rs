@@ -15,7 +15,10 @@ use ngx::ffi::{
     ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_t, ngx_http_module_t, ngx_int_t,
     ngx_module_t, ngx_post_event, ngx_posted_events, ngx_posted_next_events, ngx_str_t, ngx_uint_t,
 };
-use ngx::http::{self, HttpModule, HttpModuleLocationConf, HttpRequestHandler, MergeConfigError};
+use ngx::http::{
+    self, HttpModule, HttpModuleLocationConf, HttpRequestHandler, MergeConfigError,
+    RequestWithContext,
+};
 use ngx::{ngx_conf_log_error, ngx_log_debug_http, ngx_string};
 use tokio::runtime::Runtime;
 
@@ -140,7 +143,7 @@ impl HttpRequestHandler for AsyncAccessHandler {
     const PHASE: ngx::http::HttpPhase = ngx::http::HttpPhase::Access;
     type Output = Status;
 
-    fn handler(request: &mut http::Request) -> Self::Output {
+    fn handler(mut request: &mut http::Request) -> Self::Output {
         let co = Module::location_conf(request).expect("module config is none");
 
         ngx_log_debug_http!(request, "async module enabled: {}", co.enable);
@@ -149,7 +152,10 @@ impl HttpRequestHandler for AsyncAccessHandler {
             return Status::NGX_DECLINED;
         }
 
-        if let Some(ctx) = request.get_module_ctx::<RequestCTX>(Module::module()) {
+        let rctx: &mut RequestWithContext<Module, RequestCTX>;
+        (rctx, request) = RequestWithContext::from_request(request);
+
+        if let Some(ctx) = rctx.get() {
             if !ctx.done.load(Ordering::Relaxed) {
                 return Status::NGX_AGAIN;
             }
@@ -157,13 +163,12 @@ impl HttpRequestHandler for AsyncAccessHandler {
             return Status::NGX_OK;
         }
 
-        let ctx = request.pool().allocate(RequestCTX::default());
-        if ctx.is_null() {
+        let ctx = rctx.set(RequestCTX::default());
+        if ctx.is_err() {
             return Status::NGX_ERROR;
         }
-        request.set_module_ctx(ctx.cast(), Module::module());
+        let ctx = ctx.unwrap();
 
-        let ctx = unsafe { &mut *ctx };
         ctx.event.handler = Some(check_async_work_done);
         ctx.event.data = request.connection().cast();
         ctx.event.log = unsafe { (*request.connection()).log };
