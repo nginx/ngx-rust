@@ -97,7 +97,7 @@ macro_rules! ngx_log_error {
     ( $level:expr, $log:expr, $($arg:tt)+ ) => {
         let log = $log;
         let level = $level as $crate::ffi::ngx_uint_t;
-        if level < unsafe { (*log).log_level } {
+        if level <= unsafe { (*log).log_level } {
             let mut buf =
                 [const { ::core::mem::MaybeUninit::<u8>::uninit() }; $crate::log::LOG_BUFFER_SIZE];
             let message = $crate::log::write_fmt(&mut buf, format_args!($($arg)+));
@@ -112,7 +112,7 @@ macro_rules! ngx_conf_log_error {
     ( $level:expr, $cf:expr, $($arg:tt)+ ) => {
         let cf: *mut $crate::ffi::ngx_conf_t = $cf;
         let level = $level as $crate::ffi::ngx_uint_t;
-        if level < unsafe { (*(*cf).log).log_level } {
+        if level <= unsafe { (*(*cf).log).log_level } {
             let mut buf =
                 [const { ::core::mem::MaybeUninit::<u8>::uninit() }; $crate::log::LOG_BUFFER_SIZE];
             let message = $crate::log::write_fmt(&mut buf, format_args!($($arg)+));
