@@ -13,3 +13,5 @@
 
 # Tree-wide formatting change: max-width 120 -> 100
 d866b64a3c83105c20b0c005392f8e8fcaaf2066
+# Tree-wide formatting change: use_small_heuristics -> "Max"
+4b30e402b0393dd4b888980d57ce6792adbb9455
