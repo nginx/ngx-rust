@@ -116,10 +116,7 @@ pub struct LockedSlabPool(NonNull<ngx_slab_pool_t>);
 unsafe impl Allocator for LockedSlabPool {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         if layout.size() == 0 {
-            return Ok(NonNull::slice_from_raw_parts(
-                dangling_for_layout(&layout),
-                layout.size(),
-            ));
+            return Ok(NonNull::slice_from_raw_parts(dangling_for_layout(&layout), layout.size()));
         }
 
         // Small slab allocations (size <= ngx_pagesize / 2) are always aligned to the size rounded

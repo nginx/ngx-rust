@@ -142,11 +142,7 @@ mod tests {
                 "TestStr(\"Ferris the 🦀\")",
                 "TestStr(46,65,72,72,69,73,20,74,68,65,20,f0,9f,a6,80)",
             ),
-            (
-                b"\xF0\x90\x80",
-                "TestStr(\"\\xf0\\x90\\x80\")",
-                "TestStr(f0,90,80)",
-            ),
+            (b"\xF0\x90\x80", "TestStr(\"\\xf0\\x90\\x80\")", "TestStr(f0,90,80)"),
         ];
         for (bytes, expected, alternate) in cases {
             let str = TestStr(bytes);

@@ -52,9 +52,8 @@ const NGX_CONF_FEATURES: &[&str] = &[
 /// The detected value will be exposed to the buildsrcipts of _direct_ dependents of this crate as
 /// `DEP_NGINX_OS` environment variable.
 /// The list of recognized values will be exported as `DEP_NGINX_OS_CHECK`.
-const NGX_CONF_OS: &[&str] = &[
-    "darwin", "freebsd", "gnu_hurd", "hpux", "linux", "solaris", "tru64", "win32",
-];
+const NGX_CONF_OS: &[&str] =
+    &["darwin", "freebsd", "gnu_hurd", "hpux", "linux", "solaris", "tru64", "win32"];
 
 type BoxError = Box<dyn StdError>;
 
@@ -72,10 +71,7 @@ fn main() -> Result<(), BoxError> {
     println!("cargo:rerun-if-changed=build/wrapper.h");
 
     let nginx = NginxSource::from_env();
-    println!(
-        "cargo:rerun-if-changed={}",
-        nginx.build_dir.join("Makefile").to_string_lossy()
-    );
+    println!("cargo:rerun-if-changed={}", nginx.build_dir.join("Makefile").to_string_lossy());
     println!(
         "cargo:rerun-if-changed={}",
         nginx.build_dir.join("ngx_auto_config.h").to_string_lossy()
@@ -95,17 +91,11 @@ impl NginxSource {
         let source_dir = NginxSource::check_source_dir(source_dir).expect("source directory");
         let build_dir = NginxSource::check_build_dir(build_dir).expect("build directory");
 
-        Self {
-            source_dir,
-            build_dir,
-        }
+        Self { source_dir, build_dir }
     }
 
     pub fn from_env() -> Self {
-        match (
-            env::var_os("NGINX_SOURCE_DIR"),
-            env::var_os("NGINX_BUILD_DIR"),
-        ) {
+        match (env::var_os("NGINX_SOURCE_DIR"), env::var_os("NGINX_BUILD_DIR")) {
             (Some(source_dir), Some(build_dir)) => NginxSource::new(source_dir, build_dir),
             (Some(source_dir), None) => Self::from_source_dir(source_dir),
             (None, Some(build_dir)) => Self::from_build_dir(build_dir),
@@ -122,11 +112,7 @@ impl NginxSource {
     }
 
     pub fn from_build_dir(build_dir: impl AsRef<Path>) -> Self {
-        let source_dir = build_dir
-            .as_ref()
-            .parent()
-            .expect("source directory")
-            .to_owned();
+        let source_dir = build_dir.as_ref().parent().expect("source directory").to_owned();
         Self::new(source_dir, build_dir)
     }
 
@@ -138,10 +124,7 @@ impl NginxSource {
         let build_dir = PathBuf::from(out_dir).join("objs");
         let (source_dir, build_dir) = nginx_src::build(build_dir).expect("nginx-src build");
 
-        Self {
-            source_dir,
-            build_dir,
-        }
+        Self { source_dir, build_dir }
     }
 
     #[cfg(not(feature = "vendored"))]
@@ -155,12 +138,10 @@ impl NginxSource {
     fn check_source_dir(source_dir: impl AsRef<Path>) -> Result<PathBuf, BoxError> {
         match dunce::canonicalize(&source_dir) {
             Ok(path) if path.join("src/core/nginx.h").is_file() => Ok(path),
-            Err(err) => Err(format!(
-                "Invalid nginx source directory: {:?}. {}",
-                source_dir.as_ref(),
-                err
-            )
-            .into()),
+            Err(err) => {
+                Err(format!("Invalid nginx source directory: {:?}. {}", source_dir.as_ref(), err)
+                    .into())
+            }
             _ => Err(format!(
                 "Invalid nginx source directory: {:?}. NGINX_SOURCE_DIR is not specified or \
                  contains invalid value.",
@@ -173,12 +154,10 @@ impl NginxSource {
     fn check_build_dir(build_dir: impl AsRef<Path>) -> Result<PathBuf, BoxError> {
         match dunce::canonicalize(&build_dir) {
             Ok(path) if path.join("ngx_auto_config.h").is_file() => Ok(path),
-            Err(err) => Err(format!(
-                "Invalid nginx build directory: {:?}. {}",
-                build_dir.as_ref(),
-                err
-            )
-            .into()),
+            Err(err) => {
+                Err(format!("Invalid nginx build directory: {:?}. {}", build_dir.as_ref(), err)
+                    .into())
+            }
             _ => Err(format!(
                 "Invalid NGINX build directory: {:?}. NGINX_BUILD_DIR is not specified or \
                  contains invalid value.",
@@ -195,26 +174,18 @@ fn generate_binding(nginx: &NginxSource) {
     let (includes, defines) = parse_makefile(&autoconf_makefile_path);
     let includes: Vec<_> = includes
         .into_iter()
-        .map(|path| {
-            if path.is_absolute() {
-                path
-            } else {
-                nginx.source_dir.join(path)
-            }
-        })
+        .map(|path| if path.is_absolute() { path } else { nginx.source_dir.join(path) })
         .collect();
-    let mut clang_args: Vec<String> = includes
-        .iter()
-        .map(|path| format!("-I{}", path.to_string_lossy()))
-        .collect();
+    let mut clang_args: Vec<String> =
+        includes.iter().map(|path| format!("-I{}", path.to_string_lossy())).collect();
 
-    clang_args.extend(defines.iter().map(|(n, ov)| {
-        if let Some(v) = ov {
-            format!("-D{n}={v}")
-        } else {
-            format!("-D{n}")
-        }
-    }));
+    clang_args.extend(
+        defines.iter().map(
+            |(n, ov)| {
+                if let Some(v) = ov { format!("-D{n}={v}") } else { format!("-D{n}") }
+            },
+        ),
+    );
 
     print_cargo_metadata(nginx, &includes, &defines).expect("cargo dependency metadata");
 
@@ -246,9 +217,7 @@ fn generate_binding(nginx: &NginxSource) {
     let out_dir_env =
         env::var("OUT_DIR").expect("The required environment variable OUT_DIR was not set");
     let out_path = PathBuf::from(out_dir_env);
-    bindings
-        .write_to_file(out_path.join("bindings.rs"))
-        .expect("Couldn't write bindings!");
+    bindings.write_to_file(out_path.join("bindings.rs")).expect("Couldn't write bindings!");
 }
 
 /// Reads through the makefile generated by autoconf and finds all of the includes
@@ -325,10 +294,7 @@ pub fn parse_makefile(
 
     cflags_includes.extend(all_incs);
 
-    (
-        cflags_includes.into_iter().map(PathBuf::from).collect(),
-        defines,
-    )
+    (cflags_includes.into_iter().map(PathBuf::from).collect(), defines)
 }
 
 /// Collect info about the nginx configuration and expose it to the dependents via
@@ -353,10 +319,8 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
 
     let expanded = expand_definitions(includes, defines)?;
     for line in String::from_utf8(expanded)?.lines() {
-        let Some((name, value)) = line
-            .trim()
-            .strip_prefix("RUST_CONF_")
-            .and_then(|x| x.split_once('='))
+        let Some((name, value)) =
+            line.trim().strip_prefix("RUST_CONF_").and_then(|x| x.split_once('='))
         else {
             continue;
         };
@@ -377,10 +341,7 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
         }
     }
 
-    println!(
-        "cargo::metadata=build_dir={}",
-        nginx.build_dir.to_str().expect("Unicode build path")
-    );
+    println!("cargo::metadata=build_dir={}", nginx.build_dir.to_str().expect("Unicode build path"));
 
     println!(
         "cargo::metadata=include={}",
@@ -394,11 +355,7 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
         "cargo:metadata=cflags={}",
         defines
             .iter()
-            .map(|(n, ov)| if let Some(v) = ov {
-                format!("-D{n}={v}")
-            } else {
-                format!("-D{n}")
-            })
+            .map(|(n, ov)| if let Some(v) = ov { format!("-D{n}={v}") } else { format!("-D{n}") })
             .collect::<Vec<_>>()
             .join(" ")
     );

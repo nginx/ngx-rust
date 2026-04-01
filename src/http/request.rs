@@ -100,8 +100,7 @@ where
 {
     #[inline]
     fn into_handler_status(self, r: &Request) -> ngx_int_t {
-        self.map(|val| val.into_handler_status(r))
-            .unwrap_or(NGX_ERROR as _)
+        self.map(|val| val.into_handler_status(r)).unwrap_or(NGX_ERROR as _)
     }
 }
 
@@ -398,9 +397,7 @@ impl Request {
         let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.0.pool, uri) as *mut _ };
         // -------------
         // allocate memory and set values for ngx_http_post_subrequest_t
-        let sub_ptr = self
-            .pool()
-            .alloc(core::mem::size_of::<ngx_http_post_subrequest_t>());
+        let sub_ptr = self.pool().alloc(core::mem::size_of::<ngx_http_post_subrequest_t>());
 
         // assert!(sub_ptr.is_null());
         let post_subreq =
@@ -433,8 +430,7 @@ impl Request {
          * sure real body file (if already read) won't be closed by upstream
          */
         sr.request_body =
-            self.pool()
-                .alloc(core::mem::size_of::<ngx_http_request_body_t>()) as *mut _;
+            self.pool().alloc(core::mem::size_of::<ngx_http_request_body_t>()) as *mut _;
 
         if sr.request_body.is_null() {
             return Status::NGX_ERROR;
@@ -491,9 +487,7 @@ impl crate::http::HttpModuleConfExt for Request {
 
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Request")
-            .field("request_", &self.0)
-            .finish()
+        f.debug_struct("Request").field("request_", &self.0).finish()
     }
 }
 
@@ -525,10 +519,7 @@ impl<'a> From<&'a ngx_list_part_t> for ListPart<'a> {
 ///
 /// The caller has provided a valid [`ngx_str_t`] which can be dereferenced validly.
 pub unsafe fn list_iterator(list: &ngx_list_t) -> NgxListIterator<'_> {
-    NgxListIterator {
-        part: Some((&list.part).into()),
-        i: 0,
-    }
+    NgxListIterator { part: Some((&list.part).into()), i: 0 }
 }
 
 // iterator for ngx_list_t
@@ -553,12 +544,7 @@ impl<'a> Iterator for NgxListIterator<'a> {
         }
         let header = &part.arr[self.i];
         self.i += 1;
-        unsafe {
-            Some((
-                NgxStr::from_ngx_str(header.key),
-                NgxStr::from_ngx_str(header.value),
-            ))
-        }
+        unsafe { Some((NgxStr::from_ngx_str(header.key), NgxStr::from_ngx_str(header.value))) }
     }
 }
 

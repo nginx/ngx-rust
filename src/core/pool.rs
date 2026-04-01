@@ -29,18 +29,12 @@ unsafe impl Allocator for Pool {
             // We can guarantee alignment <= NGX_ALIGNMENT for allocations of size 0 made with
             // ngx_palloc_small. Any other cases are implementation-defined, and we can't tell which
             // one will be used internally.
-            return Ok(NonNull::slice_from_raw_parts(
-                dangling_for_layout(&layout),
-                layout.size(),
-            ));
+            return Ok(NonNull::slice_from_raw_parts(dangling_for_layout(&layout), layout.size()));
         } else if layout.align() == 1 {
             unsafe { ngx_pnalloc(self.0.as_ptr(), layout.size()) }
         } else if layout.align() <= NGX_ALIGNMENT {
             unsafe { ngx_palloc(self.0.as_ptr(), layout.size()) }
-        } else if cfg!(any(
-            ngx_feature = "have_posix_memalign",
-            ngx_feature = "have_memalign"
-        )) {
+        } else if cfg!(any(ngx_feature = "have_posix_memalign", ngx_feature = "have_memalign")) {
             // ngx_pmemalign is always defined, but does not guarantee the requested alignment
             // unless memalign/posix_memalign exists.
             unsafe { ngx_pmemalign(self.0.as_ptr(), layout.size(), layout.align()) }

@@ -11,9 +11,7 @@ use crate::bindings::{ngx_rbtree_insert_pt, ngx_rbtree_node_t, ngx_rbtree_t};
 #[macro_export]
 macro_rules! ngx_rbtree_data {
     ($node:expr, $type:path, $link:ident) => {
-        $node
-            .byte_sub(::core::mem::offset_of!($type, $link))
-            .cast::<$type>()
+        $node.byte_sub(::core::mem::offset_of!($type, $link)).cast::<$type>()
     };
 }
 

@@ -117,33 +117,24 @@ impl Merge for ModuleConfig {
         };
 
         if self.access_key.is_empty() {
-            self.access_key = String::from(if !prev.access_key.is_empty() {
-                &prev.access_key
-            } else {
-                ""
-            });
+            self.access_key =
+                String::from(if !prev.access_key.is_empty() { &prev.access_key } else { "" });
         }
         if self.enable && self.access_key.is_empty() {
             return Err(MergeConfigError::NoValue);
         }
 
         if self.secret_key.is_empty() {
-            self.secret_key = String::from(if !prev.secret_key.is_empty() {
-                &prev.secret_key
-            } else {
-                ""
-            });
+            self.secret_key =
+                String::from(if !prev.secret_key.is_empty() { &prev.secret_key } else { "" });
         }
         if self.enable && self.secret_key.is_empty() {
             return Err(MergeConfigError::NoValue);
         }
 
         if self.s3_bucket.is_empty() {
-            self.s3_bucket = String::from(if !prev.s3_bucket.is_empty() {
-                &prev.s3_bucket
-            } else {
-                ""
-            });
+            self.s3_bucket =
+                String::from(if !prev.s3_bucket.is_empty() { &prev.s3_bucket } else { "" });
         }
         if self.enable && self.s3_bucket.is_empty() {
             return Err(MergeConfigError::NoValue);
@@ -171,11 +162,7 @@ extern "C" fn ngx_http_awssigv4_commands_set_enable(
         let val = match args[1].to_str() {
             Ok(s) => s,
             Err(_) => {
-                ngx_conf_log_error!(
-                    NGX_LOG_EMERG,
-                    cf,
-                    "`awssigv4` argument is not utf-8 encoded"
-                );
+                ngx_conf_log_error!(NGX_LOG_EMERG, cf, "`awssigv4` argument is not utf-8 encoded");
                 return ngx::core::NGX_CONF_ERROR;
             }
         };

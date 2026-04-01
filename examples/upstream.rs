@@ -37,11 +37,7 @@ struct SrvConfig {
 
 impl Default for SrvConfig {
     fn default() -> Self {
-        SrvConfig {
-            max: u32::MAX,
-            original_init_upstream: None,
-            original_init_peer: None,
-        }
+        SrvConfig { max: u32::MAX, original_init_upstream: None, original_init_peer: None }
     }
 }
 
@@ -186,11 +182,7 @@ unsafe extern "C" fn ngx_http_upstream_get_custom_peer(
         return rc;
     }
 
-    ngx_log_debug_mask!(
-        DebugMask::Http,
-        unsafe { (*pc).log },
-        "CUSTOM UPSTREAM end get peer"
-    );
+    ngx_log_debug_mask!(DebugMask::Http, unsafe { (*pc).log }, "CUSTOM UPSTREAM end get peer");
     Status::NGX_OK.into()
 }
 
@@ -202,11 +194,7 @@ unsafe extern "C" fn ngx_http_upstream_free_custom_peer(
     data: *mut c_void,
     state: ngx_uint_t,
 ) {
-    ngx_log_debug_mask!(
-        DebugMask::Http,
-        unsafe { (*pc).log },
-        "CUSTOM UPSTREAM free peer"
-    );
+    ngx_log_debug_mask!(DebugMask::Http, unsafe { (*pc).log }, "CUSTOM UPSTREAM free peer");
 
     let hcpd: *mut UpstreamPeerData = unsafe { mem::transmute(data) };
 
@@ -214,11 +202,7 @@ unsafe extern "C" fn ngx_http_upstream_free_custom_peer(
 
     unsafe { original_free_peer(pc, (*hcpd).data, state) };
 
-    ngx_log_debug_mask!(
-        DebugMask::Http,
-        unsafe { (*pc).log },
-        "CUSTOM UPSTREAM end free peer"
-    );
+    ngx_log_debug_mask!(DebugMask::Http, unsafe { (*pc).log }, "CUSTOM UPSTREAM end free peer");
 }
 
 // ngx_http_upstream_init_custom
@@ -249,11 +233,7 @@ unsafe extern "C" fn ngx_http_upstream_init_custom(
 
     let init_upstream_ptr = hccf.original_init_upstream.unwrap();
     if unsafe { init_upstream_ptr(cf, us) } != Status::NGX_OK.into() {
-        ngx_conf_log_error!(
-            NGX_LOG_EMERG,
-            cf,
-            "CUSTOM UPSTREAM failed calling init_upstream"
-        );
+        ngx_conf_log_error!(NGX_LOG_EMERG, cf, "CUSTOM UPSTREAM failed calling init_upstream");
         return isize::from(Status::NGX_ERROR);
     }
 

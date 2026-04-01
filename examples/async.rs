@@ -181,10 +181,7 @@ impl HttpRequestHandler for AsyncAccessHandler {
             // not really thread safe, we should apply all these operation in nginx thread
             // but this is just an example. proper way would be storing these headers in the request
             // ctx and apply them when we get back to the nginx thread.
-            req.add_header_out(
-                "X-Async-Time",
-                start.elapsed().as_millis().to_string().as_str(),
-            );
+            req.add_header_out("X-Async-Time", start.elapsed().as_millis().to_string().as_str());
 
             done_flag.store(true, Ordering::Release);
             // there is a small issue here. If traffic is low we may get stuck behind a 300ms timer
@@ -228,10 +225,7 @@ extern "C" fn ngx_http_async_commands_set_enable(
 
 fn ngx_http_async_runtime() -> &'static Runtime {
     // Should not be called from the master process
-    assert_ne!(
-        unsafe { ngx::ffi::ngx_process },
-        ngx::ffi::NGX_PROCESS_MASTER as _
-    );
+    assert_ne!(unsafe { ngx::ffi::ngx_process }, ngx::ffi::NGX_PROCESS_MASTER as _);
 
     static RUNTIME: OnceLock<Runtime> = OnceLock::new();
     RUNTIME.get_or_init(|| {

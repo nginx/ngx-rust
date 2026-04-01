@@ -35,11 +35,7 @@ impl NgxHttpOrigDstCtx {
             return Status::NGX_ERROR;
         }
         unsafe {
-            libc::memcpy(
-                port_data,
-                port_str.as_bytes().as_ptr() as *const c_void,
-                port_str.len(),
-            )
+            libc::memcpy(port_data, port_str.as_bytes().as_ptr() as *const c_void, port_str.len())
         };
         self.orig_dst_port.len = port_str.len();
         self.orig_dst_port.data = port_data as *mut u8;
@@ -158,13 +154,7 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
     let mut addr: sockaddr_storage = unsafe { mem::zeroed() };
     let mut addrlen: libc::socklen_t = mem::size_of_val(&addr) as libc::socklen_t;
     let rc = unsafe {
-        libc::getsockopt(
-            (*c).fd,
-            level,
-            optname,
-            (&raw mut addr).cast(),
-            &raw mut addrlen,
-        )
+        libc::getsockopt((*c).fd, level, optname, (&raw mut addr).cast(), &raw mut addrlen)
     };
     if rc == -1 {
         ngx_log_debug_http!(request, "httporigdst: getsockopt failed");
@@ -181,10 +171,7 @@ unsafe fn ngx_get_origdst(request: &mut http::Request) -> Result<(String, in_por
         )
     };
     if e == 0 {
-        ngx_log_debug_http!(
-            request,
-            "httporigdst: ngx_sock_ntop failed to convert sockaddr"
-        );
+        ngx_log_debug_http!(request, "httporigdst: ngx_sock_ntop failed to convert sockaddr");
         return Err(Status::NGX_ERROR);
     }
     ip.truncate(e);
@@ -217,20 +204,13 @@ http_variable_get!(
             Ok((ip, port)) => {
                 // create context,
                 // set context
-                let new_ctx = request
-                    .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
+                let new_ctx = request.pool().allocate::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
                     return Status::NGX_ERROR;
                 }
 
-                ngx_log_debug_http!(
-                    request,
-                    "httporigdst: saving ip - {:?}, port - {}",
-                    ip,
-                    port,
-                );
+                ngx_log_debug_http!(request, "httporigdst: saving ip - {:?}, port - {}", ip, port,);
                 unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
                 unsafe { (*new_ctx).bind_addr(v) };
                 request.set_module_ctx(new_ctx as *mut c_void, Module::module());
@@ -263,20 +243,13 @@ http_variable_get!(
             Ok((ip, port)) => {
                 // create context,
                 // set context
-                let new_ctx = request
-                    .pool()
-                    .allocate::<NgxHttpOrigDstCtx>(Default::default());
+                let new_ctx = request.pool().allocate::<NgxHttpOrigDstCtx>(Default::default());
 
                 if new_ctx.is_null() {
                     return Status::NGX_ERROR;
                 }
 
-                ngx_log_debug_http!(
-                    request,
-                    "httporigdst: saving ip - {:?}, port - {}",
-                    ip,
-                    port,
-                );
+                ngx_log_debug_http!(request, "httporigdst: saving ip - {:?}, port - {}", ip, port,);
                 unsafe { (*new_ctx).save(&ip, port, &request.pool()) };
                 unsafe { (*new_ctx).bind_port(v) };
                 request.set_module_ctx(new_ctx as *mut c_void, Module::module());

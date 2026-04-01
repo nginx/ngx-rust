@@ -156,11 +156,7 @@ where
     /// Creates a new queue iterator.
     pub fn new(head: &'a ngx_queue_t) -> Self {
         let head = NonNull::from(head);
-        NgxQueueIter {
-            head,
-            current: head,
-            _lifetime: PhantomData,
-        }
+        NgxQueueIter { head, current: head, _lifetime: PhantomData }
     }
 }
 
@@ -197,11 +193,7 @@ where
     /// Creates a new mutable queue iterator.
     pub fn new(head: &'a mut ngx_queue_t) -> Self {
         let head = NonNull::from(head);
-        NgxQueueIterMut {
-            head,
-            current: head,
-            _lifetime: PhantomData,
-        }
+        NgxQueueIterMut { head, current: head, _lifetime: PhantomData }
     }
 }
 
@@ -266,10 +258,7 @@ where
 impl<T, A: Allocator> Queue<T, A> {
     /// Creates a new list with specified allocator.
     pub fn try_new_in(alloc: A) -> Result<Self, AllocError> {
-        let raw = NgxQueue {
-            head: unsafe { mem::zeroed() },
-            _type: PhantomData,
-        };
+        let raw = NgxQueue { head: unsafe { mem::zeroed() }, _type: PhantomData };
         let raw = crate::allocator::allocate(raw, &alloc)?;
         Ok(Self { raw, len: 0, alloc })
     }
@@ -357,10 +346,7 @@ impl<T, A: Allocator> Queue<T, A> {
         let entry = QueueEntry::<T>::from_queue(node);
         let copy = unsafe { entry.read() };
         // Skip drop as QueueEntry is already copied to `x`.
-        unsafe {
-            self.allocator()
-                .deallocate(entry.cast(), Layout::for_value(entry.as_ref()))
-        };
+        unsafe { self.allocator().deallocate(entry.cast(), Layout::for_value(entry.as_ref())) };
         copy.item
     }
 }

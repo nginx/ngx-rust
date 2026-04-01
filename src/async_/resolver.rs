@@ -153,15 +153,8 @@ impl<'a> Resolution<'a> {
     ) -> Result<Pin<Box<Self, Pool>>, Error> {
         // Create a pinned Resolution on the Pool, so that we can make
         // a stable pointer to the Resolution struct.
-        let mut this = Box::pin_in(
-            Resolution {
-                complete: None,
-                waker: None,
-                pool,
-                ctx: None,
-            },
-            pool.clone(),
-        );
+        let mut this =
+            Box::pin_in(Resolution { complete: None, waker: None, pool, ctx: None }, pool.clone());
 
         // Set up the ctx with everything the resolver needs to resolve a
         // name, and the handler callback which is called on completion.
@@ -286,10 +279,7 @@ impl ResolverCtx {
     /// of the ngx_addr_t are allocated on the given Pool
     pub fn into_result(self, pool: &Pool) -> Result<Vec<ngx_addr_t, Pool>, Error> {
         if let Some(e) = NonZero::new(self.state) {
-            return Err(Error::Resolver(
-                ResolverError::from(e),
-                self.name.to_string(),
-            ));
+            return Err(Error::Resolver(ResolverError::from(e), self.name.to_string()));
         }
         if self.addrs.is_null() {
             Err(Error::AllocationFailed)?;
@@ -298,8 +288,7 @@ impl ResolverCtx {
         let mut out = Vec::new_in(pool.clone());
 
         if self.naddrs > 0 {
-            out.try_reserve_exact(self.naddrs)
-                .map_err(|_| Error::AllocationFailed)?;
+            out.try_reserve_exact(self.naddrs).map_err(|_| Error::AllocationFailed)?;
 
             for addr in unsafe { core::slice::from_raw_parts(self.addrs, self.naddrs) } {
                 out.push(copy_resolved_addr(addr, pool)?);
@@ -321,17 +310,11 @@ fn copy_resolved_addr(
         Err(Error::AllocationFailed)?;
     }
     unsafe {
-        addr.sockaddr
-            .cast::<u8>()
-            .copy_to_nonoverlapping(sockaddr.cast(), addr.socklen as usize)
+        addr.sockaddr.cast::<u8>().copy_to_nonoverlapping(sockaddr.cast(), addr.socklen as usize)
     };
 
     let name = unsafe { ngx_str_t::from_bytes(pool.as_ptr(), addr.name.as_bytes()) }
         .ok_or(Error::AllocationFailed)?;
 
-    Ok(ngx_addr_t {
-        sockaddr,
-        socklen: addr.socklen,
-        name,
-    })
+    Ok(ngx_addr_t { sockaddr, socklen: addr.socklen, name })
 }

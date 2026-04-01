@@ -136,11 +136,7 @@ impl NgxRbTreeIter<'_> {
             unsafe { ngx_rbtree_min(t.root, t.sentinel) }
         };
 
-        Self {
-            tree,
-            node,
-            _lifetime: PhantomData,
-        }
+        Self { tree, node, _lifetime: PhantomData }
     }
 }
 
@@ -310,23 +306,12 @@ where
         let layout = Layout::new::<ngx_rbtree_node_t>();
         let sentinel: NonNull<ngx_rbtree_node_t> = alloc.allocate_zeroed(layout)?.cast();
 
-        let tree = NgxRbTree {
-            inner: unsafe { mem::zeroed() },
-            _type: PhantomData,
-        };
+        let tree = NgxRbTree { inner: unsafe { mem::zeroed() }, _type: PhantomData };
 
-        let mut this = RbTreeMap {
-            tree,
-            sentinel,
-            alloc,
-        };
+        let mut this = RbTreeMap { tree, sentinel, alloc };
 
         unsafe {
-            ngx_rbtree_init(
-                &raw mut this.tree.inner,
-                this.sentinel.as_ptr(),
-                Some(Self::insert),
-            )
+            ngx_rbtree_init(&raw mut this.tree.inner, this.sentinel.as_ptr(), Some(Self::insert))
         };
 
         Ok(this)
@@ -347,8 +332,7 @@ where
         K: borrow::Borrow<Q>,
         Q: Hash + Ord + ?Sized,
     {
-        self.lookup(key)
-            .map(|mut x| unsafe { &mut x.as_mut().value })
+        self.lookup(key).map(|mut x| unsafe { &mut x.as_mut().value })
     }
 
     /// Removes a key from the tree, returning the value at the key if the key was previously in the
@@ -465,10 +449,8 @@ where
         self.clear();
 
         unsafe {
-            self.allocator().deallocate(
-                self.sentinel.cast(),
-                Layout::for_value(self.sentinel.as_ref()),
-            )
+            self.allocator()
+                .deallocate(self.sentinel.cast(), Layout::for_value(self.sentinel.as_ref()))
         };
     }
 }

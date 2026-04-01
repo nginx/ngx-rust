@@ -94,10 +94,7 @@ impl HttpRequestHandler for CurlRequestHandler {
 
         match co.enable {
             true => {
-                if request
-                    .user_agent()
-                    .is_some_and(|ua| ua.as_bytes().starts_with(b"curl"))
-                {
+                if request.user_agent().is_some_and(|ua| ua.as_bytes().starts_with(b"curl")) {
                     http::HTTPStatus::FORBIDDEN.into()
                 } else {
                     Status::NGX_DECLINED

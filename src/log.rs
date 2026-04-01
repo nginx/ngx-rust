@@ -270,9 +270,7 @@ impl<'data> LogBuf<'data> {
             // SAFETY: &[u8] and &[MaybeUninit<u8>] have the same layout
             let src: &[MaybeUninit<u8>] = core::mem::transmute(src);
             // SAFETY: self.buf has at least n bytes available after self.filled
-            self.buf
-                .get_unchecked_mut(self.filled..self.filled + n)
-                .copy_from_slice(src);
+            self.buf.get_unchecked_mut(self.filled..self.filled + n).copy_from_slice(src);
         }
         self.filled += n;
         self
@@ -335,16 +333,10 @@ mod tests {
 
         // overflow results in truncated output
         write!(&mut buf, " This is a test, {}", u64::MAX).unwrap();
-        assert_eq!(
-            str::from_utf8(buf.filled()),
-            Ok("Hello World! This is a test, 184")
-        );
+        assert_eq!(str::from_utf8(buf.filled()), Ok("Hello World! This is a test, 184"));
 
         // and any following writes are still safe
         write!(&mut buf, "test").unwrap();
-        assert_eq!(
-            str::from_utf8(buf.filled()),
-            Ok("Hello World! This is a test, 184")
-        );
+        assert_eq!(str::from_utf8(buf.filled()), Ok("Hello World! This is a test, 184"));
     }
 }

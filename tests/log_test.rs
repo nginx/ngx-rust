@@ -30,18 +30,13 @@ pub fn find_nginx_binary() -> io::Result<PathBuf> {
         // TEST_NGINX_BINARY is specified for tests
         env::var("TEST_NGINX_BINARY").ok().map(PathBuf::from),
         // The module is built against an external NGINX source tree
-        env::var("NGINX_BUILD_DIR")
-            .map(PathBuf::from)
-            .map(|x| x.join(NGINX_BINARY_NAME))
-            .ok(),
+        env::var("NGINX_BUILD_DIR").map(PathBuf::from).map(|x| x.join(NGINX_BINARY_NAME)).ok(),
         env::var("NGINX_SOURCE_DIR")
             .map(PathBuf::from)
             .map(|x| x.join("objs").join(NGINX_BINARY_NAME))
             .ok(),
         // Fallback to the build directory exposed by nginx-sys
-        option_env!("DEP_NGINX_BUILD_DIR")
-            .map(PathBuf::from)
-            .map(|x| x.join(NGINX_BINARY_NAME)),
+        option_env!("DEP_NGINX_BUILD_DIR").map(PathBuf::from).map(|x| x.join(NGINX_BINARY_NAME)),
     ]
     .into_iter()
     .flatten()
@@ -73,11 +68,7 @@ impl Nginx {
 
         fs::create_dir(prefix.path().join("logs"))?;
 
-        Ok(Nginx {
-            prefix,
-            bin_path: binary.as_ref().to_owned(),
-            config_path: config,
-        })
+        Ok(Nginx { prefix, bin_path: binary.as_ref().to_owned(), config_path: config })
     }
 
     /// start nginx process with arguments
@@ -118,11 +109,7 @@ impl Nginx {
 
     // replace config with another config
     pub fn replace_config<P: AsRef<Path>>(&mut self, from: P) -> Result<u64> {
-        println!(
-            "copying config from: {:?} to: {:?}",
-            from.as_ref(),
-            self.config_path
-        ); // replace with logging
+        println!("copying config from: {:?} to: {:?}", from.as_ref(), self.config_path); // replace with logging
         fs::copy(from, &self.config_path)
     }
 }
@@ -150,10 +137,7 @@ mod tests {
         );
 
         nginx.replace_config(&test_config_path).unwrap_or_else(|_| {
-            panic!(
-                "Unable to load config file: {}",
-                test_config_path.to_string_lossy()
-            )
+            panic!("Unable to load config file: {}", test_config_path.to_string_lossy())
         });
         let output = nginx.restart().expect("Unable to restart NGINX");
         assert!(output.status.success());
