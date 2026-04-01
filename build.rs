@@ -39,9 +39,8 @@ fn main() {
         (1_021_001, "nginx1_21_1"),
         (1_025_001, "nginx1_25_1"),
     ];
-    VERSION_CHECKS
-        .iter()
-        .for_each(|check| println!("cargo::rustc-check-cfg=cfg({})", check.1));
+    VERSION_CHECKS.iter().for_each(|check| println!("cargo::rustc-check-cfg=cfg({})", check.1));
+
     println!("cargo::rerun-if-env-changed=DEP_NGINX_VERSION_NUMBER");
     if let Ok(version) = std::env::var("DEP_NGINX_VERSION_NUMBER") {
         let version: u64 = version.parse().unwrap();

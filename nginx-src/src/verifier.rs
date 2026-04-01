@@ -13,9 +13,7 @@ pub struct SignatureVerifier {
 impl SignatureVerifier {
     pub fn new() -> io::Result<Self> {
         if env::var("NGX_NO_SIGNATURE_CHECK").is_ok() {
-            return Err(io::Error::other(
-                "signature check disabled by user".to_string(),
-            ));
+            return Err(io::Error::other("signature check disabled by user".to_string()));
         };
 
         if let Err(x) = duct::cmd!(GNUPG_COMMAND, "--version").stdout_null().run() {
@@ -26,10 +24,8 @@ impl SignatureVerifier {
 
         // We do not want to mess with the default gpg data for the running user,
         // so we store all gpg data within our build directory.
-        let gnupghome = env::var("OUT_DIR")
-            .map(PathBuf::from)
-            .map_err(io::Error::other)?
-            .join(".gnupg");
+        let gnupghome =
+            env::var("OUT_DIR").map(PathBuf::from).map_err(io::Error::other)?.join(".gnupg");
 
         if !fs::exists(&gnupghome)? {
             fs::create_dir_all(&gnupghome)?;
@@ -43,11 +39,7 @@ impl SignatureVerifier {
     /// Imports all the required GPG keys into a temporary directory in order to
     /// validate the integrity of the downloaded tarballs.
     pub fn import_keys(&self, server: &str, key_ids: &[&str]) -> io::Result<()> {
-        println!(
-            "Importing {} GPG keys for key server: {}",
-            key_ids.len(),
-            server
-        );
+        println!("Importing {} GPG keys for key server: {}", key_ids.len(), server);
 
         let mut args = vec![
             OsString::from("--homedir"),
@@ -76,14 +68,8 @@ impl SignatureVerifier {
     /// Validates the integrity of a file against the cryptographic signature associated with
     /// the file.
     pub fn verify_signature(&self, path: &Path, signature: &Path) -> io::Result<()> {
-        let cmd = duct::cmd!(
-            GNUPG_COMMAND,
-            "--homedir",
-            &self.gnupghome,
-            "--verify",
-            signature,
-            path
-        );
+        let cmd =
+            duct::cmd!(GNUPG_COMMAND, "--homedir", &self.gnupghome, "--verify", signature, path);
         let output = cmd.stderr_to_stdout().stdout_capture().unchecked().run()?;
         if !output.status.success() {
             eprintln!("{}", String::from_utf8_lossy(&output.stdout));

@@ -58,11 +58,7 @@ impl HttpModuleConfExt for crate::ffi::ngx_http_conf_ctx_t {
 impl HttpModuleConfExt for crate::ffi::ngx_cycle_t {
     #[inline]
     unsafe fn http_main_conf_unchecked<T>(&self, module: &ngx_module_t) -> Option<NonNull<T>> {
-        let http_conf = unsafe {
-            self.conf_ctx
-                .add(nginx_sys::ngx_http_module.index)
-                .as_ref()?
-        };
+        let http_conf = unsafe { self.conf_ctx.add(nginx_sys::ngx_http_module.index).as_ref()? };
         let conf_ctx = (*http_conf).cast::<ngx_http_conf_ctx_t>();
         unsafe { conf_ctx.as_ref()?.http_main_conf_unchecked(module) }
     }

@@ -79,9 +79,7 @@ unsafe impl lock_api::RawRwLock for RawSpinlock {
             return false;
         }
 
-        self.0
-            .compare_exchange(value, value + 1, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
+        self.0.compare_exchange(value, value + 1, Ordering::Acquire, Ordering::Relaxed).is_ok()
     }
 
     unsafe fn unlock_shared(&self) {
@@ -111,9 +109,7 @@ unsafe impl lock_api::RawRwLock for RawSpinlock {
     }
 
     fn try_lock_exclusive(&self) -> bool {
-        self.0
-            .compare_exchange(0, NGX_RWLOCK_WLOCK, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
+        self.0.compare_exchange(0, NGX_RWLOCK_WLOCK, Ordering::Acquire, Ordering::Relaxed).is_ok()
     }
 
     unsafe fn unlock_exclusive(&self) {

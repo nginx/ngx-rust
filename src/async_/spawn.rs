@@ -121,10 +121,7 @@ impl Drop for SchedulerInner {
 fn schedule(runnable: Runnable, info: ScheduleInfo) {
     if info.woken_while_running {
         SCHEDULER.schedule(runnable);
-        ngx_log_debug!(
-            ngx_cycle_log().as_ptr(),
-            "async: task scheduled while running"
-        );
+        ngx_log_debug!(ngx_cycle_log().as_ptr(), "async: task scheduled while running");
     } else {
         runnable.run();
     }

@@ -13,12 +13,7 @@ use crate::ffi::{ngx_str_t, u_char};
 /// [`ngx_str_t`]: https://nginx.org/en/docs/dev/development_guide.html#string_overview
 #[macro_export]
 macro_rules! ngx_string {
-    ($s:expr) => {{
-        $crate::ffi::ngx_str_t {
-            len: $s.len() as _,
-            data: concat!($s, "\0").as_ptr() as *mut u8,
-        }
-    }};
+    ($s:expr) => {{ $crate::ffi::ngx_str_t { len: $s.len() as _, data: concat!($s, "\0").as_ptr() as *mut u8 } }};
 }
 
 #[cfg(feature = "alloc")]
@@ -553,10 +548,7 @@ mod tests {
     #[test]
     fn test_str_comparisons() {
         let string = "test".to_string();
-        let ngx_string = ngx_str_t {
-            data: string.as_ptr().cast_mut(),
-            len: string.len(),
-        };
+        let ngx_string = ngx_str_t { data: string.as_ptr().cast_mut(), len: string.len() };
         let ns: &NgxStr = string.as_bytes().into();
 
         #[cfg(feature = "alloc")]
@@ -582,10 +574,7 @@ mod tests {
         use crate::allocator::Global;
 
         let string = "test".to_string();
-        let ngx_string = ngx_str_t {
-            data: string.as_ptr().cast_mut(),
-            len: string.len(),
-        };
+        let ngx_string = ngx_str_t { data: string.as_ptr().cast_mut(), len: string.len() };
         let borrowed: &NgxStr = string.as_bytes().into();
         let owned = NgxString::try_from_bytes_in(&string, Global).unwrap();
 

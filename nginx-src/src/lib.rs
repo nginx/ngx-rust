@@ -57,10 +57,7 @@ to do the following:
 /// Outputs cargo instructions required for using this crate from a buildscript.
 pub fn print_cargo_metadata() {
     for file in ["lib.rs", "download.rs", "verifier.rs"] {
-        println!(
-            "cargo::rerun-if-changed={path}/src/{file}",
-            path = env!("CARGO_MANIFEST_DIR")
-        )
+        println!("cargo::rerun-if-changed={path}/src/{file}", path = env!("CARGO_MANIFEST_DIR"))
     }
 
     for var in ENV_VARS_TRIGGERING_RECOMPILE {
@@ -93,10 +90,8 @@ fn build_info(source_dir: &Path, configure_flags: &[String]) -> String {
 
 /// Generate the flags to use with autoconf `configure` for NGINX.
 fn nginx_configure_flags(vendored: &[String]) -> Vec<String> {
-    let mut nginx_opts: Vec<String> = NGINX_CONFIGURE_BASE
-        .iter()
-        .map(|x| String::from(*x))
-        .collect();
+    let mut nginx_opts: Vec<String> =
+        NGINX_CONFIGURE_BASE.iter().map(|x| String::from(*x)).collect();
 
     nginx_opts.extend(vendored.iter().map(Into::into));
 
@@ -139,10 +134,7 @@ fn configure(source_dir: &Path, build_dir: &Path, flags: &[String]) -> io::Resul
         .find(|x| x.is_file())
         .ok_or(io::ErrorKind::NotFound)?;
 
-    println!(
-        "Running NGINX configure script with flags: {:?}",
-        flags.join(" ")
-    );
+    println!("Running NGINX configure script with flags: {:?}", flags.join(" "));
 
     let mut build_dir_arg: OsString = "--builddir=".into();
     build_dir_arg.push(build_dir);
@@ -150,10 +142,7 @@ fn configure(source_dir: &Path, build_dir: &Path, flags: &[String]) -> io::Resul
     let mut flags: Vec<OsString> = flags.iter().map(|x| x.into()).collect();
     flags.push(build_dir_arg);
 
-    let output = duct::cmd(configure, flags)
-        .dir(source_dir)
-        .stderr_to_stdout()
-        .run()?;
+    let output = duct::cmd(configure, flags).dir(source_dir).stderr_to_stdout().run()?;
 
     if !output.status.success() {
         println!("configure failed with {:?}", output.status);
@@ -202,10 +191,7 @@ where
         /* Use the duct dependency here to merge the output of STDOUT and STDERR into a single stream,
         and to provide the combined output as a reader which can be iterated over line-by-line. We
         use duct to do this because it is a lot of work to implement this from scratch. */
-        let result = duct::cmd(*make, &args)
-            .dir(source_dir)
-            .stderr_to_stdout()
-            .run();
+        let result = duct::cmd(*make, &args).dir(source_dir).stderr_to_stdout().run();
 
         match result {
             Err(err) if err.kind() == io::ErrorKind::NotFound => {

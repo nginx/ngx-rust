@@ -111,9 +111,7 @@ const DEPENDENCIES: &[(&str, SourceSpec)] = &[
 ];
 
 static VERIFIER: LazyLock<Option<SignatureVerifier>> = LazyLock::new(|| {
-    SignatureVerifier::new()
-        .inspect_err(|err| eprintln!("GnuPG verifier: {err}"))
-        .ok()
+    SignatureVerifier::new().inspect_err(|err| eprintln!("GnuPG verifier: {err}")).ok()
 });
 
 static CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -124,9 +122,7 @@ static CACHE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     // directory. Environment variable `CACHE_DIR` overrides this.
     // Recommendation: set env "CACHE_DIR = { value = ".cache", relative = true }" in
     // `.cargo/config.toml` in your project
-    let cache_dir = env::var("CACHE_DIR")
-        .map(PathBuf::from)
-        .unwrap_or(base_dir.join(".cache"));
+    let cache_dir = env::var("CACHE_DIR").map(PathBuf::from).unwrap_or(base_dir.join(".cache"));
 
     if !cache_dir.exists() {
         fs::create_dir_all(&cache_dir)
@@ -155,7 +151,7 @@ fn download(cache_dir: &Path, url: &str) -> Result<PathBuf, Box<dyn StdError + S
 
     if !file_path.exists() {
         return Err(
-            format!("Downloaded file was not written to the expected location: {url}",).into(),
+            format!("Downloaded file was not written to the expected location: {url}",).into()
         );
     }
     Ok(file_path)
@@ -204,16 +200,13 @@ fn extract_archive(archive_path: &Path, extract_output_base_dir: &Path) -> io::R
     let extract_output_dir = extract_output_base_dir.to_owned();
     let archive_output_dir = extract_output_dir.join(stem);
     if !archive_output_dir.exists() {
-        Archive::new(GzDecoder::new(archive_file))
-            .entries()?
-            .filter_map(|e| e.ok())
-            .for_each(|mut entry| {
+        Archive::new(GzDecoder::new(archive_file)).entries()?.filter_map(|e| e.ok()).for_each(
+            |mut entry| {
                 let path = entry.path().unwrap();
                 let stripped_path = path.components().skip(1).collect::<PathBuf>();
-                entry
-                    .unpack(archive_output_dir.join(stripped_path))
-                    .unwrap();
-            });
+                entry.unpack(archive_output_dir.join(stripped_path)).unwrap();
+            },
+        );
     } else {
         println!(
             "Archive [{}] already extracted to directory: {}",

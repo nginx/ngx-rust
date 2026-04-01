@@ -106,9 +106,7 @@ struct SharedDictMainConfig {
 
 impl Default for SharedDictMainConfig {
     fn default() -> Self {
-        Self {
-            shm_zone: ptr::null_mut(),
-        }
+        Self { shm_zone: ptr::null_mut() }
     }
 }
 
@@ -119,11 +117,8 @@ extern "C" fn ngx_http_shared_dict_add_zone(
 ) -> *mut c_char {
     // SAFETY: configuration handlers always receive a valid `cf` pointer.
     let cf = unsafe { cf.as_mut().unwrap() };
-    let smcf = unsafe {
-        conf.cast::<SharedDictMainConfig>()
-            .as_mut()
-            .expect("shared dict main config")
-    };
+    let smcf =
+        unsafe { conf.cast::<SharedDictMainConfig>().as_mut().expect("shared dict main config") };
 
     // SAFETY:
     // - `cf.args` is guaranteed to be a pointer to an array with 3 elements (NGX_CONF_TAKE2).
@@ -171,14 +166,7 @@ fn ngx_http_shared_dict_get_shared(shm_zone: &mut ngx_shm_zone_t) -> Result<&Sha
             .cast();
     }
 
-    unsafe {
-        alloc
-            .as_ref()
-            .data
-            .cast::<SharedData>()
-            .as_ref()
-            .ok_or(Status::NGX_ERROR)
-    }
+    unsafe { alloc.as_ref().data.cast::<SharedData>().as_ref().ok_or(Status::NGX_ERROR) }
 }
 
 extern "C" fn ngx_http_shared_dict_zone_init(
@@ -272,10 +260,8 @@ extern "C" fn ngx_http_shared_dict_get_variable(
         return Status::NGX_ERROR.into();
     };
 
-    let value = shared
-        .read()
-        .get(key)
-        .and_then(|x| unsafe { ngx_str_t::from_bytes(r.pool, x.as_bytes()) });
+    let value =
+        shared.read().get(key).and_then(|x| unsafe { ngx_str_t::from_bytes(r.pool, x.as_bytes()) });
 
     ngx_log_debug!(
         unsafe { (*r.connection).log },
@@ -367,10 +353,7 @@ extern "C" fn ngx_http_shared_dict_get_entries(
     let pool = unsafe { Pool::from_ngx_pool(r.pool) };
     let smcf = HttpSharedDictModule::main_conf_mut(r).expect("shared dict main config");
 
-    ngx_log_debug!(
-        unsafe { (*r.connection).log },
-        "shared dict: get all entries"
-    );
+    ngx_log_debug!(unsafe { (*r.connection).log }, "shared dict: get all entries");
 
     let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
         return Status::NGX_ERROR.into();

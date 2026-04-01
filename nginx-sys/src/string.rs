@@ -54,10 +54,7 @@ impl ngx_str_t {
     ///
     /// This method replaces the `ngx_null_string` C macro.
     pub const fn empty() -> Self {
-        ngx_str_t {
-            len: 0,
-            data: ptr::null_mut(),
-        }
+        ngx_str_t { len: 0, data: ptr::null_mut() }
     }
 
     /// Create an `ngx_str_t` instance from a byte slice.
@@ -66,12 +63,7 @@ impl ngx_str_t {
     ///
     /// The caller must provide a valid pointer to a memory pool.
     pub unsafe fn from_bytes(pool: *mut ngx_pool_t, src: &[u8]) -> Option<Self> {
-        unsafe {
-            detail::bytes_to_uchar(pool, src).map(|data| Self {
-                data,
-                len: src.len(),
-            })
-        }
+        unsafe { detail::bytes_to_uchar(pool, src).map(|data| Self { data, len: src.len() }) }
     }
 
     /// Create an `ngx_str_t` instance from a string slice (`&str`).
@@ -89,12 +81,7 @@ impl ngx_str_t {
     /// # Returns
     /// An `ngx_str_t` instance representing the given string slice.
     pub unsafe fn from_str(pool: *mut ngx_pool_t, data: &str) -> Self {
-        unsafe {
-            ngx_str_t {
-                data: detail::str_to_uchar(pool, data),
-                len: data.len(),
-            }
-        }
+        unsafe { ngx_str_t { data: detail::str_to_uchar(pool, data), len: data.len() } }
     }
 
     /// Divides one `ngx_str_t` into two at an index.
@@ -108,14 +95,8 @@ impl ngx_str_t {
         }
 
         Some((
-            ngx_str_t {
-                data: self.data,
-                len: mid,
-            },
-            ngx_str_t {
-                data: unsafe { self.data.add(mid) },
-                len: self.len - mid,
-            },
+            ngx_str_t { data: self.data, len: mid },
+            ngx_str_t { data: unsafe { self.data.add(mid) }, len: self.len - mid },
         ))
     }
 
@@ -233,10 +214,7 @@ mod tests {
     #[test]
     fn ngx_str_prefix() {
         let s = "key=value";
-        let s = ngx_str_t {
-            data: s.as_ptr().cast_mut(),
-            len: s.len(),
-        };
+        let s = ngx_str_t { data: s.as_ptr().cast_mut(), len: s.len() };
 
         assert_eq!(
             s.strip_prefix("key=").as_ref().map(ngx_str_t::as_bytes),

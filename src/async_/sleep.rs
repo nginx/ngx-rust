@@ -93,10 +93,7 @@ impl TimerEvent {
         ev.log = log.as_ptr();
         ev.set_cancelable(1);
 
-        Self {
-            event: ev,
-            waker: None,
-        }
+        Self { event: ev, waker: None }
     }
 
     pub fn poll_sleep(
