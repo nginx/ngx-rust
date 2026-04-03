@@ -20,8 +20,8 @@
 #include <ngx_stream.h>
 #endif
 
-#elif defined(NGX_RS_FEATURE_HTTP)
-#include <ngx_http.h>
+#else
+#error "libclang does not support __has_include"
 #endif
 
 const char *NGX_RS_MODULE_SIGNATURE = NGX_MODULE_SIGNATURE;
