@@ -6,6 +6,8 @@ pub mod detail;
 mod event;
 #[cfg(all(feature = "http", ngx_feature = "http"))]
 mod http;
+#[cfg(all(feature = "mail", ngx_feature = "mail"))]
+mod mail;
 mod queue;
 mod rbtree;
 #[cfg(all(feature = "stream", ngx_feature = "stream"))]
@@ -33,6 +35,8 @@ pub use bindings::*;
 pub use event::*;
 #[cfg(all(feature = "http", ngx_feature = "http"))]
 pub use http::*;
+#[cfg(all(feature = "mail", ngx_feature = "mail"))]
+pub use mail::*;
 pub use queue::*;
 pub use rbtree::*;
 #[cfg(all(feature = "stream", ngx_feature = "stream"))]

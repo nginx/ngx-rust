@@ -19,6 +19,8 @@ static NGINX_CONFIGURE_BASE: &[&str] = &[
     "--with-http_realip_module",
     "--with-http_ssl_module",
     "--with-http_v2_module",
+    "--with-mail",
+    "--with-mail_ssl_module",
     "--with-stream",
     "--with-stream_realip_module",
     "--with-stream_ssl_module",

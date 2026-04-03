@@ -12,6 +12,10 @@
 #include <ngx_http.h>
 #endif
 
+#if defined(NGX_RS_FEATURE_MAIL) && __has_include(<ngx_mail.h>)
+#include <ngx_mail.h>
+#endif
+
 #if defined(NGX_RS_FEATURE_STREAM) && __has_include(<ngx_stream.h>)
 #include <ngx_stream.h>
 #endif
