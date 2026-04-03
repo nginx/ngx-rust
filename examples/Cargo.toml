@@ -13,7 +13,7 @@ autobins = false
 build = "../build.rs"
 
 [dependencies]
-nginx-sys = { path = "../nginx-sys/", default-features = false }
+nginx-sys = { path = "../nginx-sys/" }
 ngx = { path = "../", default-features = false, features = ["std"] }
 
 [dev-dependencies]
