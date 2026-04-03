@@ -99,13 +99,13 @@ mod tests {
     #[test]
     fn populated_slot_returns_typed_reference() {
         let mut value: u32 = 42;
-        let mut slots: [CoreConfSlot; 1] = [(&mut value as *mut u32).cast()];
+        let mut slots: [CoreConfSlot; 1] = [(&raw mut value).cast()];
 
         let mut cycle: ngx_cycle_t = unsafe { MaybeUninit::zeroed().assume_init() };
         cycle.conf_ctx = slots.as_mut_ptr();
 
         let mut conf: ngx_conf_t = unsafe { MaybeUninit::zeroed().assume_init() };
-        conf.cycle = &mut cycle;
+        conf.cycle = &raw mut cycle;
 
         let module = module_with_index(0);
 

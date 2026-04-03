@@ -33,7 +33,7 @@ unsafe fn manual_core_main_conf_ptr(
 fn cycle_core_conf_matches_manual_traversal() {
     let mut core_conf: ngx_core_conf_t = unsafe { MaybeUninit::zeroed().assume_init() };
     let mut slots: [CoreConfSlot; 2] = [ptr::null_mut(); 2];
-    slots[1] = (&mut core_conf as *mut ngx_core_conf_t).cast();
+    slots[1] = (&raw mut core_conf).cast();
 
     let mut cycle: ngx_cycle_t = unsafe { MaybeUninit::zeroed().assume_init() };
     let conf_ctx: CoreConfCtx = slots.as_mut_ptr();
@@ -62,13 +62,13 @@ fn cycle_core_conf_matches_manual_traversal() {
 // still resolves the same core config slot as manual traversal.
 fn conf_core_conf_matches_manual_traversal() {
     let mut core_conf: ngx_core_conf_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut slots: [CoreConfSlot; 1] = [(&mut core_conf as *mut ngx_core_conf_t).cast()];
+    let mut slots: [CoreConfSlot; 1] = [(&raw mut core_conf).cast()];
 
     let mut cycle: ngx_cycle_t = unsafe { MaybeUninit::zeroed().assume_init() };
     cycle.conf_ctx = slots.as_mut_ptr();
 
     let mut conf: ngx_conf_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    conf.cycle = &mut cycle;
+    conf.cycle = &raw mut cycle;
 
     let module = module_with_index(0);
     let from_manual = unsafe { manual_core_main_conf_ptr(&cycle, &module) };
