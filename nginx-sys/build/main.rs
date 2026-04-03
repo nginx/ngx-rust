@@ -37,6 +37,8 @@ const NGX_CONF_FEATURES: &[&str] = &[
     "http_v2",
     "http_v3",
     "http_x_forwarded_for",
+    "mail",
+    "mail_ssl",
     "pcre",
     "pcre2",
     "quic",
@@ -189,6 +191,10 @@ fn generate_binding(nginx: &NginxSource) {
 
     if cfg!(feature = "http") {
         clang_args.push("-DNGX_RS_FEATURE_HTTP".to_string());
+    }
+
+    if cfg!(feature = "mail") {
+        clang_args.push("-DNGX_RS_FEATURE_MAIL".to_string());
     }
 
     if cfg!(feature = "stream") {
@@ -408,6 +414,10 @@ fn expand_definitions<T: AsRef<Path>>(
 
 #if __has_include(<ngx_http.h>)
 RUST_CONF_HTTP=1
+#endif
+
+#if __has_include(<ngx_mail.h>)
+RUST_CONF_MAIL=1
 #endif
 
 #if __has_include(<ngx_stream.h>)

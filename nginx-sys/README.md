@@ -30,6 +30,11 @@ patches applied.
   thus it may be necessary to check for `http` in
   [`DEP_NGINX_FEATURES`](#dep_nginx_features).
 
+- `mail`: Allows generation of bindings for the Mail module, `ngx_mail.h`.
+  The feature will be ignored if NGINX is configured without Mail support,
+  thus it may be necessary to check for `mail` in
+  [`DEP_NGINX_FEATURES`](#dep_nginx_features).
+
 - `stream`: Allows generation of bindings for the Stream module, `ngx_stream.h`.
   The feature will be ignored if NGINX is configured without Stream support,
   thus it may be necessary to check for `stream` in
