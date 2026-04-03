@@ -308,12 +308,24 @@ ngx_rust_make_module () {
         ngx_rustc_module_opt="--example $ngx_rust_target_name"
     fi
 
+    if [ -z "$ngx_rust_phony_emitted" ]; then
+        ngx_rust_phony_emitted=1
+
+        # Make cannot track the Rust module source and dependency changes,
+        # so we defer the task to cargo and invoke it unconditionally.
+        #
+        # We have to use the pseudotarget instead of .PHONY for better
+        # compatibility with various Make implementations.
+        cat <<END                                             >> $NGX_MAKEFILE
+
+.NGX_RUST_PHONY: ;
+
+END
+    fi
+
     cat << END                                                >> $NGX_MAKEFILE
 
-# always run cargo instead of trying to track the source modifications
-.PHONY: $ngx_rust_obj
-
-$ngx_rust_obj:
+$ngx_rust_obj: .NGX_RUST_PHONY
 	$NGX_CARGO rustc \\
 		--config $ngx_cargo_config \\
 		--crate-type staticlib \\
