@@ -1,20 +1,22 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
+#include <ngx_event.h>
+#include <ngx_event_connect.h>
 
 /* __has_include was a compiler-specific extension until C23,
  * but it's safe to assume that bindgen supports it via libclang.
  */
 #if defined(__has_include)
 
-#if __has_include(<ngx_http.h>)
+#if defined(NGX_RS_FEATURE_HTTP) && __has_include(<ngx_http.h>)
 #include <ngx_http.h>
 #endif
 
-#if __has_include(<ngx_stream.h>)
+#if defined(NGX_RS_FEATURE_STREAM) && __has_include(<ngx_stream.h>)
 #include <ngx_stream.h>
 #endif
 
-#else
+#elif defined(NGX_RS_FEATURE_HTTP)
 #include <ngx_http.h>
 #endif
 

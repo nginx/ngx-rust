@@ -142,6 +142,7 @@ pub mod ffi;
 ///
 /// This modules provides wrappers and utilities to NGINX http APIs, such as requests,
 /// configuration access, and statuses.
+#[cfg(ngx_feature = "http")]
 pub mod http;
 
 /// The log module.

@@ -24,6 +24,17 @@ patches applied.
 
 ## Features
 
+- `http` - **Enabled** by default. Allows generation of bindings for the HTTP
+  module, `ngx_http.h`.
+  The feature will be ignored if NGINX is configured without HTTP support,
+  thus it may be necessary to check for `http` in
+  [`DEP_NGINX_FEATURES`](#dep_nginx_features).
+
+- `stream`: Allows generation of bindings for the Stream module, `ngx_stream.h`.
+  The feature will be ignored if NGINX is configured without Stream support,
+  thus it may be necessary to check for `stream` in
+  [`DEP_NGINX_FEATURES`](#dep_nginx_features).
+
 - `vendored`: Enables the build scripts to download and build a copy of nginx
   source and link against it.
   See `nginx-src` crate documentation for additional details.
@@ -31,7 +42,7 @@ patches applied.
 ## Input variables
 
 `NGINX_SOURCE_DIR`, `NGINX_BUILD_DIR` control paths to an external nginx source
-tree and a configured build directory.  Normally, specifying either of these is
+tree and a configured build directory. Normally, specifying either of these is
 sufficient, as the build directory defaults to `objs` under the source dir.
 
 However, it's possible to set the latter to any valid path with
@@ -64,6 +75,7 @@ The most common use for this variable is to specify [`cargo::rustc-check-cfg`].
 nginx being built against.
 
 An example of a build script with these variables:
+
 ```rust
 // Specify acceptable values for `ngx_feature`.
 println!("cargo::rerun-if-env-changed=DEP_NGINX_FEATURES_CHECK");
@@ -81,6 +93,7 @@ if let Ok(features) = std::env::var("DEP_NGINX_FEATURES") {
 ```
 
 And an usage example:
+
 ```rust
 #[cfg(ngx_feature = "debug")]
 println!("this nginx binary was built with debug logging enabled");
@@ -94,6 +107,7 @@ Version, as detected by the nginx configuration script.
 `DEP_NGINX_OS` the currently detected one.
 
 Usage examples:
+
 ```rust
 // Specify acceptable values for `ngx_os`
 println!("cargo::rerun-if-env-changed=DEP_NGINX_OS_CHECK");
@@ -124,6 +138,7 @@ println!("this nginx binary was built on FreeBSD");
   `nginx/1.25.5 (nginx-plus-r32)`
 
 Usage example:
+
 ```rust
 println!("cargo::rustc-check-cfg=cfg(nginx1_27_0)");
 println!("cargo::rerun-if-env-changed=DEP_NGINX_VERSION_NUMBER");
@@ -147,6 +162,7 @@ use nginx_sys::nginx_version;
 
 println!("nginx version: {}", nginx_version);
 ```
+
 [using another sys crate]: https://doc.rust-lang.org/nightly/cargo/reference/build-script-examples.html#using-another-sys-crate
 [links manifest key]: https://doc.rust-lang.org/nightly/cargo/reference/build-scripts.html#the-links-manifest-key
 [`cargo::rustc-check-cfg`]: https://doc.rust-lang.org/nightly/cargo/reference/build-scripts.html#rustc-check-cfg

@@ -187,6 +187,14 @@ fn generate_binding(nginx: &NginxSource) {
         ),
     );
 
+    if cfg!(feature = "http") {
+        clang_args.push("-DNGX_RS_FEATURE_HTTP".to_string());
+    }
+
+    if cfg!(feature = "stream") {
+        clang_args.push("-DNGX_RS_FEATURE_STREAM".to_string());
+    }
+
     print_cargo_metadata(nginx, &includes, &defines).expect("cargo dependency metadata");
 
     // bindgen targets the latest known stable by default
