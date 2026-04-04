@@ -1,9 +1,9 @@
-use core::cmp;
-use core::fmt;
-use core::hash;
-use core::ptr;
-use core::slice;
-use core::str;
+use ::core::cmp;
+use ::core::fmt;
+use ::core::hash;
+use ::core::ptr;
+use ::core::slice;
+use ::core::str;
 
 use crate::bindings::{ngx_pool_t, ngx_str_t};
 use crate::detail;
