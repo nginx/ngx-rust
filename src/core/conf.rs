@@ -2,12 +2,20 @@ use core::ptr::NonNull;
 
 use crate::ffi::{ngx_core_conf_t, ngx_module_t};
 
-/// Utility trait for types containing core module main configuration.
+/// Raw access to core module main configuration slots.
+///
+/// This trait is implemented for NGINX-owned types such as `ngx_cycle_t` and `ngx_conf_t`
+/// that carry configuration context pointers. It exposes the low-level lookup step that
+/// retrieves a module's main configuration as an untyped pointer.
+///
+/// Most callers should not use this trait directly. Prefer `CoreModuleMainConf` to obtain a
+/// typed reference for a specific core module.
 pub trait CoreModuleConfExt {
-    /// Get a non-null reference to the main configuration structure for a core module.
+    /// Get a non-null pointer to a core module's main configuration.
     ///
     /// # Safety
     /// Caller must ensure that type `T` matches the configuration type for the specified module.
+    /// Supplying the wrong type will produce an invalid typed pointer.
     #[inline]
     unsafe fn core_main_conf_unchecked<T>(&self, _module: &ngx_module_t) -> Option<NonNull<T>> {
         None
@@ -30,45 +38,54 @@ impl CoreModuleConfExt for crate::ffi::ngx_conf_t {
     }
 }
 
-/// Get a typed reference to the main configuration structure for a core module.
-pub fn core_main_conf<T>(o: &impl CoreModuleConfExt, module: &ngx_module_t) -> Option<&'static T> {
-    unsafe { Some(o.core_main_conf_unchecked(module)?.as_ref()) }
-}
+/// Typed access to a core module's main configuration.
+///
+/// Implement this trait for a concrete core-style module to associate it with its main
+/// configuration type and global `ngx_module_t`. The provided default methods build on top of
+/// `CoreModuleConfExt` to turn the raw configuration slot lookup into typed references.
+///
+/// # Safety
+/// Caller must ensure that type `CoreModuleMainConf::MainConf` matches the configuration type
+/// for the specified module.
+pub unsafe trait CoreModuleMainConf {
+    /// Concrete type of this module's main configuration.
+    type MainConf;
 
-/// Get a typed mutable reference to the main configuration structure for a core module.
-pub fn core_main_conf_mut<T>(
-    o: &impl CoreModuleConfExt,
-    module: &ngx_module_t,
-) -> Option<&'static mut T> {
-    unsafe { Some(o.core_main_conf_unchecked(module)?.as_mut()) }
+    /// Returns the global `ngx_module_t` describing this module.
+    fn module() -> &'static ngx_module_t;
+
+    /// Get a typed shared reference to this module's main configuration.
+    fn main_conf(o: &impl CoreModuleConfExt) -> Option<&'static Self::MainConf> {
+        unsafe { Some(o.core_main_conf_unchecked(Self::module())?.as_ref()) }
+    }
+
+    /// Get a typed mutable reference to this module's main configuration.
+    fn main_conf_mut(o: &impl CoreModuleConfExt) -> Option<&'static mut Self::MainConf> {
+        unsafe { Some(o.core_main_conf_unchecked(Self::module())?.as_mut()) }
+    }
 }
 
 /// Auxiliary structure to access `ngx_core_module` configuration.
 pub struct NgxCoreModule;
 
-impl NgxCoreModule {
-    /// Returns a reference to the global `ngx_core_module`.
-    pub fn module() -> &'static ngx_module_t {
+unsafe impl CoreModuleMainConf for NgxCoreModule {
+    type MainConf = ngx_core_conf_t;
+
+    fn module() -> &'static ngx_module_t {
         unsafe { &*core::ptr::addr_of!(nginx_sys::ngx_core_module) }
-    }
-
-    /// Get a typed reference to `ngx_core_module` main configuration.
-    pub fn main_conf(o: &impl CoreModuleConfExt) -> Option<&'static ngx_core_conf_t> {
-        core_main_conf(o, Self::module())
-    }
-
-    /// Get a typed mutable reference to `ngx_core_module` main configuration.
-    pub fn main_conf_mut(o: &impl CoreModuleConfExt) -> Option<&'static mut ngx_core_conf_t> {
-        core_main_conf_mut(o, Self::module())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    extern crate alloc;
+    extern crate std;
+
+    use alloc::boxed::Box;
     use core::ffi::c_void;
     use core::mem::MaybeUninit;
 
-    use super::{CoreModuleConfExt, core_main_conf, core_main_conf_mut};
+    use super::{CoreModuleConfExt, CoreModuleMainConf};
     use crate::ffi::{ngx_conf_t, ngx_cycle_t, ngx_module_t};
 
     type CoreConfSlot = *mut *mut *mut c_void;
@@ -109,12 +126,42 @@ mod tests {
 
         let module = module_with_index(0);
 
-        let got = core_main_conf::<u32>(&conf, &module).copied();
+        let got = unsafe { conf.core_main_conf_unchecked::<u32>(&module).map(|v| *v.as_ref()) };
         assert_eq!(got, Some(42));
 
-        let got_mut = core_main_conf_mut::<u32>(&conf, &module);
+        let got_mut =
+            unsafe { conf.core_main_conf_unchecked::<u32>(&module).map(|mut v| v.as_mut()) };
         assert!(got_mut.is_some());
         if let Some(v) = got_mut {
+            *v = 99;
+        }
+        assert_eq!(value, 99);
+    }
+
+    struct TestCoreModule;
+
+    unsafe impl CoreModuleMainConf for TestCoreModule {
+        type MainConf = u32;
+
+        fn module() -> &'static ngx_module_t {
+            Box::leak(Box::new(module_with_index(0)))
+        }
+    }
+
+    #[test]
+    fn main_conf_trait_accessors_return_typed_references() {
+        let mut value: u32 = 42;
+        let mut slots: [CoreConfSlot; 1] = [(&raw mut value).cast()];
+
+        let mut cycle: ngx_cycle_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        cycle.conf_ctx = slots.as_mut_ptr();
+
+        let mut conf: ngx_conf_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        conf.cycle = &raw mut cycle;
+
+        assert_eq!(TestCoreModule::main_conf(&conf).copied(), Some(42));
+
+        if let Some(v) = TestCoreModule::main_conf_mut(&conf) {
             *v = 99;
         }
         assert_eq!(value, 99);
