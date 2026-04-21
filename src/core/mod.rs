@@ -1,10 +1,12 @@
 mod buffer;
+mod conf;
 mod pool;
 pub mod slab;
 mod status;
 mod string;
 
 pub use buffer::*;
+pub use conf::*;
 pub use pool::*;
 pub use slab::SlabPool;
 pub use status::*;
