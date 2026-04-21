@@ -2,6 +2,15 @@ use core::ptr::NonNull;
 
 use crate::ffi::{ngx_core_conf_t, ngx_module_t};
 
+/// Trait for core-style modules.
+///
+/// This is the foundational trait that identifies a type as representing a
+/// concrete NGINX core module.
+pub trait CoreModule {
+    /// Returns the global `ngx_module_t` describing this module.
+    fn module() -> &'static ngx_module_t;
+}
+
 /// Raw access to core module main configuration slots.
 ///
 /// This trait is implemented for NGINX-owned types such as `ngx_cycle_t` and `ngx_conf_t`
@@ -47,12 +56,9 @@ impl CoreModuleConfExt for crate::ffi::ngx_conf_t {
 /// # Safety
 /// Caller must ensure that type `CoreModuleMainConf::MainConf` matches the configuration type
 /// for the specified module.
-pub unsafe trait CoreModuleMainConf {
+pub unsafe trait CoreModuleMainConf: CoreModule {
     /// Concrete type of this module's main configuration.
     type MainConf;
-
-    /// Returns the global `ngx_module_t` describing this module.
-    fn module() -> &'static ngx_module_t;
 
     /// Get a typed shared reference to this module's main configuration.
     fn main_conf(o: &impl CoreModuleConfExt) -> Option<&'static Self::MainConf> {
@@ -68,12 +74,14 @@ pub unsafe trait CoreModuleMainConf {
 /// Auxiliary structure to access `ngx_core_module` configuration.
 pub struct NgxCoreModule;
 
-unsafe impl CoreModuleMainConf for NgxCoreModule {
-    type MainConf = ngx_core_conf_t;
-
+impl CoreModule for NgxCoreModule {
     fn module() -> &'static ngx_module_t {
         unsafe { &*core::ptr::addr_of!(nginx_sys::ngx_core_module) }
     }
+}
+
+unsafe impl CoreModuleMainConf for NgxCoreModule {
+    type MainConf = ngx_core_conf_t;
 }
 
 #[cfg(test)]
@@ -85,7 +93,7 @@ mod tests {
     use core::ffi::c_void;
     use core::mem::MaybeUninit;
 
-    use super::{CoreModuleConfExt, CoreModuleMainConf};
+    use super::{CoreModule, CoreModuleConfExt, CoreModuleMainConf};
     use crate::ffi::{ngx_conf_t, ngx_cycle_t, ngx_module_t};
 
     type CoreConfSlot = *mut *mut *mut c_void;
@@ -140,12 +148,14 @@ mod tests {
 
     struct TestCoreModule;
 
-    unsafe impl CoreModuleMainConf for TestCoreModule {
-        type MainConf = u32;
-
+    impl CoreModule for TestCoreModule {
         fn module() -> &'static ngx_module_t {
             Box::leak(Box::new(module_with_index(0)))
         }
+    }
+
+    unsafe impl CoreModuleMainConf for TestCoreModule {
+        type MainConf = u32;
     }
 
     #[test]
