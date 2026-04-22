@@ -85,7 +85,8 @@ macro_rules! http_variable_get {
 /// in the `into_handler_status` method.
 ///
 /// There are predefined implementations for `ngx_int_t`, [`Status`], [`HTTPStatus`],
-/// [`Option`] with value type implementing [`IntoHandlerStatus`].
+/// [`Option`] with value type implementing [`IntoHandlerStatus`],
+/// and [`Result`] with value and error types implementing [`IntoHandlerStatus`].
 pub trait IntoHandlerStatus
 where
     Self: Sized,
@@ -101,6 +102,16 @@ where
     #[inline]
     fn into_handler_status(self, r: &Request) -> ngx_int_t {
         self.map(|val| val.into_handler_status(r)).unwrap_or(NGX_ERROR as _)
+    }
+}
+
+impl<T, E> IntoHandlerStatus for Result<T, E>
+where
+    T: IntoHandlerStatus,
+    E: IntoHandlerStatus,
+{
+    fn into_handler_status(self, r: &Request) -> ngx_int_t {
+        self.map_or_else(|err| err.into_handler_status(r), |val| val.into_handler_status(r))
     }
 }
 
@@ -195,10 +206,42 @@ impl Request {
         unsafe { &mut *r.cast::<Request>() }
     }
 
+    /// Create a const [`Request`] from a const [`ngx_http_request_t`].
+    ///
+    /// # Safety
+    ///
+    /// The caller has provided a valid non-null pointer to a valid `ngx_http_request_t`
+    /// which shares the same representation as `Request`.
+    pub unsafe fn from_const_ngx_http_request<'a>(r: *const ngx_http_request_t) -> &'a Request {
+        unsafe { &*r.cast::<Request>() }
+    }
+
     /// Is this the main request (as opposed to a subrequest)?
     pub fn is_main(&self) -> bool {
         let main = self.0.main.cast();
         core::ptr::eq(self, main)
+    }
+
+    /// Get a mutable reference to the main request.
+    ///
+    /// If this is already the main request, returns `self`; otherwise returns
+    /// a mutable reference to the associated main request. Since nginx processes subrequests
+    /// sequentially, it is safe to return a mutable reference to the main request even
+    /// if `self` is a subrequest.
+    pub fn main_mut(&mut self) -> &mut Request {
+        if self.is_main() { self } else { unsafe { Request::from_ngx_http_request(self.0.main) } }
+    }
+
+    /// Get a reference to the main request.
+    ///
+    /// If this is already the main request, returns `self`; otherwise returns
+    /// a reference to the associated main request.
+    pub fn main(&self) -> &Request {
+        if self.is_main() {
+            self
+        } else {
+            unsafe { Request::from_const_ngx_http_request(self.0.main) }
+        }
     }
 
     /// Request pool.
@@ -248,6 +291,14 @@ impl Request {
         unsafe { ctx.as_ref() }
     }
 
+    /// Get mutable Module context
+    pub fn get_module_ctx_mut<T>(&mut self, module: &ngx_module_t) -> Option<&mut T> {
+        let ctx = self.get_module_ctx_ptr(module).cast::<T>();
+        // SAFETY: ctx is either NULL or allocated with ngx_p(c)alloc and
+        // explicitly initialized by the module
+        unsafe { ctx.as_mut() }
+    }
+
     /// Sets the value as the module's context.
     ///
     /// See <https://nginx.org/en/docs/dev/development_guide.html#http_request>
@@ -290,6 +341,11 @@ impl Request {
         } else {
             None
         }
+    }
+
+    /// Get HTTP status of response.
+    pub fn status(&self) -> HTTPStatus {
+        self.0.headers_out.status.try_into().unwrap_or(HTTPStatus(0))
     }
 
     /// Set HTTP status of response.
@@ -381,62 +437,6 @@ impl Request {
             }
         }
         Status::NGX_DONE
-    }
-
-    /// Send a subrequest
-    pub fn subrequest(
-        &self,
-        uri: &str,
-        module: &ngx_module_t,
-        post_callback: unsafe extern "C" fn(
-            *mut ngx_http_request_t,
-            *mut c_void,
-            ngx_int_t,
-        ) -> ngx_int_t,
-    ) -> Status {
-        let uri_ptr = unsafe { &mut ngx_str_t::from_str(self.0.pool, uri) as *mut _ };
-        // -------------
-        // allocate memory and set values for ngx_http_post_subrequest_t
-        let sub_ptr = self.pool().alloc(core::mem::size_of::<ngx_http_post_subrequest_t>());
-
-        // assert!(sub_ptr.is_null());
-        let post_subreq =
-            sub_ptr as *const ngx_http_post_subrequest_t as *mut ngx_http_post_subrequest_t;
-        unsafe {
-            (*post_subreq).handler = Some(post_callback);
-            // WARN: safety! ensure that ctx is already set
-            (*post_subreq).data = self.get_module_ctx_ptr(module);
-        }
-        // -------------
-
-        let mut psr: *mut ngx_http_request_t = core::ptr::null_mut();
-        let r = unsafe {
-            ngx_http_subrequest(
-                (self as *const Request as *mut Request).cast(),
-                uri_ptr,
-                core::ptr::null_mut(),
-                &raw mut psr,
-                sub_ptr as *mut _,
-                NGX_HTTP_SUBREQUEST_WAITED as _,
-            )
-        };
-
-        // previously call of ngx_http_subrequest() would ensure that the pointer is not null
-        // anymore
-        let sr = unsafe { &mut *psr };
-
-        /*
-         * allocate fake request body to avoid attempts to read it and to make
-         * sure real body file (if already read) won't be closed by upstream
-         */
-        sr.request_body =
-            self.pool().alloc(core::mem::size_of::<ngx_http_request_body_t>()) as *mut _;
-
-        if sr.request_body.is_null() {
-            return Status::NGX_ERROR;
-        }
-        sr.set_header_only(1 as _);
-        Status(r)
     }
 
     /// Iterate over headers_in
