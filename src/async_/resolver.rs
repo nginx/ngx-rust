@@ -18,7 +18,7 @@ use core::task::{Context, Poll, Waker};
 use crate::{
     allocator::Box,
     collections::Vec,
-    core::Pool,
+    core::{Pool, Status},
     ffi::{
         ngx_addr_t, ngx_msec_t, ngx_resolve_name, ngx_resolve_start, ngx_resolver_ctx_t,
         ngx_resolver_t, ngx_str_t,
@@ -38,6 +38,8 @@ pub enum Error {
     Resolver(ResolverError, String),
     /// Allocation failed
     AllocationFailed,
+    /// Unknown internal error while starting name resolution
+    Internal,
 }
 
 impl fmt::Display for Error {
@@ -46,6 +48,7 @@ impl fmt::Display for Error {
             Error::NoResolver => write!(f, "No resolver configured"),
             Error::Resolver(err, context) => write!(f, "{err}: resolving `{context}`"),
             Error::AllocationFailed => write!(f, "Allocation failed"),
+            Error::Internal => write!(f, "Internal error"),
         }
     }
 }
@@ -190,11 +193,11 @@ impl<'a> Resolution<'a> {
         // cache, the handler may get called from this stack. Otherwise, it
         // will be called later by nginx when it gets a dns response or a
         // timeout.
-        let ret = unsafe { ngx_resolve_name(ctxp.as_ptr()) };
-        if let Some(e) = NonZero::new(ret) {
+        let ret = unsafe { Status(ngx_resolve_name(ctxp.as_ptr())) };
+        if !ret.is_ok() {
             // ngx_resolve_name will free the context on error.
             core::mem::forget(this.ctx.take());
-            return Err(Error::Resolver(ResolverError::from(e), name.to_string()));
+            return Err(Error::Internal);
         }
 
         Ok(this)
