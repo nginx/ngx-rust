@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## Release 0.5.1
+
+### Features
+
+* Traits for core module configuration access ([#272])
+
+### Bugfixes
+
+* Use-after-free in `ngx::async_::resolver` on resolver initialization failure
+* Log messages were not emitted on an expected log level
+
+[#272]: https://github.com/nginx/ngx-rust/pull/272
+
 ## Release 0.5.0
 
 ### Breaking changes
