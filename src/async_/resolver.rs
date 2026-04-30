@@ -192,6 +192,8 @@ impl<'a> Resolution<'a> {
         // timeout.
         let ret = unsafe { ngx_resolve_name(ctxp.as_ptr()) };
         if let Some(e) = NonZero::new(ret) {
+            // ngx_resolve_name will free the context on error.
+            core::mem::forget(this.ctx.take());
             return Err(Error::Resolver(ResolverError::from(e), name.to_string()));
         }
 
