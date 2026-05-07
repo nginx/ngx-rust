@@ -68,6 +68,8 @@ serde = [
 std = [
     "allocator-api2/std"
 ]
+# Enables the Stream module API.
+stream = ["nginx-sys/stream"]
 # Enables the build scripts to build a copy of nginx source and link against it.
 vendored = ["nginx-sys/vendored"]
 
