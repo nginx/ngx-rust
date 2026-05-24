@@ -9,6 +9,7 @@ use crate::core::*;
 use crate::ffi::*;
 use crate::http::HttpPhase;
 use crate::http::status::*;
+use crate::http::upstream::UpstreamState;
 
 /// Define a static request handler.
 ///
@@ -219,6 +220,27 @@ impl Request {
             return None;
         }
         Some(self.0.upstream)
+    }
+
+    /// Per-attempt upstream states recorded for this request.  Empty
+    /// when no upstream was contacted (no `proxy_pass` /
+    /// `fastcgi_pass` / etc., or a cache hit served directly from
+    /// disk).
+    ///
+    /// One entry per attempt in chronological order.  A request that
+    /// exercises `proxy_next_upstream` yields multiple entries (e.g.
+    /// the failed peer, then the successful one); a request that
+    /// succeeds on the first try yields exactly one entry — which is
+    /// the same `ngx_http_upstream_state_t` that `u->state` points
+    /// at.
+    pub fn upstream_states(&self) -> &[UpstreamState] {
+        // SAFETY: `upstream_states`, when non-null, points to an
+        // `ngx_array_t` of `ngx_http_upstream_state_t` allocated in the
+        // request pool, and `UpstreamState` is `#[repr(transparent)]`
+        // over that type.
+        NonNull::new(self.0.upstream_states)
+            .map(|x| unsafe { x.as_ref().as_slice::<UpstreamState>() })
+            .unwrap_or_default()
     }
 
     /// Pointer to a [`ngx_connection_t`] client connection object.
@@ -798,4 +820,43 @@ enum MethodInner {
     Patch,
     Trace,
     Connect,
+}
+
+#[cfg(test)]
+mod tests {
+    use core::mem::MaybeUninit;
+
+    extern crate alloc;
+    use alloc::vec::Vec;
+
+    use super::*;
+    use crate::ffi::{ngx_array_t, ngx_http_upstream_state_t};
+
+    #[test]
+    fn upstream_states_lists_each_attempt_in_order() {
+        let mut r: ngx_http_request_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        // SAFETY: `r` outlives `req`, and the test reads only
+        // `upstream_states`, which it sets up below.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        // No upstream contacted: the array is null.
+        assert!(req.upstream_states().is_empty());
+
+        // A 502 followed by a 200, as a `proxy_next_upstream` retry
+        // leaves it.
+        let mut states: [ngx_http_upstream_state_t; 2] =
+            unsafe { MaybeUninit::zeroed().assume_init() };
+        states[0].status = 502;
+        states[1].status = 200;
+
+        let mut arr: ngx_array_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        arr.elts = states.as_mut_ptr().cast();
+        arr.nelts = states.len();
+        arr.size = size_of::<ngx_http_upstream_state_t>();
+        r.upstream_states = &raw mut arr;
+
+        // SAFETY: as above; `states` and `arr` also outlive `req`.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        let statuses: Vec<_> = req.upstream_states().iter().map(|s| s.status).collect();
+        assert_eq!(statuses, [502, 200]);
+    }
 }
