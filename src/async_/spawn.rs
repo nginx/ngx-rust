@@ -118,13 +118,16 @@ impl Drop for SchedulerInner {
     }
 }
 
-fn schedule(runnable: Runnable, info: ScheduleInfo) {
-    if info.woken_while_running {
-        SCHEDULER.schedule(runnable);
-        ngx_log_debug!(ngx_cycle_log().as_ptr(), "async: task scheduled while running");
-    } else {
-        runnable.run();
-    }
+fn schedule(runnable: Runnable, _info: ScheduleInfo) {
+    // Always defer the wake via `ngx_post_event`; never re-poll synchronously.
+    //
+    // `Waker::wake()` may fire from arbitrary contexts, including a future's
+    // `Drop` while a lock is held (e.g. h2's `Streams::drop` wakes its parked
+    // `Connection` task while holding `Arc<Mutex<Inner>>`). A synchronous
+    // re-poll would re-enter the task and deadlock on that lock. Deferring
+    // costs one event-loop tick: `ngx_event_process_posted` drains the queue
+    // at the end of each cycle.
+    SCHEDULER.schedule(runnable);
 }
 
 /// Creates a new task running on the NGINX event loop.
