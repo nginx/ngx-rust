@@ -45,6 +45,13 @@ pub use stream::*;
 /// Default alignment for pool allocations.
 pub const NGX_ALIGNMENT: usize = NGX_RS_ALIGNMENT;
 
+/// Sentinel returned by `ngx_resolve_start()` when no resolver is configured.
+///
+/// nginx's `NGX_NO_RESOLVER` macro expands to `(void *) -1`, which bindgen does
+/// not emit. It is an address-only sentinel that must never be dereferenced;
+/// callers compare the `ngx_resolve_start()` return value against it.
+pub const NGX_NO_RESOLVER: *mut ngx_resolver_ctx_t = ptr::without_provenance_mut(usize::MAX);
+
 // Check if the allocations made with ngx_palloc are properly aligned.
 // If the check fails, objects allocated from `ngx_pool` can violate Rust pointer alignment
 // requirements.

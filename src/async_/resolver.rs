@@ -16,8 +16,8 @@ use core::ptr::NonNull;
 use core::task::{Context, Poll, Waker};
 
 use nginx_sys::{
-    NGX_RESOLVE_FORMERR, NGX_RESOLVE_NOTIMP, NGX_RESOLVE_NXDOMAIN, NGX_RESOLVE_REFUSED,
-    NGX_RESOLVE_SERVFAIL, NGX_RESOLVE_TIMEDOUT,
+    NGX_NO_RESOLVER, NGX_RESOLVE_FORMERR, NGX_RESOLVE_NOTIMP, NGX_RESOLVE_NXDOMAIN,
+    NGX_RESOLVE_REFUSED, NGX_RESOLVE_SERVFAIL, NGX_RESOLVE_TIMEDOUT,
 };
 
 use crate::{
@@ -276,6 +276,9 @@ impl ResolverCtx {
     /// `temp` contains a name which is textual form of an addr.
     pub fn new(resolver: NonNull<ngx_resolver_t>) -> Result<Self, Error> {
         let ctx = unsafe { ngx_resolve_start(resolver.as_ptr(), core::ptr::null_mut()) };
+        if ctx == NGX_NO_RESOLVER {
+            return Err(Error::NoResolver);
+        }
         NonNull::new(ctx).map(Self).ok_or(Error::AllocationFailed)
     }
 
