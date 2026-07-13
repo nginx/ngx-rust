@@ -76,6 +76,10 @@ std = [
     "alloc",
     "allocator-api2/std"
 ]
+# Enables the HTTP module API.
+http = ["nginx-sys/http"]
+# Enables the Stream module API.
+stream = ["nginx-sys/stream"]
 # Enables the build scripts to build a copy of nginx source and link against it.
 vendored = ["nginx-sys/vendored"]
 
