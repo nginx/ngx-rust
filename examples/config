@@ -48,6 +48,14 @@ if [ $HTTP = YES ]; then
     fi
 
     if :; then
+        ngx_module_name=ngx_http_subrequest_module
+        ngx_module_libs=
+        ngx_rust_target_name=subrequest
+
+        ngx_rust_module
+    fi
+
+    if :; then
         ngx_module_name=ngx_http_upstream_custom_module
         ngx_module_libs=
         ngx_rust_target_name=upstream
