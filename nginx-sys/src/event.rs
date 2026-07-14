@@ -1,4 +1,4 @@
-use core::ptr;
+use ::core::ptr;
 
 use crate::{
     NGX_TIMER_LAZY_DELAY, ngx_current_msec, ngx_event_t, ngx_event_timer_rbtree, ngx_msec_t,
