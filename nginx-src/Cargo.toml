@@ -22,9 +22,9 @@ rust-version.workspace = true
 
 [dependencies]
 duct = "1"
-flate2 = "1"
-tar = "0.4"
-ureq = "~3.2"
+flate2 = "1.0.32"
+tar = "0.4.45"
+ureq = "3.2"
 
 [lints]
 workspace = true

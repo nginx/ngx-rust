@@ -18,11 +18,11 @@ ngx = { path = "../", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 aws-sign-v4 = "0.3.0"
-chrono = "0.4.23"
+chrono = "0.4.27"
 http = "1.1.0"
 # use unicode-rs idna backend for lower MSRV and faster builds
 idna_adapter = "=1.1.0"
-libc = "0.2.140"
+libc = "0.2.168"
 tokio = { version = "1.33.0", features = ["full"] }
 
 [[example]]
