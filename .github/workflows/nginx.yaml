@@ -69,7 +69,7 @@ jobs:
       matrix:
         nginx-ref:
           - master
-          - stable-1.28
+          - stable-1.30
         module:
           - static
           - dynamic
