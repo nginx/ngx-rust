@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "nginx-src"
-version = "1.28.5+1.28.3"
+version = "1.30.0+1.30.4"
 dependencies = [
  "duct",
  "flate2",
