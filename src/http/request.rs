@@ -9,6 +9,7 @@ use crate::core::*;
 use crate::ffi::*;
 use crate::http::HttpPhase;
 use crate::http::status::*;
+use crate::http::upstream::UpstreamState;
 
 /// Define a static request handler.
 ///
@@ -219,6 +220,65 @@ impl Request {
             return None;
         }
         Some(self.0.upstream)
+    }
+
+    /// Per-attempt upstream states recorded for this request.  Empty
+    /// when no upstream was contacted (no `proxy_pass` /
+    /// `fastcgi_pass` / etc., or a cache hit served directly from
+    /// disk).
+    ///
+    /// One entry per attempt in chronological order.  A request that
+    /// exercises `proxy_next_upstream` yields multiple entries (e.g.
+    /// the failed peer, then the successful one); a request that
+    /// succeeds on the first try yields exactly one entry — which is
+    /// the same `ngx_http_upstream_state_t` that `u->state` points
+    /// at.
+    pub fn upstream_states(&self) -> &[UpstreamState] {
+        let arr = self.0.upstream_states;
+        if arr.is_null() {
+            return &[];
+        }
+        // SAFETY: `upstream_states`, when non-null, points to an
+        // `ngx_array_t` allocated in the request pool, valid for the
+        // lifetime of the request.
+        let raw = unsafe { &*arr };
+        if raw.nelts == 0 {
+            return &[];
+        }
+        // SAFETY: `UpstreamState` is `#[repr(transparent)]` over
+        // `ngx_http_upstream_state_t`, so the layouts are identical
+        // and the slice cast is sound.
+        unsafe { slice::from_raw_parts(raw.elts.cast::<UpstreamState>(), raw.nelts) }
+    }
+
+    /// Wall-clock seconds (since the epoch) at which nginx began
+    /// processing this request.  Pair with [`Request::start_msec`]
+    /// to compute request latency.
+    pub fn start_sec(&self) -> time_t {
+        self.0.start_sec
+    }
+
+    /// Milliseconds-since-second component of the request start
+    /// time, complementing [`Request::start_sec`].
+    pub fn start_msec(&self) -> ngx_msec_t {
+        self.0.start_msec as ngx_msec_t
+    }
+
+    /// Bytes received from the client for this request, including
+    /// the request line and headers.  Useful as the source label
+    /// for `ingress` byte counters.
+    pub fn request_length(&self) -> off_t {
+        self.0.request_length
+    }
+
+    /// Bytes sent to the client on this request's connection.
+    /// Reads `r->connection->sent`, the byte total nginx itself uses
+    /// to render `$bytes_sent` in `log_format`.
+    pub fn bytes_sent(&self) -> off_t {
+        // SAFETY: `connection` is non-null for the lifetime of a
+        // valid `Request` (set by nginx core in
+        // `ngx_http_create_request`).
+        unsafe { (*self.0.connection).sent }
     }
 
     /// Pointer to a [`ngx_connection_t`] client connection object.
@@ -799,4 +859,101 @@ enum MethodInner {
     Patch,
     Trace,
     Connect,
+}
+
+#[cfg(test)]
+mod tests {
+    use core::mem::MaybeUninit;
+
+    extern crate alloc;
+    use alloc::vec::Vec;
+
+    use super::*;
+    use crate::ffi::{ngx_array_t, ngx_connection_t, ngx_http_upstream_state_t};
+
+    fn zeroed_request() -> ngx_http_request_t {
+        // SAFETY: `ngx_http_request_t` is a `#[repr(C)]` aggregate of
+        // pointers and scalars for which the all-zero bit pattern is
+        // a defined (if mostly meaningless) value.  Tests only call
+        // accessors that read fields populated below.
+        unsafe { MaybeUninit::zeroed().assume_init() }
+    }
+
+    fn request_from(r: &mut ngx_http_request_t) -> &mut Request {
+        // SAFETY: `Request` is `#[repr(transparent)]` over
+        // `ngx_http_request_t`, so the reference is sound.
+        unsafe { Request::from_ngx_http_request(r) }
+    }
+
+    #[test]
+    fn upstream_states_empty_when_array_null() {
+        let mut r = zeroed_request();
+        // upstream_states is already null after zero-init.
+        let req = request_from(&mut r);
+        assert!(req.upstream_states().is_empty());
+    }
+
+    #[test]
+    fn upstream_states_empty_when_nelts_zero() {
+        let mut arr: ngx_array_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        // `nelts == 0` should be reported as empty even if `elts`
+        // happens to be non-null (nginx leaves it pointing at the
+        // initial allocation).
+        arr.elts = (&raw mut arr).cast();
+        arr.nelts = 0;
+
+        let mut r = zeroed_request();
+        r.upstream_states = &raw mut arr;
+        let req = request_from(&mut r);
+        assert!(req.upstream_states().is_empty());
+    }
+
+    #[test]
+    fn upstream_states_returns_each_attempt_in_order() {
+        // Two upstream attempts: a 502 followed by a 200, mirroring a
+        // `proxy_next_upstream` retry.
+        let mut states: [ngx_http_upstream_state_t; 2] =
+            unsafe { MaybeUninit::zeroed().assume_init() };
+        states[0].status = 502;
+        states[0].response_time = 3;
+        states[1].status = 200;
+        states[1].response_time = 12;
+
+        let mut arr: ngx_array_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        arr.elts = states.as_mut_ptr().cast();
+        arr.nelts = states.len();
+
+        let mut r = zeroed_request();
+        r.upstream_states = &raw mut arr;
+        let req = request_from(&mut r);
+
+        let collected: Vec<(u16, u64)> =
+            req.upstream_states().iter().map(|s| (s.status(), s.response_time() as u64)).collect();
+        let expected: Vec<(u16, u64)> = [(502u16, 3u64), (200, 12)].into_iter().collect();
+        assert_eq!(collected, expected);
+    }
+
+    #[test]
+    fn timing_and_length_accessors_read_underlying_fields() {
+        let mut r = zeroed_request();
+        r.start_sec = 1_700_000_000;
+        r.start_msec = 250;
+        r.request_length = 4096;
+
+        let req = request_from(&mut r);
+        assert_eq!(req.start_sec(), 1_700_000_000);
+        assert_eq!(req.start_msec(), 250);
+        assert_eq!(req.request_length(), 4096);
+    }
+
+    #[test]
+    fn bytes_sent_reads_through_connection() {
+        let mut conn: ngx_connection_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        conn.sent = 8192;
+        let mut r = zeroed_request();
+        r.connection = &raw mut conn;
+
+        let req = request_from(&mut r);
+        assert_eq!(req.bytes_sent(), 8192);
+    }
 }
