@@ -7,7 +7,7 @@ use crate::ffi::*;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HTTPStatus(pub ngx_uint_t);
 
-/// A possible error value when converting a `HTTPStatus` from a `u16` or `&str`
+/// A possible error value when converting a `HTTPStatus` from a `usize`, `isize` or `&[u8]`.
 ///
 /// This error indicates that the supplied input was not a valid number, was less
 /// than 100, or was greater than 599.
@@ -48,32 +48,48 @@ impl From<HTTPStatus> for ngx_uint_t {
     }
 }
 
-impl fmt::Debug for HTTPStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
+impl TryFrom<usize> for HTTPStatus {
+    type Error = InvalidHTTPStatusCode;
+
+    #[inline]
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        if !(100..600).contains(&value) {
+            return Err(InvalidHTTPStatusCode::new());
+        }
+        Ok(HTTPStatus(value))
     }
 }
 
-impl HTTPStatus {
-    /// Convets a u16 to a status code.
+impl TryFrom<isize> for HTTPStatus {
+    type Error = InvalidHTTPStatusCode;
+
     #[inline]
-    pub fn from_u16(src: u16) -> Result<HTTPStatus, InvalidHTTPStatusCode> {
-        if !(100..600).contains(&src) {
-            return Err(InvalidHTTPStatusCode::new());
-        }
-
-        Ok(HTTPStatus(src.into()))
+    fn try_from(value: isize) -> Result<Self, Self::Error> {
+        let value: usize = value.try_into().map_err(|_| InvalidHTTPStatusCode::new())?;
+        Self::try_from(value)
     }
+}
 
-    /// Converts a &[u8] to a status code.
-    pub fn from_bytes(src: &[u8]) -> Result<HTTPStatus, InvalidHTTPStatusCode> {
-        if src.len() != 3 {
+impl TryFrom<u16> for HTTPStatus {
+    type Error = InvalidHTTPStatusCode;
+
+    #[inline]
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        Self::try_from(value as usize)
+    }
+}
+
+impl TryFrom<&[u8]> for HTTPStatus {
+    type Error = InvalidHTTPStatusCode;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() != 3 {
             return Err(InvalidHTTPStatusCode::new());
         }
 
-        let a = src[0].wrapping_sub(b'0') as u16;
-        let b = src[1].wrapping_sub(b'0') as u16;
-        let c = src[2].wrapping_sub(b'0') as u16;
+        let a = value[0].wrapping_sub(b'0') as u16;
+        let b = value[1].wrapping_sub(b'0') as u16;
+        let c = value[2].wrapping_sub(b'0') as u16;
 
         if a == 0 || a > 5 || b > 9 || c > 9 {
             return Err(InvalidHTTPStatusCode::new());
