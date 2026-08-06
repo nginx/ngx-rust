@@ -1,4 +1,4 @@
-use core::mem::offset_of;
+use ::core::mem::offset_of;
 
 use crate::bindings::ngx_stream_conf_ctx_t;
 

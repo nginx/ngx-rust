@@ -1,4 +1,4 @@
-use core::ptr;
+use ::core::ptr;
 
 use crate::bindings::ngx_queue_t;
 

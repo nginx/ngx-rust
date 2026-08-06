@@ -1,8 +1,8 @@
 //! Implementation details shared between nginx-sys and ngx.
 #![allow(missing_docs)]
 
-use core::fmt;
-use core::ptr::copy_nonoverlapping;
+use ::core::fmt;
+use ::core::ptr::copy_nonoverlapping;
 
 use crate::bindings::{ngx_pnalloc, ngx_pool_t, u_char};
 
