@@ -36,7 +36,7 @@ events {
 http {
     %%TEST_GLOBALS_HTTP%%
 
-    shared_dict_zone z 64k;
+    shared_dict_zone z 512k;
     shared_dict $arg_key $foo;
 
     server {
