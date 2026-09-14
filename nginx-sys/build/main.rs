@@ -218,6 +218,12 @@ fn generate_binding(nginx: &NginxSource) {
         clang_args.push("-DNGX_RS_FEATURE_STREAM".to_string());
     }
 
+    // Disable clang-provided builtins for several well-known functions. The prototypes for these
+    // functions differ from the standard library headers, causing conflicts with libc crate
+    // definitions.
+    // See rust-lang/bindgen#1770
+    clang_args.push("-fno-builtin".to_string());
+
     print_cargo_metadata(nginx, &includes, &defines).expect("cargo dependency metadata");
 
     // bindgen targets the latest known stable by default
