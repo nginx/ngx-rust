@@ -1,4 +1,4 @@
-use core::slice;
+use core::{ptr, slice};
 
 use crate::ffi::*;
 
@@ -67,6 +67,32 @@ pub trait MutableBuffer: Buffer {
         let buf = self.as_ngx_buf_mut();
         unsafe { slice::from_raw_parts_mut((*buf).pos, self.len()) }
     }
+
+    /// Returns the available space in the buffer.
+    ///
+    /// A buffer from [`crate::core::Pool::create_buffer`] starts empty, with
+    /// its whole allocation available.
+    fn capacity(&self) -> usize {
+        let buf = self.as_ngx_buf();
+        // msrv(1.87.0): ptr::offset_from_unsigned()
+        unsafe { (*buf).end.offset_from((*buf).last) as usize }
+    }
+
+    /// Appends as much of `bytes` as fits and returns the number of bytes
+    /// written.
+    ///
+    /// Use [`MutableBuffer::capacity`] beforehand to avoid a partial write.
+    fn append(&mut self, bytes: &[u8]) -> usize {
+        let n = bytes.len().min(self.capacity());
+
+        let buf = self.as_ngx_buf_mut();
+        unsafe {
+            ptr::copy_nonoverlapping(bytes.as_ptr(), (*buf).last, n);
+            (*buf).last = (*buf).last.add(n);
+        }
+
+        n
+    }
 }
 
 /// Wrapper struct for a temporary buffer, providing methods for working with an `ngx_buf_t`.
@@ -125,5 +151,53 @@ impl Buffer for MemoryBuffer {
     /// Returns a mutable reference to the underlying `ngx_buf_t` pointer.
     fn as_ngx_buf_mut(&mut self) -> *mut ngx_buf_t {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Builds the shape `ngx_create_temp_buf` produces: `pos == last == start`.
+    fn temp_buf(storage: &mut [u8], raw: &mut ngx_buf_t) -> TemporaryBuffer {
+        raw.start = storage.as_mut_ptr();
+        raw.pos = raw.start;
+        raw.last = raw.start;
+        raw.end = unsafe { raw.start.add(storage.len()) };
+        TemporaryBuffer::from_ngx_buf(raw)
+    }
+
+    #[test]
+    fn append_fills_a_freshly_created_buffer() {
+        let mut storage = [0u8; 64];
+        let mut raw: ngx_buf_t = unsafe { core::mem::zeroed() };
+        let mut buf = temp_buf(&mut storage, &mut raw);
+
+        // A new buffer holds nothing, and all of its allocation is available.
+        assert_eq!(buf.len(), 0);
+        assert_eq!(buf.capacity(), 64);
+        assert!(buf.as_bytes_mut().is_empty());
+
+        assert_eq!(buf.append(b"hello "), 6);
+        assert_eq!(buf.append(b"world"), 5);
+
+        assert_eq!(buf.as_bytes(), b"hello world");
+        assert_eq!(buf.len(), 11);
+        assert_eq!(buf.capacity(), 53);
+    }
+
+    #[test]
+    fn append_writes_what_fits_when_full() {
+        let mut storage = [0u8; 4];
+        let mut raw: ngx_buf_t = unsafe { core::mem::zeroed() };
+        let mut buf = temp_buf(&mut storage, &mut raw);
+
+        assert_eq!(buf.append(b"too long"), 4);
+        assert_eq!(buf.as_bytes(), b"too ");
+        assert_eq!(buf.capacity(), 0);
+
+        // A full buffer accepts nothing more.
+        assert_eq!(buf.append(b"x"), 0);
+        assert_eq!(buf.as_bytes(), b"too ");
     }
 }
