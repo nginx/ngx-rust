@@ -23,7 +23,10 @@ if [ $HTTP = YES ]; then
         ngx_rust_module
     fi
 
-    if :; then
+    # Skipped on Darwin: chrono reads the local timezone through
+    # iana-time-zone, which links CoreFoundation. CoreFoundation is not
+    # fork-safe, so it cannot be linked into nginx.
+    if [ "$NGX_SYSTEM" != Darwin ]; then
         ngx_module_name=ngx_http_awssigv4_module
         ngx_module_libs="-lm"
         ngx_rust_target_name=awssig
