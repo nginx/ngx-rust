@@ -21,6 +21,11 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
+# The example is not built on Darwin: chrono reaches the local timezone
+# through CoreFoundation, which is not fork-safe.  See examples/config.
+plan(skip_all => 'awssig example is not built on this platform')
+	if $^O eq 'darwin';
+
 my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(1)
 	->write_file_expand('nginx.conf', <<"EOF");
 

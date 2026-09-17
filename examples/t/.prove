@@ -1,0 +1,64 @@
+---
+generation: 11
+last_run_time: 1789642220.28353
+tests:
+  "./async.t":
+    elapsed: 2.26030302047729
+    gen: 11
+    last_fail_time: 1789642159.55943
+    last_pass_time: 1789642216.66124
+    last_result: 0
+    last_run_time: 1789642216.66124
+    last_todo: 0
+    mtime: 1779628780
+    seq: 54
+    total_failures: 6
+    total_passes: 5
+  "./awssig.t":
+    elapsed: 0.0434160232543945
+    gen: 11
+    last_pass_time: 1789642214.44578
+    last_result: 0
+    last_run_time: 1789642214.44578
+    last_todo: 0
+    mtime: 1789641794
+    seq: 51
+    total_passes: 11
+  "./curl.t":
+    elapsed: 0.251311063766479
+    gen: 11
+    last_fail_time: 1789642159.56034
+    last_pass_time: 1789642214.65495
+    last_result: 0
+    last_run_time: 1789642214.65495
+    last_todo: 0
+    mtime: 1730375785
+    seq: 52
+    total_failures: 6
+    total_passes: 5
+  "./shared_dict.t":
+    elapsed: 5.87828707695007
+    gen: 11
+    last_fail_time: 1789642159.56064
+    last_pass_time: 1789642220.28316
+    last_result: 0
+    last_run_time: 1789642220.28316
+    last_todo: 0
+    mtime: 1789641955
+    seq: 55
+    total_failures: 6
+    total_passes: 5
+  "./upstream.t":
+    elapsed: 0.262914180755615
+    gen: 11
+    last_fail_time: 1789642159.56518
+    last_pass_time: 1789642214.71092
+    last_result: 0
+    last_run_time: 1789642214.71092
+    last_todo: 0
+    mtime: 1730375785
+    seq: 53
+    total_failures: 6
+    total_passes: 5
+version: 1
+...
