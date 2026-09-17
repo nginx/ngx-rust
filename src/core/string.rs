@@ -514,7 +514,7 @@ mod _alloc {
         A: Allocator + Clone,
     {
         fn write_str(&mut self, s: &str) -> fmt::Result {
-            self.append_within_capacity(s).map_err(|_| fmt::Error)
+            self.try_append(s).map_err(|_| fmt::Error)
         }
     }
 
@@ -616,6 +616,53 @@ mod tests {
 
         assert_eq!(s, b"Hello world!");
         assert_eq!((s.as_bytes().as_ptr(), s.capacity()), saved);
+    }
+
+    /// An allocator that always refuses, so that a write can be made to fail
+    /// without relying on exhausting real memory.
+    #[cfg(feature = "alloc")]
+    #[derive(Clone)]
+    struct Oom;
+
+    #[cfg(feature = "alloc")]
+    unsafe impl crate::allocator::Allocator for Oom {
+        fn allocate(
+            &self,
+            _layout: core::alloc::Layout,
+        ) -> Result<core::ptr::NonNull<[u8]>, crate::allocator::AllocError> {
+            Err(crate::allocator::AllocError)
+        }
+
+        unsafe fn deallocate(&self, _ptr: core::ptr::NonNull<u8>, _layout: core::alloc::Layout) {}
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_string_write_grows() {
+        use core::fmt::Write;
+
+        use crate::allocator::Global;
+
+        let w = NgxStr::from_bytes(b"world");
+
+        // No capacity reserved up front.
+        let mut s = NgxString::new_in(Global);
+
+        write!(s, "Hello {w}!").expect("write");
+
+        assert_eq!(s, b"Hello world!");
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn test_string_write_reports_allocation_failure() {
+        use core::fmt::Write;
+
+        let mut s = NgxString::new_in(Oom);
+
+        // An error rather than a panic, and nothing written.
+        write!(s, "Hello").expect_err("write should fail");
+        assert!(s.is_empty());
     }
 
     #[test]
