@@ -145,6 +145,69 @@ jobs:
         run: |
           prove -j$(nproc) --state=save ${NGX_TEST_FILES} || prove -v --state=failed
 
+  macos:
+    runs-on: macos-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        nginx-ref:
+          - stable-1.30
+        module:
+          - static
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.nginx-ref }}
+          repository: 'nginx/nginx'
+          path: 'nginx'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: 'nginx/nginx-tests'
+          path: 'nginx/tests'
+          sparse-checkout: |
+            lib
+
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
+        with:
+          toolchain: stable
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            nginx/objs/**/CACHEDIR.TAG
+            nginx/objs/**/ngx-debug
+            nginx/objs/**/ngx-release
+          key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-nginx-
+
+      - name: Configure nginx with static modules
+        working-directory: nginx
+        run: |
+          ${NGX_CONFIGURE_CMD} \
+              ${NGX_CONFIGURE_UNIX} \
+              ${NGX_CONFIGURE_STATIC_MODULES}
+
+      - name: Build nginx
+        working-directory: nginx
+        run: make -j$(sysctl -n hw.ncpu)
+
+      - name: Run tests
+        env:
+          PERL5LIB: ${{ github.workspace }}/nginx/tests/lib
+          TEST_NGINX_BINARY: ${{ github.workspace }}/nginx/objs/nginx
+          TEST_NGINX_MODULES: ${{ github.workspace }}/nginx/objs
+          TEST_NGINX_VERBOSE: 1
+        run: |
+          prove -j$(sysctl -n hw.ncpu) --state=save ${NGX_TEST_FILES} \
+              || prove -v --state=failed
+
   windows:
     runs-on: windows-2022
     env:
