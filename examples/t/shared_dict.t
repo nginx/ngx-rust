@@ -108,7 +108,12 @@ sub check {
 
 	my $pid = $1;
 
-	for (1 .. 25) {
+	for (1 .. 60) {
+		# Back-to-back requests keep landing on the worker that is
+		# already awake.  Pause so the kernel has a reason to wake
+		# the other one.
+		select(undef, undef, undef, 0.2);
+
 		$r = http_get($uri);
         
 		return unless ($r =~ $like && $r =~ /X-Process: (\d+)/);
