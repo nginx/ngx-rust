@@ -9,10 +9,14 @@ use nginx_sys::{
     ngx_command_t, ngx_conf_t, ngx_http_add_variable, ngx_http_compile_complex_value_t,
     ngx_http_complex_value, ngx_http_complex_value_t, ngx_http_module_t, ngx_http_request_t,
     ngx_http_variable_t, ngx_http_variable_value_t, ngx_int_t, ngx_module_t, ngx_parse_size,
-    ngx_shared_memory_add, ngx_shm_zone_t, ngx_str_t, ngx_uint_t,
+    ngx_str_t, ngx_uint_t,
 };
+use ngx::allocator::AllocError;
 use ngx::collections::RbTreeMap;
-use ngx::core::{NGX_CONF_ERROR, NGX_CONF_OK, NgxStr, NgxString, Pool, SlabPool, Status};
+use ngx::core::{
+    NGX_CONF_ERROR, NGX_CONF_OK, NgxStr, NgxString, Pool, SharedZone, SharedZoneData, SlabPool,
+    Status,
+};
 use ngx::http::{HttpModule, HttpModuleMainConf};
 use ngx::{ngx_conf_log_error, ngx_log_debug, ngx_string};
 
@@ -97,17 +101,18 @@ pub static mut ngx_http_shared_dict_module: ngx_module_t = ngx_module_t {
     ..ngx_module_t::default()
 };
 
-type SharedData = ngx::sync::RwLock<RbTreeMap<NgxString<SlabPool>, NgxString<SlabPool>, SlabPool>>;
+/// Contents of the shared memory zone.
+struct SharedDict(ngx::sync::RwLock<RbTreeMap<NgxString<SlabPool>, NgxString<SlabPool>, SlabPool>>);
 
-#[derive(Debug)]
-struct SharedDictMainConfig {
-    shm_zone: *mut ngx_shm_zone_t,
+impl SharedZoneData for SharedDict {
+    fn new_in(alloc: SlabPool) -> Result<Self, AllocError> {
+        Ok(Self(ngx::sync::RwLock::new(RbTreeMap::try_new_in(alloc)?)))
+    }
 }
 
-impl Default for SharedDictMainConfig {
-    fn default() -> Self {
-        Self { shm_zone: ptr::null_mut() }
-    }
+#[derive(Debug, Default)]
+struct SharedDictMainConfig {
+    shm_zone: Option<SharedZone<SharedDict>>,
 }
 
 extern "C" fn ngx_http_shared_dict_add_zone(
@@ -126,58 +131,19 @@ extern "C" fn ngx_http_shared_dict_add_zone(
     debug_assert!(!cf.args.is_null() && unsafe { (*cf.args).nelts >= 3 });
     let args = unsafe { (*cf.args).as_slice_mut() };
 
-    let mut name: ngx_str_t = args[1];
+    // SAFETY: the directive arguments are valid nginx strings owned by the configuration pool.
+    let name = unsafe { NgxStr::from_ngx_str(args[1]) };
     let size = unsafe { ngx_parse_size(&raw mut args[2]) };
     if size == -1 {
         return NGX_CONF_ERROR;
     }
 
-    smcf.shm_zone = unsafe {
-        ngx_shared_memory_add(
-            cf,
-            &raw mut name,
-            size as usize,
-            (&raw mut ngx_http_shared_dict_module).cast(),
-        )
-    };
-
-    let Some(shm_zone) = (unsafe { smcf.shm_zone.as_mut() }) else {
-        return NGX_CONF_ERROR;
-    };
-
-    shm_zone.init = Some(ngx_http_shared_dict_zone_init);
-    shm_zone.data = ptr::from_mut(smcf).cast();
-
-    NGX_CONF_OK
-}
-
-fn ngx_http_shared_dict_get_shared(shm_zone: &mut ngx_shm_zone_t) -> Result<&SharedData, Status> {
-    let mut alloc = unsafe { SlabPool::from_shm_zone(shm_zone) }.ok_or(Status::NGX_ERROR)?;
-
-    if alloc.as_mut().data.is_null() {
-        let shared: RbTreeMap<NgxString<SlabPool>, NgxString<SlabPool>, SlabPool> =
-            RbTreeMap::try_new_in(alloc.clone()).map_err(|_| Status::NGX_ERROR)?;
-
-        let shared = ngx::sync::RwLock::new(shared);
-
-        alloc.as_mut().data = ngx::allocator::allocate(shared, &alloc)
-            .map_err(|_| Status::NGX_ERROR)?
-            .as_ptr()
-            .cast();
-    }
-
-    unsafe { alloc.as_ref().data.cast::<SharedData>().as_ref().ok_or(Status::NGX_ERROR) }
-}
-
-extern "C" fn ngx_http_shared_dict_zone_init(
-    shm_zone: *mut ngx_shm_zone_t,
-    _data: *mut c_void,
-) -> ngx_int_t {
-    let shm_zone = unsafe { &mut *shm_zone };
-
-    match ngx_http_shared_dict_get_shared(shm_zone) {
-        Err(e) => e.into(),
-        Ok(_) => Status::NGX_OK.into(),
+    match SharedZone::add(cf, name, size as usize, HttpSharedDictModule::module()) {
+        Ok(zone) => {
+            smcf.shm_zone = Some(zone);
+            NGX_CONF_OK
+        }
+        Err(_) => NGX_CONF_ERROR,
     }
 }
 
@@ -256,12 +222,15 @@ extern "C" fn ngx_http_shared_dict_get_variable(
 
     let key = unsafe { NgxStr::from_ngx_str(key) };
 
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
+    let Some(shared) = smcf.shm_zone.as_ref().and_then(SharedZone::get) else {
         return Status::NGX_ERROR.into();
     };
 
-    let value =
-        shared.read().get(key).and_then(|x| unsafe { ngx_str_t::from_bytes(r.pool, x.as_bytes()) });
+    let value = shared
+        .0
+        .read()
+        .get(key)
+        .and_then(|x| unsafe { ngx_str_t::from_bytes(r.pool, x.as_bytes()) });
 
     ngx_log_debug!(
         unsafe { (*r.connection).log },
@@ -301,7 +270,7 @@ extern "C" fn ngx_http_shared_dict_set_variable(
         return;
     }
 
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
+    let Some(shared) = smcf.shm_zone.as_ref().and_then(SharedZone::get) else {
         return;
     };
 
@@ -316,9 +285,11 @@ extern "C" fn ngx_http_shared_dict_set_variable(
             unsafe { nginx_sys::ngx_pid },
         );
 
-        let _ = shared.write().remove(key);
+        let _ = shared.0.write().remove(key);
     } else {
-        let alloc = unsafe { SlabPool::from_shm_zone(&*smcf.shm_zone).expect("slab pool") };
+        let Some(alloc) = smcf.shm_zone.as_ref().and_then(SharedZone::slab_pool) else {
+            return;
+        };
 
         let Ok(key) = NgxString::try_from_bytes_in(key.as_bytes(), alloc.clone()) else {
             return;
@@ -337,7 +308,7 @@ extern "C" fn ngx_http_shared_dict_set_variable(
             unsafe { nginx_sys::ngx_pid },
         );
 
-        let _ = shared.write().try_insert(key, value);
+        let _ = shared.0.write().try_insert(key, value);
     }
 }
 
@@ -355,13 +326,13 @@ extern "C" fn ngx_http_shared_dict_get_entries(
 
     ngx_log_debug!(unsafe { (*r.connection).log }, "shared dict: get all entries");
 
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
+    let Some(shared) = smcf.shm_zone.as_ref().and_then(SharedZone::get) else {
         return Status::NGX_ERROR.into();
     };
 
     let mut str = NgxString::new_in(pool);
     {
-        let dict = shared.read();
+        let dict = shared.0.read();
 
         let mut len: usize = 0;
         let mut values: usize = 0;
@@ -411,15 +382,15 @@ extern "C" fn ngx_http_shared_dict_set_entries(
 
     ngx_log_debug!(unsafe { (*r.connection).log }, "shared dict: clear");
 
-    let Ok(shared) = ngx_http_shared_dict_get_shared(unsafe { &mut *smcf.shm_zone }) else {
+    let Some(shared) = smcf.shm_zone.as_ref().and_then(SharedZone::get) else {
         return;
     };
 
-    let Ok(tree) = RbTreeMap::try_new_in(shared.read().allocator().clone()) else {
+    let Ok(tree) = RbTreeMap::try_new_in(shared.0.read().allocator().clone()) else {
         return;
     };
 
     // This would check both .clear() and the drop implementation
-    *shared.write() = tree;
-    // shared.write().clear()
+    *shared.0.write() = tree;
+    // shared.0.write().clear()
 }
