@@ -1,4 +1,4 @@
-use core::ptr;
+use ::core::ptr;
 
 use crate::bindings::{ngx_rbtree_insert_pt, ngx_rbtree_node_t, ngx_rbtree_t};
 
