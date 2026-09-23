@@ -80,7 +80,7 @@ jobs:
           # in the stable toolchain.
           RUSTC_BOOTSTRAP: 1
         run: |
-          patch -p1 < $GITHUB_WORKSPACE/misc/nginx-sanitizer-support.patch
+          patch -p1 < $GITHUB_WORKSPACE/build/nginx-sanitizer-support.patch
           auto/configure \
             --with-cc=clang \
             --with-cc-opt="$CFLAGS" \
@@ -107,6 +107,6 @@ jobs:
               user root;
         run: |
             TEST_NGINX_BINARY="$PWD/nginx/objs/nginx" \
-            LSAN_OPTIONS="suppressions=$PWD/misc/lsan-suppressions.txt" \
-            UBSAN_OPTIONS="suppressions=$PWD/misc/ubsan-suppressions.txt" \
+            LSAN_OPTIONS="suppressions=$PWD/build/lsan-suppressions.txt" \
+            UBSAN_OPTIONS="suppressions=$PWD/build/ubsan-suppressions.txt" \
             prove -v -Inginx/tests/lib examples/t
