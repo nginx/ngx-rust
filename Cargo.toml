@@ -82,3 +82,6 @@ tempfile = { version = "3.20.0", default-features = false }
 
 [lints]
 workspace = true
+
+[profile.coverage]
+inherits = "dev"

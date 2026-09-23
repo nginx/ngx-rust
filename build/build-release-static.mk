@@ -1,0 +1,2 @@
+NGINX_CONFIGURE_ARGS	+= --add-module="$(MODULE_SOURCE_DIR)"
+CARGO_PROFILE		= release
