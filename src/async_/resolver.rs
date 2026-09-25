@@ -93,7 +93,7 @@ impl core::error::Error for ResolverError {}
 /// Convert from the NGX_RESOLVE_ error codes.
 impl From<NonZero<isize>> for ResolverError {
     fn from(code: NonZero<isize>) -> ResolverError {
-        match code.get() as u32 {
+        match code.get() {
             NGX_RESOLVE_FORMERR => ResolverError::FormErr,
             NGX_RESOLVE_SERVFAIL => ResolverError::ServFail,
             NGX_RESOLVE_NXDOMAIN => ResolverError::NXDomain,

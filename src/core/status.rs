@@ -39,7 +39,7 @@ macro_rules! ngx_codes {
         impl Status {
         $(
             $(#[$docs])*
-            pub const $konst: Status = Status($konst as ngx_int_t);
+            pub const $konst: Status = Status($konst);
         )+
 
         }

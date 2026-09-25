@@ -129,7 +129,7 @@ impl ngx_module_t {
             name: ptr::null_mut(),
             spare0: 0,
             spare1: 0,
-            version: nginx_version as ngx_uint_t,
+            version: nginx_version,
             signature: NGX_RS_MODULE_SIGNATURE.as_ptr(),
             ctx: ptr::null_mut(),
             commands: ptr::null_mut(),
@@ -268,7 +268,7 @@ pub unsafe fn ngx_list_init(
     unsafe {
         (*list).part.elts = ngx_palloc(pool, n * size);
         if (*list).part.elts.is_null() {
-            return NGX_ERROR as ngx_int_t;
+            return NGX_ERROR;
         }
         (*list).part.nelts = 0;
         (*list).part.next = ptr::null_mut();
@@ -276,7 +276,7 @@ pub unsafe fn ngx_list_init(
         (*list).size = size;
         (*list).nalloc = n;
         (*list).pool = pool;
-        NGX_OK as ngx_int_t
+        NGX_OK
     }
 }
 

@@ -21,7 +21,7 @@ pub unsafe fn ngx_add_timer(ev: *mut ngx_event_t, timer: ngx_msec_t) {
              * value is less than NGX_TIMER_LAZY_DELAY milliseconds: this allows
              * to minimize the rbtree operations for fast connections.
              */
-            if key.abs_diff((*ev).timer.key) < NGX_TIMER_LAZY_DELAY as _ {
+            if key.abs_diff((*ev).timer.key) < NGX_TIMER_LAZY_DELAY {
                 return;
             }
 

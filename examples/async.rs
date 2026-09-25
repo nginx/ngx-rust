@@ -13,7 +13,7 @@ use ngx::core::Status;
 use ngx::ffi::{
     NGX_CONF_TAKE1, NGX_HTTP_LOC_CONF, NGX_HTTP_LOC_CONF_OFFSET, NGX_HTTP_MODULE, NGX_LOG_EMERG,
     ngx_command_t, ngx_conf_t, ngx_connection_t, ngx_event_t, ngx_http_module_t, ngx_int_t,
-    ngx_module_t, ngx_post_event, ngx_posted_events, ngx_posted_next_events, ngx_str_t, ngx_uint_t,
+    ngx_module_t, ngx_post_event, ngx_posted_events, ngx_posted_next_events, ngx_str_t,
 };
 use ngx::http::{self, HttpModule, HttpModuleLocationConf, HttpRequestHandler, MergeConfigError};
 use ngx::{ngx_conf_log_error, ngx_log_debug_http, ngx_string};
@@ -47,7 +47,7 @@ unsafe impl HttpModuleLocationConf for Module {
 static mut NGX_HTTP_ASYNC_COMMANDS: [ngx_command_t; 2] = [
     ngx_command_t {
         name: ngx_string!("async"),
-        type_: (NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1) as ngx_uint_t,
+        type_: NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
         set: Some(ngx_http_async_commands_set_enable),
         conf: NGX_HTTP_LOC_CONF_OFFSET,
         offset: 0,
@@ -78,7 +78,7 @@ ngx::ngx_modules!(ngx_http_async_module);
 pub static mut ngx_http_async_module: ngx_module_t = ngx_module_t {
     ctx: &raw const NGX_HTTP_ASYNC_MODULE_CTX as _,
     commands: unsafe { &raw mut NGX_HTTP_ASYNC_COMMANDS[0] },
-    type_: NGX_HTTP_MODULE as _,
+    type_: NGX_HTTP_MODULE,
     ..ngx_module_t::default()
 };
 
@@ -225,7 +225,7 @@ extern "C" fn ngx_http_async_commands_set_enable(
 
 fn ngx_http_async_runtime() -> &'static Runtime {
     // Should not be called from the master process
-    assert_ne!(unsafe { ngx::ffi::ngx_process }, ngx::ffi::NGX_PROCESS_MASTER as _);
+    assert_ne!(unsafe { ngx::ffi::ngx_process }, ngx::ffi::NGX_PROCESS_MASTER);
 
     static RUNTIME: OnceLock<Runtime> = OnceLock::new();
     RUNTIME.get_or_init(|| {
