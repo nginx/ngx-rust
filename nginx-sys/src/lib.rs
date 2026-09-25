@@ -4,14 +4,8 @@
 
 pub mod detail;
 mod event;
-#[cfg(all(feature = "http", ngx_feature = "http"))]
-mod http;
-#[cfg(all(feature = "mail", ngx_feature = "mail"))]
-mod mail;
 mod queue;
 mod rbtree;
-#[cfg(all(feature = "stream", ngx_feature = "stream"))]
-mod stream;
 mod string;
 
 use core::ptr;
@@ -33,17 +27,8 @@ mod bindings {
 #[doc(no_inline)]
 pub use bindings::*;
 pub use event::*;
-#[cfg(all(feature = "http", ngx_feature = "http"))]
-pub use http::*;
-#[cfg(all(feature = "mail", ngx_feature = "mail"))]
-pub use mail::*;
 pub use queue::*;
 pub use rbtree::*;
-#[cfg(all(feature = "stream", ngx_feature = "stream"))]
-pub use stream::*;
-
-/// Default alignment for pool allocations.
-pub const NGX_ALIGNMENT: usize = NGX_RS_ALIGNMENT;
 
 /// Sentinel returned by `ngx_resolve_start()` when no resolver is configured.
 ///
@@ -124,8 +109,8 @@ impl ngx_module_t {
     /// Create a new `ngx_module_t` instance with default values.
     pub const fn default() -> Self {
         Self {
-            ctx_index: ngx_uint_t::MAX,
-            index: ngx_uint_t::MAX,
+            ctx_index: NGX_MODULE_UNSET_INDEX,
+            index: NGX_MODULE_UNSET_INDEX,
             name: ptr::null_mut(),
             spare0: 0,
             spare1: 0,

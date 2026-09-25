@@ -76,6 +76,9 @@ fn core_constants() {
     let _module: &[ngx_uint_t] = &[NGX_CORE_MODULE, NGX_CONF_MODULE];
 
     let _: ngx_int_t = NGX_CONF_UNSET;
+    let _: ngx_uint_t = NGX_CONF_UNSET_UINT;
+    let _: usize = NGX_CONF_UNSET_SIZE;
+    let _: ngx_msec_t = NGX_CONF_UNSET_MSEC;
 
     let _: *mut ngx_resolver_ctx_t = NGX_NO_RESOLVER;
     let _: &[ngx_uint_t] = &[
@@ -103,9 +106,11 @@ fn core_constants() {
     let _: ngx_pid_t = NGX_INVALID_PID;
 
     let _: ngx_int_t = NGX_MAX_INT_T_VALUE;
+    let _: i32 = NGX_MAX_INT32_VALUE;
     let _: off_t = NGX_MAX_OFF_T_VALUE;
     let _: usize = NGX_MAX_SIZE_T_VALUE;
     let _: time_t = NGX_MAX_TIME_T_VALUE;
+    let _: u32 = NGX_MAX_UINT32_VALUE;
 
     assert_eq!(mem::size_of::<time_t>(), NGX_TIME_T_SIZE);
 }
