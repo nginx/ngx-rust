@@ -12,7 +12,7 @@ use ngx::ffi::{
 use ngx::http::{self, HttpModule};
 use ngx::{http_variable_get, ngx_log_debug_http, ngx_string};
 
-const IPV4_STRLEN: usize = 16; // Not exported from `libc`
+const IPV4_STRLEN: usize = ngx::ffi::NGX_INET_ADDRSTRLEN + 1 /* NUL */;
 
 #[derive(Debug, Default)]
 struct NgxHttpOrigDstCtx {
