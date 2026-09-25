@@ -97,7 +97,7 @@ ngx::ngx_modules!(ngx_http_orig_dst_module);
 pub static mut ngx_http_orig_dst_module: ngx_module_t = ngx_module_t {
     ctx: &raw const NGX_HTTP_ORIG_DST_MODULE_CTX as _,
     commands: ptr::null_mut(),
-    type_: NGX_HTTP_MODULE as _,
+    type_: NGX_HTTP_MODULE,
     ..ngx_module_t::default()
 };
 

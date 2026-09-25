@@ -85,7 +85,7 @@ static NGX_HTTP_UPSTREAM_CUSTOM_CTX: ngx_http_module_t = ngx_http_module_t {
 static mut NGX_HTTP_UPSTREAM_CUSTOM_COMMANDS: [ngx_command_t; 2] = [
     ngx_command_t {
         name: ngx_string!("custom"),
-        type_: (NGX_HTTP_UPS_CONF | NGX_CONF_NOARGS | NGX_CONF_TAKE1) as ngx_uint_t,
+        type_: NGX_HTTP_UPS_CONF | NGX_CONF_NOARGS | NGX_CONF_TAKE1,
         set: Some(ngx_http_upstream_commands_set_custom),
         conf: NGX_HTTP_SRV_CONF_OFFSET,
         offset: 0,
@@ -105,7 +105,7 @@ ngx::ngx_modules!(ngx_http_upstream_custom_module);
 pub static mut ngx_http_upstream_custom_module: ngx_module_t = ngx_module_t {
     ctx: &raw const NGX_HTTP_UPSTREAM_CUSTOM_CTX as _,
     commands: unsafe { &raw mut NGX_HTTP_UPSTREAM_CUSTOM_COMMANDS[0] },
-    type_: NGX_HTTP_MODULE as _,
+    type_: NGX_HTTP_MODULE,
     ..ngx_module_t::default()
 };
 
@@ -265,7 +265,7 @@ unsafe extern "C" fn ngx_http_upstream_commands_set_custom(
 
     if let Some(value) = args.get(1) {
         let n = unsafe { ngx_atoi(value.data, value.len) };
-        if n == (NGX_ERROR as isize) || n == 0 {
+        if n == NGX_ERROR || n == 0 {
             ngx_conf_log_error!(
                 NGX_LOG_EMERG,
                 cf,

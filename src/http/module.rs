@@ -57,7 +57,7 @@ pub trait HttpModule {
     /// Callers should provide valid non-null `ngx_conf_t` arguments. Implementers must
     /// guard against null inputs or risk runtime errors.
     unsafe extern "C" fn preconfiguration(_cf: *mut ngx_conf_t) -> ngx_int_t {
-        Status::NGX_OK.into()
+        NGX_OK
     }
 
     /// # Safety
@@ -65,7 +65,7 @@ pub trait HttpModule {
     /// Callers should provide valid non-null `ngx_conf_t` arguments. Implementers must
     /// guard against null inputs or risk runtime errors.
     unsafe extern "C" fn postconfiguration(_cf: *mut ngx_conf_t) -> ngx_int_t {
-        Status::NGX_OK.into()
+        NGX_OK
     }
 
     /// # Safety

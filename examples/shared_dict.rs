@@ -9,7 +9,7 @@ use nginx_sys::{
     ngx_command_t, ngx_conf_t, ngx_http_add_variable, ngx_http_compile_complex_value_t,
     ngx_http_complex_value, ngx_http_complex_value_t, ngx_http_module_t, ngx_http_request_t,
     ngx_http_variable_t, ngx_http_variable_value_t, ngx_int_t, ngx_module_t, ngx_parse_size,
-    ngx_shared_memory_add, ngx_shm_zone_t, ngx_str_t, ngx_uint_t,
+    ngx_shared_memory_add, ngx_shm_zone_t, ngx_str_t,
 };
 use ngx::collections::RbTreeMap;
 use ngx::core::{NGX_CONF_ERROR, NGX_CONF_OK, NgxStr, NgxString, Pool, SlabPool, Status};
@@ -45,7 +45,7 @@ unsafe impl HttpModuleMainConf for HttpSharedDictModule {
 static mut NGX_HTTP_SHARED_DICT_COMMANDS: [ngx_command_t; 3] = [
     ngx_command_t {
         name: ngx_string!("shared_dict_zone"),
-        type_: (NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE2) as ngx_uint_t,
+        type_: NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE2,
         set: Some(ngx_http_shared_dict_add_zone),
         conf: NGX_HTTP_MAIN_CONF_OFFSET,
         offset: 0,
@@ -53,7 +53,7 @@ static mut NGX_HTTP_SHARED_DICT_COMMANDS: [ngx_command_t; 3] = [
     },
     ngx_command_t {
         name: ngx_string!("shared_dict"),
-        type_: (NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE2) as ngx_uint_t,
+        type_: NGX_HTTP_MAIN_CONF | NGX_CONF_TAKE2,
         set: Some(ngx_http_shared_dict_add_variable),
         conf: NGX_HTTP_MAIN_CONF_OFFSET,
         offset: 0,
@@ -67,7 +67,7 @@ static mut NGX_HTTP_SHARED_DICT_VARS: [ngx_http_variable_t; 1] = [ngx_http_varia
     set_handler: Some(ngx_http_shared_dict_set_entries),
     get_handler: Some(ngx_http_shared_dict_get_entries),
     data: 0,
-    flags: (NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE) as ngx_uint_t,
+    flags: NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE,
     index: 0,
 }];
 
@@ -93,7 +93,7 @@ ngx::ngx_modules!(ngx_http_shared_dict_module);
 pub static mut ngx_http_shared_dict_module: ngx_module_t = ngx_module_t {
     ctx: &raw const NGX_HTTP_SHARED_DICT_MODULE_CTX as _,
     commands: unsafe { &raw mut NGX_HTTP_SHARED_DICT_COMMANDS[0] },
-    type_: NGX_HTTP_MODULE as _,
+    type_: NGX_HTTP_MODULE,
     ..ngx_module_t::default()
 };
 
@@ -221,11 +221,7 @@ extern "C" fn ngx_http_shared_dict_add_variable(
     name.len -= 1;
 
     let var = unsafe {
-        ngx_http_add_variable(
-            cf,
-            &raw mut name,
-            (NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE) as ngx_uint_t,
-        )
+        ngx_http_add_variable(cf, &raw mut name, NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE)
     };
     if var.is_null() {
         return NGX_CONF_ERROR;
@@ -305,7 +301,7 @@ extern "C" fn ngx_http_shared_dict_set_variable(
         return;
     };
 
-    if r.method == NGX_HTTP_DELETE as _ {
+    if r.method == NGX_HTTP_DELETE {
         let key = unsafe { NgxStr::from_ngx_str(key) };
 
         ngx_log_debug!(

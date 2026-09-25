@@ -12,8 +12,7 @@ pub const DEBUG: bool = cfg!(ngx_feature = "debug");
 ///
 /// Approximates the remaining space in `u_char[NGX_MAX_ERROR_STR]` after writing the standard
 /// prefix
-pub const LOG_BUFFER_SIZE: usize =
-    NGX_MAX_ERROR_STR as usize - b"1970/01/01 00:00:00 [info] 1#1: ".len();
+pub const LOG_BUFFER_SIZE: usize = NGX_MAX_ERROR_STR - b"1970/01/01 00:00:00 [info] 1#1: ".len();
 
 /// Obtains a pointer to the global (cycle) log object.
 ///
@@ -30,12 +29,9 @@ pub fn ngx_cycle_log() -> NonNull<ngx_log_t> {
 
 /// Utility function to provide typed checking of the mask's field state.
 #[inline(always)]
-pub fn check_mask(mask: DebugMask, log_level: usize) -> bool {
-    let mask_bits: u32 = mask.into();
-    if log_level & mask_bits as usize == 0 {
-        return false;
-    }
-    true
+pub fn check_mask(mask: DebugMask, log_level: ngx_uint_t) -> bool {
+    let mask_bits: ngx_uint_t = mask.into();
+    log_level & mask_bits != 0
 }
 
 /// Format args into a provided buffer
@@ -76,7 +72,7 @@ pub unsafe fn log_debug(log: *mut ngx_log_t, err: ngx_err_t, buf: &[u8]) {
     unsafe {
         #[cfg(ngx_feature = "have_variadic_macros")]
         ffi::ngx_log_error_core(
-            ffi::NGX_LOG_DEBUG as _,
+            ffi::NGX_LOG_DEBUG,
             log,
             err,
             c"%*s".as_ptr(),
@@ -213,10 +209,10 @@ pub enum DebugMask {
     All,
 }
 
-impl TryFrom<u32> for DebugMask {
-    type Error = u32;
+impl TryFrom<ngx_uint_t> for DebugMask {
+    type Error = ngx_uint_t;
 
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
+    fn try_from(value: ngx_uint_t) -> Result<Self, Self::Error> {
         match value {
             crate::ffi::NGX_LOG_DEBUG_CORE => Ok(DebugMask::Core),
             crate::ffi::NGX_LOG_DEBUG_ALLOC => Ok(DebugMask::Alloc),
@@ -231,7 +227,7 @@ impl TryFrom<u32> for DebugMask {
     }
 }
 
-impl From<DebugMask> for u32 {
+impl From<DebugMask> for ngx_uint_t {
     fn from(value: DebugMask) -> Self {
         match value {
             DebugMask::Core => crate::ffi::NGX_LOG_DEBUG_CORE,
@@ -297,12 +293,16 @@ mod tests {
 
     #[test]
     fn test_mask_lower_bound() {
-        assert!(<DebugMask as Into<u32>>::into(DebugMask::Core) == crate::ffi::NGX_LOG_DEBUG_FIRST);
+        assert!(
+            <DebugMask as Into<ngx_uint_t>>::into(DebugMask::Core)
+                == crate::ffi::NGX_LOG_DEBUG_FIRST
+        );
     }
     #[test]
     fn test_mask_upper_bound() {
         assert!(
-            <DebugMask as Into<u32>>::into(DebugMask::Stream) == crate::ffi::NGX_LOG_DEBUG_LAST
+            <DebugMask as Into<ngx_uint_t>>::into(DebugMask::Stream)
+                == crate::ffi::NGX_LOG_DEBUG_LAST
         );
     }
     #[test]

@@ -100,7 +100,7 @@ where
 {
     #[inline]
     fn into_handler_status(self, r: &Request) -> ngx_int_t {
-        self.map(|val| val.into_handler_status(r)).unwrap_or(NGX_ERROR as _)
+        self.map(|val| val.into_handler_status(r)).unwrap_or(NGX_ERROR)
     }
 }
 
@@ -267,7 +267,7 @@ impl Request {
         // a valid Nginx string is stored in `value` if it successfully returns.
         unsafe {
             let mut value = ngx_str_t::default();
-            if ngx_http_complex_value(r, val, &raw mut value) != NGX_OK as ngx_int_t {
+            if ngx_http_complex_value(r, val, &raw mut value) != NGX_OK {
                 return None;
             }
             Some(NgxStr::from_ngx_str(value))
@@ -417,7 +417,7 @@ impl Request {
                 core::ptr::null_mut(),
                 &raw mut psr,
                 sub_ptr as *mut _,
-                NGX_HTTP_SUBREQUEST_WAITED as _,
+                NGX_HTTP_SUBREQUEST_WAITED,
             )
         };
 
@@ -638,7 +638,6 @@ impl Method {
     }
 
     fn from_ngx(t: ngx_uint_t) -> Method {
-        let t = t as _;
         match t {
             crate::ffi::NGX_HTTP_GET => Method(MethodInner::Get),
             crate::ffi::NGX_HTTP_HEAD => Method(MethodInner::Head),
