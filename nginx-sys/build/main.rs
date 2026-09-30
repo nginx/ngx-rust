@@ -251,6 +251,8 @@ fn generate_binding(nginx: &NginxSource) {
         // Allow all the NGINX symbols,
         .allowlist_item("ngx_.*")
         .allowlist_var("(NGX|NGINX|nginx)_.*")
+        .allowlist_var("[Aa][Nn][Gg][Ii][Ee]_.*")
+        .allowlist_var("[Tt][Ee][Nn][Gg][Ii][Nn][Ee]_.*")
         // ...and a couple of symbols we need in nginx-sys.
         .allowlist_function(macro_dependencies.join("|"))
         .parse_callbacks(callbacks)
@@ -367,6 +369,7 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
     };
 
     let mut ngx_features: Vec<String> = vec![];
+    let mut nginx_name = "nginx".to_string();
     let mut ngx_os = String::new();
 
     let expanded = expand_definitions(includes, defines)?;
@@ -382,6 +385,8 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
 
         if name == "nginx_build" {
             println!("cargo::metadata=build={}", unquote(value));
+        } else if name == "nginx_name" {
+            nginx_name = unquote(value);
         } else if name == "nginx_version" {
             println!("cargo::metadata=version={}", unquote(value));
         } else if name == "nginx_version_number" {
@@ -422,6 +427,10 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
     for feature in ngx_features {
         println!("cargo::rustc-cfg=ngx_feature=\"{feature}\"");
     }
+
+    println!("cargo::metadata=name={nginx_name}");
+    println!("cargo::rustc-check-cfg=cfg(nginx_name, values(any()))");
+    println!("cargo::rustc-cfg=nginx_name=\"{nginx_name}\"");
 
     // A quoted list of all recognized operating systems to be passed to rustc-check-cfg.
     let values = NGX_CONF_OS.join("\",\"");
@@ -465,6 +474,16 @@ RUST_CONF_STREAM=1
 #else
 /* fallback */
 RUST_CONF_HTTP=1
+#endif
+
+#if (defined ANGIE_VERSION)
+RUST_CONF_NGINX_NAME=\"Angie\"
+
+#elif (defined TENGINE_VERSION)
+RUST_CONF_NGINX_NAME=TENGINE
+
+#elif (defined NGINX_NAME)
+RUST_CONF_NGINX_NAME=NGINX_NAME
 #endif
 
 RUST_CONF_NGINX_BUILD=NGINX_VER_BUILD
