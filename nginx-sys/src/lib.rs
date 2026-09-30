@@ -110,14 +110,17 @@ impl ngx_module_t {
         Self {
             ctx_index: NGX_MODULE_UNSET_INDEX,
             index: NGX_MODULE_UNSET_INDEX,
-            name: ptr::null_mut(),
-            spare0: 0,
-            spare1: 0,
+
+            #[cfg(nginx_name = "Angie")]
+            angie_sign: ngx_angie_sign as _,
+
+            #[cfg(nginx_name = "Angie")]
+            version: angie_version as _,
+            #[cfg(not(nginx_name = "Angie"))]
             version: nginx_version,
+
             signature: NGX_RS_MODULE_SIGNATURE.as_ptr(),
-            ctx: ptr::null_mut(),
-            commands: ptr::null_mut(),
-            type_: 0,
+
             init_master: None,
             init_module: None,
             init_process: None,
@@ -125,14 +128,8 @@ impl ngx_module_t {
             exit_thread: None,
             exit_process: None,
             exit_master: None,
-            spare_hook0: 0,
-            spare_hook1: 0,
-            spare_hook2: 0,
-            spare_hook3: 0,
-            spare_hook4: 0,
-            spare_hook5: 0,
-            spare_hook6: 0,
-            spare_hook7: 0,
+
+            ..unsafe { core::mem::zeroed() }
         }
     }
 }

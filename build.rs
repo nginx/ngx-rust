@@ -33,20 +33,24 @@ fn main() {
         println!("cargo::rustc-cfg=ngx_os=\"{os}\"");
     }
 
+    println!("cargo::rerun-if-env-changed=DEP_NGINX_NAME");
+    let nginx_name = std::env::var("DEP_NGINX_NAME").unwrap_or("nginx".to_string());
+
     // Generate cfg values for version checks
-    const VERSION_CHECKS: &[(u64, &str)] = &[
+    let versions: &[(u64, &str, bool)] = &[
         //
-        (1_021_001, "nginx1_21_1"),
-        (1_025_001, "nginx1_25_1"),
+        (1_021_001, "nginx1_21_1", true),
+        (1_025_001, "nginx1_25_1", true),
+        (1_031_002, "angie1_12_0", nginx_name == "Angie"),
     ];
-    VERSION_CHECKS.iter().for_each(|check| println!("cargo::rustc-check-cfg=cfg({})", check.1));
+    versions.iter().for_each(|check| println!("cargo::rustc-check-cfg=cfg({})", check.1));
 
     println!("cargo::rerun-if-env-changed=DEP_NGINX_VERSION_NUMBER");
     if let Ok(version) = std::env::var("DEP_NGINX_VERSION_NUMBER") {
         let version: u64 = version.parse().unwrap();
 
-        for check in VERSION_CHECKS {
-            if version >= check.0 {
+        for check in versions {
+            if version >= check.0 && check.2 {
                 println!("cargo::rustc-cfg={}", check.1);
             }
         }

@@ -57,7 +57,16 @@ pub fn write_fmt<'a>(buf: &'a mut [MaybeUninit<u8>], args: fmt::Arguments<'_>) -
 pub unsafe fn log_error(level: ngx_uint_t, log: *mut ngx_log_t, err: ngx_err_t, buf: &[u8]) {
     unsafe {
         #[cfg(ngx_feature = "have_variadic_macros")]
-        ffi::ngx_log_error_core(level, log, err, c"%*s".as_ptr(), buf.len(), buf.as_ptr());
+        ffi::ngx_log_error_core(
+            level,
+            log,
+            #[cfg(angie1_12_0)]
+            ::core::ptr::null_mut(),
+            err,
+            c"%*s".as_ptr(),
+            buf.len(),
+            buf.as_ptr(),
+        );
         #[cfg(not(ngx_feature = "have_variadic_macros"))]
         ffi::ngx_log_error(level, log, err, c"%*s".as_ptr(), buf.len(), buf.as_ptr());
     }
@@ -74,6 +83,8 @@ pub unsafe fn log_debug(log: *mut ngx_log_t, err: ngx_err_t, buf: &[u8]) {
         ffi::ngx_log_error_core(
             ffi::NGX_LOG_DEBUG,
             log,
+            #[cfg(angie1_12_0)]
+            ::core::ptr::null_mut(),
             err,
             c"%*s".as_ptr(),
             buf.len(),
