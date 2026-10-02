@@ -92,10 +92,6 @@ jobs:
           sparse-checkout: |
             lib
 
-      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
-        with:
-          toolchain: stable
-
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -108,6 +104,9 @@ jobs:
             nginx/objs/**/ngx-release
           key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-nginx-
+
+      - name: set up Rust toolchain
+        run: rustup toolchain install --no-self-update --override --profile minimal stable
 
       - name: Update configure arguments
         if: matrix.nginx-ref != 'stable-1.22'
@@ -175,10 +174,6 @@ jobs:
           sparse-checkout: |
             lib
 
-      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
-        with:
-          toolchain: stable
-
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -191,6 +186,9 @@ jobs:
             nginx/objs/**/ngx-release
           key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-nginx-
+
+      - name: set up Rust toolchain
+        run: rustup toolchain install --no-self-update --override --profile minimal stable
 
       - name: Prepare build environment
         shell: bash
