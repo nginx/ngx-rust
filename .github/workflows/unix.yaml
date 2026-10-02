@@ -9,52 +9,66 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_TERM_COLOR: 'always'
   RUST_BACKTRACE: '1'
-  NGX_CONFIGURE_CMD: >-
-    auto/configure
-    --with-compat
-    --with-debug
-    --with-http_realip_module
-    --with-http_ssl_module
-    --with-http_v2_module
-    --with-stream
-    --with-stream_realip_module
-    --with-stream_ssl_module
-    --with-threads
-
-  NGX_CONFIGURE_DYNAMIC_MODULES: >-
-    --add-dynamic-module=${{ github.workspace }}/examples
-  NGX_CONFIGURE_STATIC_MODULES: >-
-    --add-module=${{ github.workspace }}/examples
-
-  NGX_TEST_FILES: examples/t
-  NGX_TEST_GLOBALS_DYNAMIC: >-
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_async_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_awssigv4_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_curl_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_shared_dict_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_upstream_custom_module.so;
+  NGINX_SOURCE_DIR: nginx
 
 jobs:
+  rust-version:
+    name: Minimal supported Rust version
+    outputs:
+      version: ${{ steps.read_version.outputs.msrv }}
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: read_version
+        run: |
+          awk -F '=' \
+            '/^rust-version[[:space:]]*=/ { gsub(/([" ]|#.*)/,"",$2); print ("msrv=" $2) }' \
+            Cargo.toml \
+          | tee -a "$GITHUB_OUTPUT"
+
   test:
-    runs-on: ubuntu-latest
+    needs: rust-version
 
     strategy:
       fail-fast: false
       matrix:
+        runner:
+          - ubuntu-latest
+        rust-version:
+          - stable
         nginx-ref:
           - master
           - stable-1.30
-        module:
-          - static
-          - dynamic
+        build:
+          - debug
+          - debug-static
+
         include:
           # minimal supported nginx version (Debian bookworm: 1.22.1)
-          - nginx-ref: stable-1.22
-            module: dynamic
+          - runner: ubuntu-latest
+            rust-version: stable
+            nginx-ref: stable-1.22
+            build: debug
+
+          # minimal supported Rust version
+          - runner: ubuntu-latest
+            rust-version: ${{ needs.rust-version.outputs.version }}
+            nginx-ref: stable-1.30
+            build: debug
+
+    env:
+      NGINX_EXTRA_CONFIGURE_ARGS: >-
+        ${{ matrix.nginx-ref != 'stable-1.22' && '--with-http_v3_module' || '' }}
+
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,45 +91,38 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            nginx/objs/**/CACHEDIR.TAG
-            nginx/objs/**/ngx-debug
-            nginx/objs/**/ngx-release
+            objs-*/**/CACHEDIR.TAG
+            objs-*/**/ngx-debug
+            objs-*/**/ngx-release
+            target/
           key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-nginx-
 
       - name: set up Rust toolchain
-        run: rustup toolchain install --no-self-update --override --profile minimal stable
-
-      - name: Update configure arguments
-        if: matrix.nginx-ref != 'stable-1.22'
-        run: |
-            echo NGX_CONFIGURE_CMD="${NGX_CONFIGURE_CMD} --with-http_v3_module" \
-                >> "$GITHUB_ENV"
-
-      - name: Configure nginx with static modules
-        if: matrix.module == 'static'
-        working-directory: nginx
-        run: |
-          ${NGX_CONFIGURE_CMD} \
-              ${NGX_CONFIGURE_STATIC_MODULES}
-
-      - name: Configure nginx with dynamic modules
-        if: matrix.module != 'static'
-        working-directory: nginx
-        run: |
-          ${NGX_CONFIGURE_CMD} \
-              ${NGX_CONFIGURE_DYNAMIC_MODULES}
-          echo TEST_NGINX_GLOBALS="$NGX_TEST_GLOBALS_DYNAMIC" >> "$GITHUB_ENV"
-
-      - name: Build nginx
-        working-directory: nginx
-        run: make -j$(nproc)
-
-      - name: Run tests
         env:
-          PERL5LIB: ${{ github.workspace }}/nginx/tests/lib
-          TEST_NGINX_BINARY: ${{ github.workspace }}/nginx/objs/nginx
-          TEST_NGINX_MODULES: ${{ github.workspace }}/nginx/objs
-          TEST_NGINX_VERBOSE: 1
+          toolchain: ${{ matrix.rust-version }}
         run: |
-          prove -j$(nproc) --state=save ${NGX_TEST_FILES} || prove -v --state=failed
+          rustup toolchain install --no-self-update --override --profile minimal \
+            --component 'rustfmt,clippy' $toolchain
+
+      - name: CPU count
+        run: echo PARALLEL="-j $(getconf _NPROCESSORS_ONLN)" >> "$GITHUB_ENV"
+
+      - name: build
+        id: build
+        run: make BUILD=${{ matrix.build }} $PARALLEL build
+
+      - name: check
+        # always run if build succeeds
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: make BUILD=${{ matrix.build }} check
+
+      - name: run tests
+        # always run if build succeeds
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: make BUILD=${{ matrix.build }} TEST_PREREQ= test
+
+      - name: run unittests
+        # always run if build succeeds
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: make BUILD=${{ matrix.build }} $PARALLEL unittest

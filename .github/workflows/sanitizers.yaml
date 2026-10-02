@@ -9,17 +9,24 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_TERM_COLOR: 'always'
   RUST_BACKTRACE: '1'
+  NGINX_SOURCE_DIR: nginx
+  NGINX_EXTRA_CONFIGURE_ARGS: --with-http_v3_module
   BUILDREQUIRES: >-
     openssl-devel pcre2-devel zlib-devel
     cargo rust-src rustfmt
     clang compiler-rt llvm
     git-core
-    make patch
+    make patch which
     perl-FindBin
+    perl-IO-Socket-INET6
     perl-IO-Socket-SSL
     perl-Test-Harness
     perl-Test-Simple
@@ -59,49 +66,19 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            nginx/objs/ngx_rust_examples
+            objs-*/**/CACHEDIR.TAG
+            objs-*/**/ngx-debug
+            objs-*/**/ngx-release
           key: ${{ runner.os }}-cargo-asan-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-asan-
 
       - name: Configure and build nginx
-        working-directory: nginx
-        env:
-          CFLAGS: >-
-            -DNGX_DEBUG_PALLOC=1
-            -DNGX_SUPPRESS_WARN=1
-            -O1
-            -fno-omit-frame-pointer
-            -fsanitize=address,undefined
-          LDFLAGS: -fsanitize=address,undefined
-          RUSTFLAGS: -Zsanitizer=address -Zexternal-clangrt
-          # Pass --target to cargo to ensure that sanitizer flags are not
-          # applied to the build scripts and proc-macros.
-          NGX_RUST_TARGET: x86_64-unknown-linux-gnu
-          # Extra options passed to cargo rustc
-          NGX_RUSTC_OPT: -Zbuild-std
-          # Enable unstable features, such as the -Z options above,
-          # in the stable toolchain.
-          RUSTC_BOOTSTRAP: 1
         run: |
-          patch -p1 < $GITHUB_WORKSPACE/build/nginx-sanitizer-support.patch
-          auto/configure \
-            --with-cc=clang \
-            --with-cc-opt="$CFLAGS" \
-            --with-ld-opt="$LDFLAGS" \
-            --with-compat \
-            --with-debug \
-            --with-http_ssl_module \
-            --with-http_v2_module \
-            --with-http_v3_module \
-            --with-stream \
-            --with-stream_ssl_module \
-            --with-threads \
-            --add-module=$(realpath ../examples)
-          make -j$(nproc)
+          patch -d "$NGINX_SOURCE_DIR" -p1 < $GITHUB_WORKSPACE/build/nginx-sanitizer-support.patch
+          make -j$(nproc) BUILD=sanitize build
 
       - name: Run tests
         env:
-          ASAN_OPTIONS: detect_stack_use_after_return=1:detect_odr_violation=0
           # `container` job steps are running as root, and thus all the files
           # created by the test scripts are owned by root.
           # But the worker processes are spawned as "nobody" by default,
@@ -109,7 +86,4 @@ jobs:
           TEST_NGINX_GLOBALS: >-
               user root;
         run: |
-            TEST_NGINX_BINARY="$PWD/nginx/objs/nginx" \
-            LSAN_OPTIONS="suppressions=$PWD/build/lsan-suppressions.txt" \
-            UBSAN_OPTIONS="suppressions=$PWD/build/ubsan-suppressions.txt" \
-            prove -v -Inginx/tests/lib examples/t
+          make -j$(nproc) BUILD=sanitize TEST_PREREQ= test

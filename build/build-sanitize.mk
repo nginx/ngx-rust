@@ -1,6 +1,6 @@
-CFLAGS_ASAN	+= -O1 -fsanitize=address -fno-omit-frame-pointer
+CFLAGS_ASAN	+= -O1 -fsanitize=address,undefined -fno-omit-frame-pointer
 CFLAGS_ASAN	+= -DNGX_DEBUG_PALLOC=1 -DNGX_SUPPRESS_WARN=1
-LDFLAGS_ASAN	+= -fsanitize=address
+LDFLAGS_ASAN	+= -fsanitize=address,undefined
 
 RUSTFLAGS 	+= -Cforce-frame-pointers=yes
 RUSTFLAGS 	+= -Zsanitizer=address -Zexternal-clangrt
@@ -12,6 +12,7 @@ BUILD_ENV	+= NGX_RUST_TARGET="$(HOST_TUPLE)"
 
 TEST_ENV	+= ASAN_OPTIONS=detect_stack_use_after_return=1:detect_odr_violation=0
 TEST_ENV	+= LSAN_OPTIONS="suppressions=$(CURDIR)/build/lsan-suppressions.txt"
+TEST_ENV	+= UBSAN_OPTIONS="suppressions=$(CURDIR)/build/ubsan-suppressions.txt"
 TEST_ENV	+= TEST_NGINX_CATLOG=1
 
 NGINX_CONFIGURE_ARGS	+= \
