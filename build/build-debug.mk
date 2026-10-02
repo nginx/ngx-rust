@@ -4,4 +4,4 @@ NGINX_CONFIGURE_ARGS	+= \
 	--with-debug \
 	--add-dynamic-module="$(MODULE_SOURCE_DIR)"
 
-build: $(CARGO_BUILT_MODULE) $(NGINX_BUILT_MODULE)
+modules: $(CARGO_BUILT_MODULE) $(NGINX_BUILT_MODULE)

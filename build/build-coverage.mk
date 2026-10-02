@@ -42,7 +42,7 @@ BUILD_ENV	+= RUSTFLAGS="$(RUSTFLAGS)"
 BUILD_ENV	+= LLVM_PROFILE_FILE="$(LLVM_PROFILE_FILE)"
 TEST_ENV	+= LLVM_PROFILE_FILE="$(LLVM_PROFILE_FILE)"
 
-build: $(CARGO_BUILT_MODULE)
+modules: $(CARGO_BUILT_MODULE)
 
 
 .PHONY: coverage-clean coverage-html coverage-lcov coverage-summary
