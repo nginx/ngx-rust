@@ -1,4 +1,4 @@
-name: NGINX
+name: Windows
 
 on:
   push:
@@ -9,26 +9,19 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_TERM_COLOR: 'always'
   RUST_BACKTRACE: '1'
   NGX_CONFIGURE_CMD: >-
     auto/configure
+    --with-cc=cl
     --with-compat
     --with-debug
-    --with-http_realip_module
-    --with-http_ssl_module
-    --with-http_v2_module
-    --with-stream
-    --with-stream_realip_module
-    --with-stream_ssl_module
-
-  NGX_CONFIGURE_UNIX: >-
-    --with-threads
-
-  NGX_CONFIGURE_WINDOWS: >-
-    --with-cc=cl
     --prefix=
     --conf-path=conf/nginx.conf
     --pid-path=logs/nginx.pid
@@ -43,111 +36,26 @@ env:
     --with-cc-opt=-DFD_SETSIZE=1024
     --with-pcre=objs/lib/pcre
     --with-zlib=objs/lib/zlib
+    --with-http_v2_module
+    --with-http_realip_module
+    --with-mail
+    --with-stream
+    --with-stream_realip_module
     --with-openssl=objs/lib/openssl
     --with-openssl-opt="no-asm no-module no-tests no-makedepend -D_WIN32_WINNT=0x0601"
-
-  NGX_CONFIGURE_DYNAMIC_MODULES: >-
-    --add-dynamic-module=${{ github.workspace }}/examples
-  NGX_CONFIGURE_STATIC_MODULES: >-
+    --with-http_ssl_module
+    --with-mail_ssl_module
+    --with-stream_ssl_module
     --add-module=${{ github.workspace }}/examples
 
   NGX_TEST_FILES: examples/t
-  NGX_TEST_GLOBALS_DYNAMIC: >-
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_async_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_awssigv4_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_curl_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_shared_dict_module.so;
-    load_module ${{ github.workspace }}/nginx/objs/ngx_http_upstream_custom_module.so;
 
   OPENSSL_VERSION: '3.0.16'
   PCRE2_VERSION: '10.45'
   ZLIB_VERSION: '1.3.1'
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        nginx-ref:
-          - master
-          - stable-1.30
-        module:
-          - static
-          - dynamic
-        include:
-          # minimal supported nginx version (Debian bookworm: 1.22.1)
-          - nginx-ref: stable-1.22
-            module: dynamic
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ matrix.nginx-ref }}
-          repository: 'nginx/nginx'
-          path: 'nginx'
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: 'nginx/nginx-tests'
-          path: 'nginx/tests'
-          sparse-checkout: |
-            lib
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            nginx/objs/**/CACHEDIR.TAG
-            nginx/objs/**/ngx-debug
-            nginx/objs/**/ngx-release
-          key: ${{ runner.os }}-nginx-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-nginx-
-
-      - name: set up Rust toolchain
-        run: rustup toolchain install --no-self-update --override --profile minimal stable
-
-      - name: Update configure arguments
-        if: matrix.nginx-ref != 'stable-1.22'
-        run: |
-            echo NGX_CONFIGURE_UNIX="${NGX_CONFIGURE_UNIX} --with-http_v3_module" \
-                >> "$GITHUB_ENV"
-
-      - name: Configure nginx with static modules
-        if: matrix.module == 'static'
-        working-directory: nginx
-        run: |
-          ${NGX_CONFIGURE_CMD} \
-              ${NGX_CONFIGURE_UNIX} \
-              ${NGX_CONFIGURE_STATIC_MODULES}
-
-      - name: Configure nginx with dynamic modules
-        if: matrix.module != 'static'
-        working-directory: nginx
-        run: |
-          ${NGX_CONFIGURE_CMD} \
-              ${NGX_CONFIGURE_UNIX} \
-              ${NGX_CONFIGURE_DYNAMIC_MODULES}
-          echo TEST_NGINX_GLOBALS="$NGX_TEST_GLOBALS_DYNAMIC" >> "$GITHUB_ENV"
-
-      - name: Build nginx
-        working-directory: nginx
-        run: make -j$(nproc)
-
-      - name: Run tests
-        env:
-          PERL5LIB: ${{ github.workspace }}/nginx/tests/lib
-          TEST_NGINX_BINARY: ${{ github.workspace }}/nginx/objs/nginx
-          TEST_NGINX_MODULES: ${{ github.workspace }}/nginx/objs
-          TEST_NGINX_VERBOSE: 1
-        run: |
-          prove -j$(nproc) --state=save ${NGX_TEST_FILES} || prove -v --state=failed
-
-  windows:
+  test:
     runs-on: windows-2022
     env:
       TEMP: "C:\\TEMP"
@@ -160,8 +68,6 @@ jobs:
       matrix:
         nginx-ref:
           - master
-        module:
-          - static
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -223,10 +129,7 @@ jobs:
         run: |
           @echo on
           call "%VCVARSALL%" %VCARCH%
-          bash.exe ^
-              %NGX_CONFIGURE_CMD% ^
-              %NGX_CONFIGURE_WINDOWS% ^
-              %NGX_CONFIGURE_STATIC_MODULES%
+          bash.exe %NGX_CONFIGURE_CMD%
           nmake -f objs/Makefile
 
       - name: Run tests
