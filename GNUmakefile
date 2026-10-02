@@ -55,6 +55,7 @@ NGINX_CONFIGURE_ARGS	= \
 	--with-stream_realip_module \
 	--with-stream_ssl_module \
 	--with-pcre \
+	--with-threads \
 	--with-compat \
 	$(NGINX_EXTRA_CONFIGURE_ARGS)
 
