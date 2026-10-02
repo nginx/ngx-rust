@@ -1,0 +1,134 @@
+name: VM
+
+on:
+  push:
+    branches:
+      - main
+      - "[0-9]+.[0-9]+.x"
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  FORWARD_ENV: CARGO_INCREMENTAL CARGO_TERM_COLOR RUST_BACKTRACE NGINX_SOURCE_DIR
+
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: "always"
+  NGINX_SOURCE_DIR: nginx
+  RUST_BACKTRACE: "1"
+
+  PACKAGES_FREEBSD: >-
+    git-lite
+    gmake
+    llvm19-lite
+    p5-IO-Socket-INET6
+    p5-IO-Socket-SSL
+    pcre2
+    pkgconf
+    rust
+  PACKAGES_NETBSD: >-
+    git-base
+    gmake
+    clang
+    p5-IO-Socket-INET6
+    p5-IO-Socket-SSL
+    pcre2
+    pkgconf
+    rust
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: cpa.sh {0}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - name: FreeBSD
+            version: "15.1"
+          - name: NetBSD
+            version: "11.0"
+        nginx-ref:
+          - master
+        build:
+          - debug
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.nginx-ref }}
+          repository: "nginx/nginx"
+          path: "nginx"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: "nginx/nginx-tests"
+          path: "nginx/tests"
+          sparse-checkout: |
+            lib
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            objs-*/**/CACHEDIR.TAG
+            objs-*/**/ngx-debug
+            objs-*/**/ngx-release
+            target/
+          key: ${{ matrix.os.name }}-nginx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.os.name }}-nginx-
+
+      - name: CPU count
+        shell: bash
+        run: |
+          CPU_COUNT=$(getconf _NPROCESSORS_ONLN)
+          echo CPU_COUNT="$CPU_COUNT" >> "$GITHUB_ENV"
+          echo PARALLEL="-j $CPU_COUNT" >> "$GITHUB_ENV"
+
+      - name: start ${{ matrix.os.name }} ${{ matrix.os.version }} VM
+        uses: cross-platform-actions/action@e0b9770014ba65d5e0815f15b74031c3a635f641 # v1.6.0
+        with:
+          environment_variables: ${{ env.FORWARD_ENV }} CPU_COUNT
+          operating_system: ${{ matrix.os.name }}
+          architecture: ${{ matrix.os.architecture }}
+          version: ${{ matrix.os.version }}
+          cpu_count: ${{ env.CPU_COUNT }}
+
+      - name: install dependencies
+        run: |
+          case "${{ matrix.os.name }}" in
+          FreeBSD)
+            sudo pkg install -y ${{ env.PACKAGES_FREEBSD }} ;;
+          NetBSD)
+            echo 'https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/${{ matrix.os.version }}/All' | \
+                sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+            sudo pkgin -fy install ${{ env.PACKAGES_NETBSD }} ;;
+          *)
+            echo "Unsupported operating system"; exit 1;;
+          esac
+
+      - name: build
+        id: build
+        run: gmake BUILD=${{ matrix.build }} $PARALLEL build
+
+      - name: check
+        # always run if build succeeds
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: gmake BUILD=${{ matrix.build }} check
+
+      - name: run tests
+        # always run if build succeeds
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: gmake BUILD=${{ matrix.build }} TEST_PREREQ= test
+
+      - name: run unittests
+        # always run if build succeeds
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: gmake BUILD=${{ matrix.build }} $PARALLEL unittest
