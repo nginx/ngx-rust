@@ -5,6 +5,7 @@ on: [ push, pull_request ]
 permissions: {}
 
 env:
+  CARGO_INCREMENTAL: '0'
   CARGO_TERM_COLOR: 'always'
   CARGO_TERM_VERBOSE: 'true'
   RUSTFLAGS: '--deny warnings'
