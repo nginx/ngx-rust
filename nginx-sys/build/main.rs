@@ -6,6 +6,8 @@ use std::fs::{File, read_to_string};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod parse_callbacks;
+
 const ENV_VARS_TRIGGERING_RECOMPILE: &[&str] = &["OUT_DIR", "NGINX_BUILD_DIR", "NGINX_SOURCE_DIR"];
 
 /// The feature flags set by the nginx configuration script.
@@ -239,6 +241,8 @@ fn generate_binding(nginx: &NginxSource) {
         &["random", "sched_yield", "usleep"]
     };
 
+    let callbacks = Box::new(parse_callbacks::NginxCallbacks::default());
+
     let bindings = bindgen::Builder::default()
         // Allow all the NGINX symbols,
         .allowlist_item("ngx_.*")
@@ -247,6 +251,7 @@ fn generate_binding(nginx: &NginxSource) {
         .allowlist_function(macro_dependencies.join("|"))
         // will be restored later in build.rs
         .blocklist_item("NGX_ALIGNMENT")
+        .parse_callbacks(callbacks)
         .generate_cstr(true)
         // The input header we would like to generate bindings for.
         .header("build/wrapper.h")
