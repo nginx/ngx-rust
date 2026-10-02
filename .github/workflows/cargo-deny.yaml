@@ -6,6 +6,8 @@ on:
       - "[0-9]+.[0-9]+.x"
   pull_request:
 
+permissions: {}
+
 jobs:
   check:
     runs-on: ubuntu-latest
