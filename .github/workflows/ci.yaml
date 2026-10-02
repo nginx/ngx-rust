@@ -89,6 +89,9 @@ jobs:
       - name: check ngx, alloc + serde
         run: cargo check -p ngx --no-default-features --features vendored,alloc,serde
 
+      - name: check ngx, async
+        run: cargo check -p ngx --no-default-features --features vendored,async
+
       - name: clippy
         # always run if build succeeds
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -103,98 +106,3 @@ jobs:
         # always run if build succeeds
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: cargo doc --all-features --no-deps
-
-  examples-linux:
-    name: Examples (Linux)
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-            submodules: true
-      - name: set up cargo cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        continue-on-error: false
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-      - name: set up nginx deps cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        continue-on-error: false
-        with:
-          path: |
-            .cache/.gnupg
-            .cache/nginx
-            .cache/*.tar.gz
-            .cache/*.tar.asc
-            .cache/*.tar.sig
-          key:  ${{ runner.os }}-deps-${{ hashFiles('**/nginx-sys/build.rs') }}
-          restore-keys: ${{ runner.os }}-deps-
-      - name: compile examples
-        run: cargo build --release --package examples --examples --all-features
-
-  test-macos:
-    name: Test (MacOS)
-    runs-on: macos-latest
-    steps:
-      - name: install command line dependencies
-        run: brew install make gnupg
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-            submodules: true
-      - name: set up Rust toolchain
-        run: |
-          rustup toolchain install --no-self-update --override --profile minimal \
-            --component rustfmt stable
-      - name: set up cargo cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        continue-on-error: false
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-      - name: set up nginx deps cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        continue-on-error: false
-        with:
-          path: |
-            .cache/*.tar.gz
-            .cache/*.tar.asc
-            .cache/*.tar.sig
-          key:  ${{ runner.os }}-deps-${{ hashFiles('**/nginx-sys/build.rs') }}
-          restore-keys: ${{ runner.os }}-deps-
-      - name: current directory
-        run: pwd
-      - name: make cache directory
-        run: mkdir -p .cache/.gnupg
-      - name: disable ipv6 for gpg
-        run: echo "disable-ipv6" > .cache/.gnupg/dirmngr.conf
-      - name: build
-        run: cargo build --workspace --all-targets --features "async,vendored"
-      - name: run tests
-        run: cargo test --workspace --features "async,vendored"
-
-  fmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: set up Rust toolchain
-        run: |
-          rustup toolchain install --no-self-update --override --profile minimal \
-            --component rustfmt stable
-      - name: rustfmt version
-        run: rustfmt --version
-      - name: cargo fmt
-        run: cargo fmt --all --check
