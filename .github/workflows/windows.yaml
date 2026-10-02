@@ -50,10 +50,6 @@ env:
 
   NGX_TEST_FILES: examples/t
 
-  OPENSSL_VERSION: '3.0.16'
-  PCRE2_VERSION: '10.45'
-  ZLIB_VERSION: '1.3.1'
-
 jobs:
   test:
     runs-on: windows-2022
@@ -103,6 +99,14 @@ jobs:
         shell: bash
         working-directory: nginx
         run: |
+          print_var() {
+            gmake -f misc/GNUmakefile --eval="print_$1: ; @echo \$($1)" "print_$1"
+          }
+
+          OPENSSL_VERSION=$(print_var OPENSSL | cut -d- -f2-)
+          PCRE2_VERSION=$(print_var PCRE | cut -d- -f2-)
+          ZLIB_VERSION=$(print_var ZLIB | cut -d- -f2-)
+
           # Disable dynamic lookup of WSAPoll(); it crashes if the symbol is already imported by
           # Rust stdlib.
           sed 's/\(_WIN32_WINNT\s*\) 0x0501/\1 0x0601/' -i src/os/win32/ngx_win32_config.h
@@ -113,14 +117,14 @@ jobs:
           mkdir -p $TEMP
           mkdir -p objs/lib
 
-          curl -sLO https://github.com/PCRE2Project/pcre2/releases/download/pcre2-$PCRE2_VERSION/pcre2-$PCRE2_VERSION.tar.gz
+          curl -fsLO https://github.com/PCRE2Project/pcre2/releases/download/pcre2-$PCRE2_VERSION/pcre2-$PCRE2_VERSION.tar.gz
           tar -C objs/lib --transform "s/pcre2-$PCRE2_VERSION/pcre/" -xzf ./pcre2-$PCRE2_VERSION.tar.gz
           echo '#include <stdint.h>' > objs/lib/pcre/src/inttypes.h
 
-          curl -sLO https://github.com/madler/zlib/releases/download/v$ZLIB_VERSION/zlib-$ZLIB_VERSION.tar.gz
+          curl -fsLO https://github.com/madler/zlib/releases/download/v$ZLIB_VERSION/zlib-$ZLIB_VERSION.tar.gz
           tar -C objs/lib --transform "s/zlib-$ZLIB_VERSION/zlib/" -xzf ./zlib-$ZLIB_VERSION.tar.gz
 
-          curl -sLO https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz
+          curl -fsLO https://github.com/openssl/openssl/releases/download/openssl-$OPENSSL_VERSION/openssl-$OPENSSL_VERSION.tar.gz
           tar -C objs/lib --transform "s/openssl-$OPENSSL_VERSION/openssl/" -xzf ./openssl-$OPENSSL_VERSION.tar.gz
 
       - name: Configure and build nginx
