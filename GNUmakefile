@@ -142,7 +142,7 @@ check: $(NGINX_BUILD_DIR)/Makefile ## Check style and lint
 	$(BUILD_ENV) $(NGX_CARGO) clippy --workspace --all-targets --verbose -- -D warnings
 
 unittest: $(NGINX_BUILD_DIR)/Makefile  ## Run unit-tests
-	$(BUILD_ENV) $(TEST_ENV) $(NGX_CARGO) test $(CARGO_PROFILE_ARG)
+	$(BUILD_ENV) $(TEST_ENV) $(NGX_CARGO) test $(CARGO_PROFILE_ARG) --workspace
 
 PROVE = env $(TEST_ENV) prove -I $(NGINX_TESTS_DIR)/lib
 
