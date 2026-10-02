@@ -64,6 +64,12 @@ jobs:
             nginx-ref: stable-1.30
             build: debug
 
+          # macOS
+          - runner: macos-latest
+            rust-version: stable
+            nginx-ref: stable-1.30
+            build: debug
+
     env:
       NGINX_EXTRA_CONFIGURE_ARGS: >-
         ${{ matrix.nginx-ref != 'stable-1.22' && '--with-http_v3_module' || '' }}
