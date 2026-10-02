@@ -102,7 +102,9 @@ TEST_ENV	+= TEST_NGINX_GLOBALS="$(TEST_NGINX_GLOBALS)"
 
 # Build targets
 
-.PHONY: help build check unittest test full-test clean
+.NOTPARALLEL: modules
+
+.PHONY: help build modules check unittest test full-test clean
 
 help:
 	@echo "Available targets:"
@@ -130,12 +132,14 @@ $(TEST_NGINX_BINARY): $(NGINX_BUILD_DIR)/Makefile FORCE
 
 $(NGINX_BUILT_MODULE): $(NGINX_BUILD_DIR)/Makefile FORCE
 	cd $(NGINX_SOURCE_DIR) \
-		&& $(BUILD_ENV) $(MAKE) -f $(NGINX_BUILD_DIR)/Makefile modules
+		&& $(BUILD_ENV) $(MAKE) -f $(NGINX_BUILD_DIR)/Makefile -j 1 modules
 
 $(CARGO_BUILT_MODULE): $(NGINX_BUILD_DIR)/Makefile FORCE
 	$(BUILD_ENV) $(NGX_CARGO) build $(CARGO_PROFILE_ARG) $(CARGO_BUILD_ARGS)
 
-build: $(TEST_NGINX_BINARY) ## Build the module
+modules:
+
+build: $(TEST_NGINX_BINARY) modules ## Build the module
 
 check: $(NGINX_BUILD_DIR)/Makefile ## Check style and lint
 	$(BUILD_ENV) $(NGX_CARGO) fmt --all --check
