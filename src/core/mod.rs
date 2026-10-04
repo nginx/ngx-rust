@@ -1,6 +1,7 @@
 mod buffer;
 mod conf;
 mod pool;
+pub mod shm;
 pub mod slab;
 mod status;
 mod string;
@@ -8,6 +9,7 @@ mod string;
 pub use buffer::*;
 pub use conf::*;
 pub use pool::*;
+pub use shm::{SharedZone, SharedZoneData, ShmError};
 pub use slab::SlabPool;
 pub use status::*;
 pub use string::*;
