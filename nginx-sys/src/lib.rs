@@ -10,7 +10,6 @@ mod string;
 
 use core::ptr;
 
-#[doc(hidden)]
 mod bindings {
     #![allow(unknown_lints)] // unnecessary_transmutes
     #![allow(missing_docs)]
@@ -24,7 +23,7 @@ mod bindings {
     #![allow(unnecessary_transmutes)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
-#[doc(no_inline)]
+
 pub use bindings::*;
 pub use event::*;
 pub use queue::*;
