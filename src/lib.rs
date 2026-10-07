@@ -133,6 +133,12 @@ pub mod collections;
 /// utilities will generally align with the NGINX 'core' files and APIs.
 pub mod core;
 
+/// The event module.
+///
+/// Helpers around nginx's event-loop globals, currently the
+/// `stub_status` connection-state atomics.
+pub mod event;
+
 /// The ffi module.
 ///
 /// This module provides scoped FFI bindings for NGINX symbols.
