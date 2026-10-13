@@ -16,7 +16,6 @@ exclude = [
     "!/nginx/docs/man",
 ]
 edition.workspace = true
-homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 

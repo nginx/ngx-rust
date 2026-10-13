@@ -10,7 +10,6 @@ build = "build/main.rs"
 links = "nginx"
 edition.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
