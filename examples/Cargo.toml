@@ -4,7 +4,6 @@ version = "0.0.0"
 publish = false
 edition.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 # https://github.com/dependabot/dependabot-core/issues/1156
