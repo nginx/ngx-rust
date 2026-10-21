@@ -22,6 +22,8 @@ const NGX_CONF_FEATURES: &[&str] = &[
     "api",
     "compat",
     "debug",
+    "have_d_namlen",
+    "have_d_type",
     "have_devpoll",
     "have_epollexclusive",
     "have_epollrdhup",
@@ -252,6 +254,8 @@ fn generate_binding(nginx: &NginxSource) {
         .allowlist_var("[Tt][Ee][Nn][Gg][Ii][Nn][Ee]_.*")
         // ...and a couple of symbols we need in nginx-sys.
         .allowlist_function(macro_dependencies.join("|"))
+        // Reimplemented in nginx-sys as functions returning ngx_fd_t on all platforms.
+        .blocklist_item("ngx_std(out|err)")
         .parse_callbacks(callbacks)
         .generate_cstr(true)
         // The input header we would like to generate bindings for.
