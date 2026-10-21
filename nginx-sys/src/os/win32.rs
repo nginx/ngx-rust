@@ -1,6 +1,8 @@
 /// Returns a non cryptograhpically-secure pseudo-random integer.
 #[inline]
 pub fn ngx_random() -> core::ffi::c_long {
+    use libc::rand;
+
     unsafe {
         // Emulate random() as Microsoft CRT does not provide it.
         // rand() should be thread-safe in the multi-threaded CRT we link to, but will not be seeded
