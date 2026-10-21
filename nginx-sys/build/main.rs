@@ -239,11 +239,8 @@ fn generate_binding(nginx: &NginxSource) {
         .expect("rust-version is valid and supported by bindgen");
 
     // Functions that we need for macro and inline fn reimplementations in the nginx-sys itself.
-    let macro_dependencies: &[_] = if env::var("CARGO_CFG_WINDOWS").is_ok() {
-        &["SwitchToThread", "rand"]
-    } else {
-        &["random", "sched_yield", "usleep"]
-    };
+    let macro_dependencies: &[_] =
+        if env::var("CARGO_CFG_WINDOWS").is_ok() { &["SwitchToThread"] } else { &["random"] };
 
     let callbacks = Box::new(parse_callbacks::NginxCallbacks::default());
 

@@ -534,6 +534,7 @@ dependencies = [
  "cc",
  "dunce",
  "errno",
+ "libc",
  "nginx-src",
  "regex",
  "shlex",

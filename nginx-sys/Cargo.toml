@@ -20,6 +20,7 @@ targets = []
 
 [dependencies]
 errno = { version = "0.3.10", default-features = false }
+libc.workspace = true
 
 [build-dependencies]
 bindgen = "0.73.2"

@@ -19,6 +19,9 @@ std_instead_of_core = "warn"
 
 [workspace.lints.rust]
 
+[workspace.dependencies]
+libc = { version = "0.2.190", default-features = false }
+
 [package]
 name = "ngx"
 version = "0.5.0"
