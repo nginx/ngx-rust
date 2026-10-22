@@ -20,7 +20,7 @@ targets = []
 
 [dependencies]
 cfg-if = "1.0.5"
-errno = { version = "0.3.10", default-features = false }
+errno.workspace = true
 libc.workspace = true
 
 [target.'cfg(windows)'.dependencies.windows-sys]
