@@ -57,11 +57,14 @@ jobs:
       TEMP: "C:\\TEMP"
       TMP: "C:\\TEMP"
       TMPDIR: "C:\\TEMP"
-      VCARCH: x64
+      VCARCH: ${{ matrix.arch }}
 
     strategy:
       fail-fast: false
       matrix:
+        arch:
+          - x86
+          - x64
         nginx-ref:
           - master
 
