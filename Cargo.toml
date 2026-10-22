@@ -20,6 +20,7 @@ std_instead_of_core = "warn"
 [workspace.lints.rust]
 
 [workspace.dependencies]
+errno = { version = "0.3.14", default-features = false }
 libc = { version = "0.2.190", default-features = false }
 
 [package]
@@ -47,6 +48,8 @@ targets = []
 
 [dependencies]
 async-task = { version = "4.7.1", optional = true }
+errno.workspace = true
+libc.workspace = true
 lock_api = "0.4.13"
 nginx-sys = { path = "nginx-sys", version = "0.5.0"}
 pin-project-lite = { version = "0.2.16", optional = true }
