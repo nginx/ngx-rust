@@ -548,6 +548,8 @@ version = "0.5.0"
 dependencies = [
  "allocator-api2",
  "async-task",
+ "errno",
+ "libc",
  "lock_api",
  "nginx-sys",
  "pin-project-lite",
