@@ -78,6 +78,13 @@ const NGX_CONF_FEATURES: &[&str] = &[
 const NGX_CONF_OS: &[&str] =
     &["darwin", "freebsd", "gnu_hurd", "hpux", "linux", "solaris", "tru64", "win32"];
 
+/// The features detected from the C standard library and POSIX headers.
+/// These flags are meant for local consumption to isolate platform weirdness from consumers.
+const LIBC_CONF: &[&str] = &[
+    // POSIX.1-2008 mandated compatibility macro for timespec fields in struct stat */
+    "have_st_mtime",
+];
+
 type BoxError = Box<dyn StdError>;
 
 /// Function invoked when `cargo build` is executed.
@@ -392,6 +399,8 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
             println!("cargo::metadata=version={}", unquote(value));
         } else if name == "nginx_version_number" {
             println!("cargo::metadata=version_number={value}");
+        } else if LIBC_CONF.contains(&name.as_str()) {
+            println!("cargo::rustc-cfg={name}={value}")
         } else if NGX_CONF_OS.contains(&name.as_str()) {
             ngx_os = name;
         } else if NGX_CONF_FEATURES.contains(&name.as_str()) && value != "0" {
@@ -417,6 +426,10 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
             .collect::<Vec<_>>()
             .join(" ")
     );
+
+    for name in LIBC_CONF {
+        println!("cargo::rustc-check-cfg=cfg({name}, values(any()))");
+    }
 
     // A quoted list of all recognized features to be passed to rustc-check-cfg.
     let values = NGX_CONF_FEATURES.join("\",\"");
@@ -490,6 +503,11 @@ RUST_CONF_NGINX_NAME=NGINX_NAME
 RUST_CONF_NGINX_BUILD=NGINX_VER_BUILD
 RUST_CONF_NGINX_VERSION=NGINX_VER
 RUST_CONF_NGINX_VERSION_NUMBER=nginx_version
+
+#ifdef st_mtime
+RUST_CONF_HAVE_ST_MTIME=ngx_value(st_mtime)
+#endif
+
 "
     )?;
 

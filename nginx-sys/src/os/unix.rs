@@ -140,7 +140,17 @@ pub unsafe fn ngx_file_fs_size(sb: *const ngx_file_info_t) -> off_t {
 
 #[inline]
 pub unsafe fn ngx_file_mtime(sb: *const ngx_file_info_t) -> time_t {
-    unsafe { (*sb).st_mtim.tv_sec }
+    cfg_if! {
+        if #[cfg(have_st_mtime = "st_mtim.tv_sec")] {
+            // POSIX-1.2008
+            unsafe { (*sb).st_mtim.tv_sec }
+        } else if #[cfg(have_st_mtime = "st_mtimespec.tv_sec")] {
+            // Darwin
+            unsafe { (*sb).st_mtimespec.tv_sec }
+        } else {
+            unsafe { (*sb).st_mtime }
+        }
+    }
 }
 
 #[inline]
