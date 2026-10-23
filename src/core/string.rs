@@ -1,5 +1,5 @@
-#[cfg(feature = "alloc")]
-use alloc::{borrow::Cow, string::String};
+use alloc::borrow::Cow;
+use alloc::string::String;
 use core::cmp;
 use core::fmt;
 use core::str::{self, Utf8Error};
@@ -16,7 +16,6 @@ macro_rules! ngx_string {
     ($s:expr) => {{ $crate::ffi::ngx_str_t { len: $s.len() as _, data: concat!($s, "\0").as_ptr() as *mut u8 } }};
 }
 
-#[cfg(feature = "alloc")]
 pub use self::_alloc::NgxString;
 
 /// Representation of a borrowed [Nginx string].
@@ -70,7 +69,6 @@ impl NgxStr {
     /// Converts an [`NgxStr`] into a [`Cow<str>`], replacing invalid UTF-8 sequences.
     ///
     /// See [`String::from_utf8_lossy`].
-    #[cfg(feature = "alloc")]
     pub fn to_string_lossy(&self) -> Cow<'_, str> {
         String::from_utf8_lossy(self.as_bytes())
     }
@@ -193,7 +191,6 @@ impl_partial_ord_eq_from!(NgxStr, &'a [u8]);
 impl_partial_ord_eq_from!(NgxStr, &'a [u8; N]; const N: usize);
 impl_partial_ord_eq_from!(NgxStr, &'a str);
 
-#[cfg(feature = "alloc")]
 mod _alloc {
     use core::borrow::Borrow;
     use core::hash;
@@ -539,8 +536,6 @@ mod _alloc {
 
 #[cfg(test)]
 mod tests {
-    extern crate alloc;
-
     use alloc::string::ToString;
 
     use super::*;
@@ -551,7 +546,6 @@ mod tests {
         let ngx_string = ngx_str_t { data: string.as_ptr().cast_mut(), len: string.len() };
         let ns: &NgxStr = string.as_bytes().into();
 
-        #[cfg(feature = "alloc")]
         assert_eq!(string, ns);
         assert_eq!(ngx_string, ns);
         assert_eq!(string.as_bytes(), ns);
@@ -559,7 +553,6 @@ mod tests {
         assert_eq!(b"test", ns);
         assert_eq!("test", ns);
 
-        #[cfg(feature = "alloc")]
         assert_eq!(ns, string);
         assert_eq!(ns, ngx_string);
         assert_eq!(ns, string.as_bytes());
@@ -569,7 +562,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "alloc")]
     fn test_string_comparisons() {
         use crate::allocator::Global;
 
@@ -597,7 +589,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "alloc")]
     fn test_string_write() {
         use core::fmt::Write;
 
@@ -620,11 +611,9 @@ mod tests {
 
     /// An allocator that always refuses, so that a write can be made to fail
     /// without relying on exhausting real memory.
-    #[cfg(feature = "alloc")]
     #[derive(Clone)]
     struct Oom;
 
-    #[cfg(feature = "alloc")]
     unsafe impl crate::allocator::Allocator for Oom {
         fn allocate(
             &self,
@@ -637,7 +626,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "alloc")]
     fn test_string_write_grows() {
         use core::fmt::Write;
 
@@ -654,7 +642,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "alloc")]
     fn test_string_write_reports_allocation_failure() {
         use core::fmt::Write;
 

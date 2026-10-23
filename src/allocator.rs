@@ -10,9 +10,8 @@
 use ::core::alloc::Layout;
 use ::core::mem;
 use ::core::ptr::{self, NonNull};
-pub use allocator_api2::alloc::{AllocError, Allocator};
-#[cfg(feature = "alloc")]
-pub use allocator_api2::{alloc::Global, boxed::Box, unsize_box};
+pub use allocator_api2::alloc::{AllocError, Allocator, Global};
+pub use allocator_api2::{boxed::Box, unsize_box};
 
 /// Explicitly duplicate an object using the specified Allocator.
 pub trait TryCloneIn: Sized {
@@ -57,25 +56,15 @@ pub(crate) const fn dangling_for_layout(layout: &Layout) -> NonNull<u8> {
     }
 }
 
-#[cfg(feature = "alloc")]
-mod impls {
-    use allocator_api2::boxed::Box;
+impl<T, OA> TryCloneIn for Box<T, OA>
+where
+    T: TryCloneIn,
+    OA: Allocator,
+{
+    type Target<A: Allocator + Clone> = Box<<T as TryCloneIn>::Target<A>, A>;
 
-    use super::*;
-
-    impl<T, OA> TryCloneIn for Box<T, OA>
-    where
-        T: TryCloneIn,
-        OA: Allocator,
-    {
-        type Target<A: Allocator + Clone> = Box<<T as TryCloneIn>::Target<A>, A>;
-
-        fn try_clone_in<A: Allocator + Clone>(
-            &self,
-            alloc: A,
-        ) -> Result<Self::Target<A>, AllocError> {
-            let x = self.as_ref().try_clone_in(alloc.clone())?;
-            Box::try_new_in(x, alloc)
-        }
+    fn try_clone_in<A: Allocator + Clone>(&self, alloc: A) -> Result<Self::Target<A>, AllocError> {
+        let x = self.as_ref().try_clone_in(alloc.clone())?;
+        Box::try_new_in(x, alloc)
     }
 }

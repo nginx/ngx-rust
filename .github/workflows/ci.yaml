@@ -80,14 +80,11 @@ jobs:
       - name: check ngx, no default features (no_std)
         run: cargo check -p ngx --no-default-features --features vendored
 
-      - name: check ngx, alloc
-        run: cargo check -p ngx --no-default-features --features vendored,alloc
-
       - name: check ngx, std
         run: cargo check -p ngx --no-default-features --features vendored,std
 
-      - name: check ngx, alloc + serde
-        run: cargo check -p ngx --no-default-features --features vendored,alloc,serde
+      - name: check ngx, serde
+        run: cargo check -p ngx --no-default-features --features vendored,serde
 
       - name: check ngx, async
         run: cargo check -p ngx --no-default-features --features vendored,async

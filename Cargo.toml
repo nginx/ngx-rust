@@ -43,29 +43,29 @@ default-target = "x86_64-unknown-linux-gnu"
 targets = []
 
 [dependencies]
-allocator-api2 = { version = "0.4.0", default-features = false, features = ["fresh-rust"] }
 async-task = { version = "4.7.1", optional = true }
 lock_api = "0.4.13"
 nginx-sys = { path = "nginx-sys", version = "0.5.0"}
 pin-project-lite = { version = "0.2.16", optional = true }
 
+[dependencies.allocator-api2]
+default-features = false
+features = ["alloc", "fresh-rust"]
+version = "0.4.0"
+
 [features]
 default = ["std"]
 # Enables a minimal async runtime built on top of the NGINX event loop.
 async = [
-    "alloc",
     "dep:async-task",
     "dep:pin-project-lite",
 ]
-# Provides APIs that require allocations via the `alloc` crate.
-alloc = ["allocator-api2/alloc"]
 # Enables serialization support for some of the provided and re-exported types.
 serde = [
     "allocator-api2/serde",
 ]
 # Provides APIs that require the standard library.
 std = [
-    "alloc",
     "allocator-api2/std"
 ]
 # Enables the build scripts to build a copy of nginx source and link against it.
