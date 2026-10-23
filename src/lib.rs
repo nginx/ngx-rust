@@ -67,8 +67,6 @@
 //!
 //! ## Cargo features
 //!
-//! - `alloc` - **Enabled** by default. This provides APIs that require allocations
-//!   via the `alloc` crate.
 //! - `async` - Enables a minimal async runtime built on top of the NGINX event loop.
 //! - `serde` - Enables serialization support for some of the provided and
 //!   re-exported types.
@@ -118,7 +116,7 @@
 //! ```
 #![warn(missing_docs)]
 #![no_std]
-#[cfg(feature = "alloc")]
+
 extern crate alloc;
 
 pub mod allocator;

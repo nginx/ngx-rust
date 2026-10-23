@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
   Please, use `libc` or `openssl-sys` for replacements.
 - Adjusted types for integer constants. A lot of type casts in the modules
   became unnecessary and will be flagged as such by clippy (#344).
+- Removed feature "ngx/alloc"; allocation support is now always enabled (#355).
 
 ### Features
 

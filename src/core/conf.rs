@@ -86,9 +86,6 @@ unsafe impl CoreModuleMainConf for NgxCoreModule {
 
 #[cfg(test)]
 mod tests {
-    extern crate alloc;
-    extern crate std;
-
     use alloc::boxed::Box;
     use core::ffi::c_void;
     use core::mem::MaybeUninit;

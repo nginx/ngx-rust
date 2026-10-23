@@ -76,8 +76,6 @@ patches applied.
 
 ## Cargo features
 
-- `alloc` - **Enabled** by default. This provides APIs that require allocations
-  via the `alloc` crate.
 - `async` - Enables a minimal async runtime built on top of the NGINX event loop.
 - `serde` - Enables serialization support for some of the provided and
   re-exported types.
