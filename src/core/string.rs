@@ -213,11 +213,11 @@ mod _alloc {
     #[repr(transparent)]
     pub struct NgxString<A>(Vec<u8, A>)
     where
-        A: Allocator + Clone;
+        A: Allocator;
 
     impl<A> NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         /// Constructs a new, empty `NgxString<A>`.
         ///
@@ -357,7 +357,7 @@ mod _alloc {
 
     impl<A> AsRef<NgxStr> for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn as_ref(&self) -> &NgxStr {
             self.as_ngx_str()
@@ -366,7 +366,7 @@ mod _alloc {
 
     impl<A> AsMut<NgxStr> for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn as_mut(&mut self) -> &mut NgxStr {
             self.as_ngx_str_mut()
@@ -375,7 +375,7 @@ mod _alloc {
 
     impl<A> AsRef<[u8]> for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         #[inline]
         fn as_ref(&self) -> &[u8] {
@@ -385,7 +385,7 @@ mod _alloc {
 
     impl<A> AsMut<[u8]> for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         #[inline]
         fn as_mut(&mut self) -> &mut [u8] {
@@ -395,7 +395,7 @@ mod _alloc {
 
     impl<A> Borrow<NgxStr> for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn borrow(&self) -> &NgxStr {
             self.as_ngx_str()
@@ -404,7 +404,7 @@ mod _alloc {
 
     impl<A> Borrow<[u8]> for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn borrow(&self) -> &[u8] {
             self.0.as_slice()
@@ -413,7 +413,7 @@ mod _alloc {
 
     impl<A> fmt::Debug for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         #[inline]
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -426,7 +426,7 @@ mod _alloc {
 
     impl<A> ops::Deref for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         type Target = NgxStr;
 
@@ -437,7 +437,7 @@ mod _alloc {
 
     impl<A> ops::DerefMut for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn deref_mut(&mut self) -> &mut Self::Target {
             self.as_ngx_str_mut()
@@ -446,7 +446,7 @@ mod _alloc {
 
     impl<A> fmt::Display for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             fmt::Display::fmt(self.as_ngx_str(), f)
@@ -455,7 +455,7 @@ mod _alloc {
 
     impl<A> hash::Hash for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn hash<H: hash::Hasher>(&self, state: &mut H) {
             self.0.hash(state);
@@ -466,20 +466,20 @@ mod _alloc {
 
     impl<A1, A2> PartialEq<NgxString<A2>> for NgxString<A1>
     where
-        A1: Allocator + Clone,
-        A2: Allocator + Clone,
+        A1: Allocator,
+        A2: Allocator,
     {
         fn eq(&self, other: &NgxString<A2>) -> bool {
             PartialEq::eq(self.as_bytes(), other.as_bytes())
         }
     }
 
-    impl<A> Eq for NgxString<A> where A: Allocator + Clone {}
+    impl<A> Eq for NgxString<A> where A: Allocator {}
 
     impl<A1, A2> PartialOrd<NgxString<A2>> for NgxString<A1>
     where
-        A1: Allocator + Clone,
-        A2: Allocator + Clone,
+        A1: Allocator,
+        A2: Allocator,
     {
         fn partial_cmp(&self, other: &NgxString<A2>) -> Option<cmp::Ordering> {
             Some(Ord::cmp(self.as_bytes(), other.as_bytes()))
@@ -488,14 +488,14 @@ mod _alloc {
 
     impl<A> Ord for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn cmp(&self, other: &Self) -> cmp::Ordering {
             Ord::cmp(self.as_bytes(), other.as_bytes())
         }
     }
 
-    impl<OA: Allocator + Clone> allocator::TryCloneIn for NgxString<OA> {
+    impl<OA: Allocator> allocator::TryCloneIn for NgxString<OA> {
         type Target<A: Allocator + Clone> = NgxString<A>;
 
         fn try_clone_in<A: Allocator + Clone>(
@@ -508,7 +508,7 @@ mod _alloc {
 
     impl<A> fmt::Write for NgxString<A>
     where
-        A: Allocator + Clone,
+        A: Allocator,
     {
         fn write_str(&mut self, s: &str) -> fmt::Result {
             self.try_append(s).map_err(|_| fmt::Error)
@@ -517,15 +517,15 @@ mod _alloc {
 
     // Implement byte comparisons directly, leave the rest to Deref<Target = NgxStr>.
 
-    impl_partial_eq!(NgxString<A>, &'a [u8]; A: Allocator + Clone);
-    impl_partial_eq!(NgxString<A>, &'a [u8; N]; A: Allocator + Clone, const N: usize);
-    impl_partial_eq!(NgxString<A>, &'a NgxStr; A: Allocator + Clone);
-    impl_partial_eq!(NgxString<A>, ngx_str_t; A: Allocator + Clone);
+    impl_partial_eq!(NgxString<A>, &'a [u8]; A: Allocator);
+    impl_partial_eq!(NgxString<A>, &'a [u8; N]; A: Allocator, const N: usize);
+    impl_partial_eq!(NgxString<A>, &'a NgxStr; A: Allocator);
+    impl_partial_eq!(NgxString<A>, ngx_str_t; A: Allocator);
 
-    impl_partial_ord!(NgxString<A>, &'a [u8]; A: Allocator + Clone);
-    impl_partial_ord!(NgxString<A>, &'a [u8; N]; A: Allocator + Clone, const N: usize);
-    impl_partial_ord!(NgxString<A>, &'a NgxStr; A: Allocator + Clone);
-    impl_partial_ord!(NgxString<A>, ngx_str_t; A: Allocator + Clone);
+    impl_partial_ord!(NgxString<A>, &'a [u8]; A: Allocator);
+    impl_partial_ord!(NgxString<A>, &'a [u8; N]; A: Allocator, const N: usize);
+    impl_partial_ord!(NgxString<A>, &'a NgxStr; A: Allocator);
+    impl_partial_ord!(NgxString<A>, ngx_str_t; A: Allocator);
 
     impl_partial_eq!(NgxStr, String);
     impl_partial_eq!(&'a NgxStr, String);
