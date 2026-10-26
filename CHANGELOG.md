@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Breaking changes
+
+- `allocator-api2` updated to 0.4.0
+- Edition 2024 and MSRV 1.85.0
+- HTTP and Stream bindings generation is now feature-controlled.
+  HTTP remains enabled by default; Stream modules must explicitly enable
+  `nginx-sys/stream` (#271).
+- Removed all standard library and dependency symbols from the bindings (#344).
+  Please, use `libc` or `openssl-sys` for replacements.
+- Adjusted types for integer constants. A lot of type casts in the modules
+  became unnecessary and will be flagged as such by clippy (#344).
+
+### Features
+
+* Traits for HTTP request handlers (#221)
+* Allow bindings generation for the Mail module (#271)
+* Core module configuration accessors (#272)
+* Support building with forks of NGINX (#349)
+
+### Bugfixes
+
+* In level filtering of logging macros (#267)
+* Double-free in ngx::async_::Resolver (#282)
+* Compatibility with misbehaving 3rd party async libraries (#295)
+* Invalid memory access in misconfigured ngx::async_::Resolver (#303)
+* Invalid accessors to ngx_http_request_t bitflags (#328, via bindgen 0.73.x)
+* Grow NgxString on write! instead of failing within capacity (#333)
+* Lints, warnings and dependency updates.
+
 ## Release 0.5.0
 
 ### Breaking changes
