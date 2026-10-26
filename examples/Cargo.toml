@@ -51,6 +51,11 @@ path = "async.rs"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "rustyindex"
+path = "rustyindex.rs"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "shared_dict"
 path = "shared_dict.rs"
 crate-type = ["cdylib"]
