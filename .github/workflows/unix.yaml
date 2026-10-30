@@ -16,6 +16,8 @@ concurrency:
 env:
   CARGO_INCREMENTAL: '0'
   CARGO_TERM_COLOR: 'always'
+  # Suppress warnings enabled by auto/cc/gcc.
+  CFLAGS: '-pipe -O -g'
   RUST_BACKTRACE: '1'
   NGINX_SOURCE_DIR: nginx
 
