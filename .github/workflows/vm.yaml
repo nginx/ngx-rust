@@ -93,7 +93,7 @@ jobs:
           echo PARALLEL="-j $CPU_COUNT" >> "$GITHUB_ENV"
 
       - name: start ${{ matrix.os.name }} ${{ matrix.os.version }} VM
-        uses: cross-platform-actions/action@e0b9770014ba65d5e0815f15b74031c3a635f641 # v1.6.0
+        uses: cross-platform-actions/action@82668f1fbd89d9c99487604f822cbf6716f124d3 # v1.7.0
         with:
           environment_variables: ${{ env.FORWARD_ENV }} CPU_COUNT
           operating_system: ${{ matrix.os.name }}
