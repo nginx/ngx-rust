@@ -22,6 +22,8 @@ const NGX_CONF_FEATURES: &[&str] = &[
     "api",
     "compat",
     "debug",
+    "have_d_namlen",
+    "have_d_type",
     "have_devpoll",
     "have_epollexclusive",
     "have_epollrdhup",
@@ -75,6 +77,13 @@ const NGX_CONF_FEATURES: &[&str] = &[
 /// The list of recognized values will be exported as `DEP_NGINX_OS_CHECK`.
 const NGX_CONF_OS: &[&str] =
     &["darwin", "freebsd", "gnu_hurd", "hpux", "linux", "solaris", "tru64", "win32"];
+
+/// The features detected from the C standard library and POSIX headers.
+/// These flags are meant for local consumption to isolate platform weirdness from consumers.
+const LIBC_CONF: &[&str] = &[
+    // POSIX.1-2008 mandated compatibility macro for timespec fields in struct stat */
+    "have_st_mtime",
+];
 
 type BoxError = Box<dyn StdError>;
 
@@ -239,11 +248,8 @@ fn generate_binding(nginx: &NginxSource) {
         .expect("rust-version is valid and supported by bindgen");
 
     // Functions that we need for macro and inline fn reimplementations in the nginx-sys itself.
-    let macro_dependencies: &[_] = if env::var("CARGO_CFG_WINDOWS").is_ok() {
-        &["SwitchToThread", "rand"]
-    } else {
-        &["random", "sched_yield", "usleep"]
-    };
+    let macro_dependencies: &[_] =
+        if env::var("CARGO_CFG_WINDOWS").is_ok() { &["SwitchToThread"] } else { &["random"] };
 
     let callbacks = Box::new(parse_callbacks::NginxCallbacks::default());
 
@@ -255,6 +261,8 @@ fn generate_binding(nginx: &NginxSource) {
         .allowlist_var("[Tt][Ee][Nn][Gg][Ii][Nn][Ee]_.*")
         // ...and a couple of symbols we need in nginx-sys.
         .allowlist_function(macro_dependencies.join("|"))
+        // Reimplemented in nginx-sys as functions returning ngx_fd_t on all platforms.
+        .blocklist_item("ngx_std(out|err)")
         .parse_callbacks(callbacks)
         .generate_cstr(true)
         // The input header we would like to generate bindings for.
@@ -391,6 +399,8 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
             println!("cargo::metadata=version={}", unquote(value));
         } else if name == "nginx_version_number" {
             println!("cargo::metadata=version_number={value}");
+        } else if LIBC_CONF.contains(&name.as_str()) {
+            println!("cargo::rustc-cfg={name}={value}")
         } else if NGX_CONF_OS.contains(&name.as_str()) {
             ngx_os = name;
         } else if NGX_CONF_FEATURES.contains(&name.as_str()) && value != "0" {
@@ -416,6 +426,10 @@ pub fn print_cargo_metadata<T: AsRef<Path>>(
             .collect::<Vec<_>>()
             .join(" ")
     );
+
+    for name in LIBC_CONF {
+        println!("cargo::rustc-check-cfg=cfg({name}, values(any()))");
+    }
 
     // A quoted list of all recognized features to be passed to rustc-check-cfg.
     let values = NGX_CONF_FEATURES.join("\",\"");
@@ -489,6 +503,11 @@ RUST_CONF_NGINX_NAME=NGINX_NAME
 RUST_CONF_NGINX_BUILD=NGINX_VER_BUILD
 RUST_CONF_NGINX_VERSION=NGINX_VER
 RUST_CONF_NGINX_VERSION_NUMBER=nginx_version
+
+#ifdef st_mtime
+RUST_CONF_HAVE_ST_MTIME=ngx_value(st_mtime)
+#endif
+
 "
     )?;
 
