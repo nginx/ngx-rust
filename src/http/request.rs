@@ -221,6 +221,42 @@ impl Request {
         Some(self.0.upstream)
     }
 
+    /// Cache lookup outcome for this request, mirroring
+    /// `$upstream_cache_status`.  `None` when the request did not
+    /// consult any cache (no `proxy_cache` / `fastcgi_cache` /
+    /// configured, or the request was processed before nginx
+    /// classified it).
+    #[cfg(ngx_feature = "http_cache")]
+    pub fn cache_status(&self) -> Option<crate::http::CacheStatus> {
+        if self.0.upstream.is_null() {
+            return None;
+        }
+        // SAFETY: `upstream` is non-null per the check above and is
+        // populated by nginx core for the lifetime of the request.
+        let status = unsafe { (*self.0.upstream).cache_status() };
+        crate::http::CacheStatus::from_raw(status as ngx_uint_t)
+    }
+
+    /// The file cache consulted for this request, or `None` when no
+    /// cache lookup happened.
+    #[cfg(ngx_feature = "http_cache")]
+    pub fn file_cache(&self) -> Option<&crate::http::FileCache> {
+        if self.0.cache.is_null() {
+            return None;
+        }
+        // SAFETY: `cache` is non-null per the check above, and points to
+        // an `ngx_http_cache_t` in the request pool.  The file cache it
+        // refers to is set up by `ngx_http_file_cache_init` and lives as
+        // long as the configuration, which outlives the request.
+        unsafe {
+            let file_cache = (*self.0.cache).file_cache;
+            if file_cache.is_null() {
+                return None;
+            }
+            Some(crate::http::FileCache::from_ptr(file_cache))
+        }
+    }
+
     /// Pointer to a [`ngx_connection_t`] client connection object.
     ///
     /// [`ngx_connection_t`]: https://nginx.org/en/docs/dev/development_guide.html#connection
@@ -798,4 +834,62 @@ enum MethodInner {
     Patch,
     Trace,
     Connect,
+}
+
+#[cfg(all(test, ngx_feature = "http_cache"))]
+mod tests {
+    use core::mem::MaybeUninit;
+
+    use super::*;
+    use crate::ffi::{
+        NGX_HTTP_CACHE_HIT, ngx_http_cache_t, ngx_http_file_cache_t, ngx_http_upstream_t,
+    };
+    use crate::http::CacheStatus;
+
+    #[test]
+    fn cache_status_is_none_unless_a_lookup_happened() {
+        let mut r: ngx_http_request_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        // SAFETY: `r` outlives `req`, and the test reads only `upstream`,
+        // which it sets up below.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        // No upstream.
+        assert_eq!(req.cache_status(), None);
+
+        // An upstream that did not consult a cache leaves 0.
+        let mut u: ngx_http_upstream_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        r.upstream = &raw mut u;
+        // SAFETY: as above; `u` also outlives `req`.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        assert_eq!(req.cache_status(), None);
+
+        u.set_cache_status(NGX_HTTP_CACHE_HIT);
+        // SAFETY: as above.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        assert_eq!(req.cache_status(), Some(CacheStatus::Hit));
+    }
+
+    #[test]
+    fn file_cache_is_none_unless_a_cache_was_consulted() {
+        let mut r: ngx_http_request_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        // SAFETY: `r` outlives `req`, and the test reads only `cache`,
+        // which it sets up below.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        assert!(req.file_cache().is_none());
+
+        // A request cache without a file cache behind it.
+        let mut empty: ngx_http_cache_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        r.cache = &raw mut empty;
+        // SAFETY: as above; `empty` also outlives `req`.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        assert!(req.file_cache().is_none());
+
+        let mut fc: ngx_http_file_cache_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut c: ngx_http_cache_t = unsafe { MaybeUninit::zeroed().assume_init() };
+        c.file_cache = &raw mut fc;
+        r.cache = &raw mut c;
+        // SAFETY: as above; `c` and `fc` also outlive `req`.
+        let req = unsafe { Request::from_ngx_http_request(&raw mut r) };
+        let got = req.file_cache().map(|x| core::ptr::from_ref(x).cast::<ngx_http_file_cache_t>());
+        assert_eq!(got, Some(core::ptr::from_ref(&fc)));
+    }
 }
