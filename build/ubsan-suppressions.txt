@@ -23,6 +23,10 @@ function:ngx_output_chain
 nonnull-attribute:ngx_http_upstream_zone_preresolve
 nonnull-attribute:ngx_stream_upstream_zone_preresolve
 
+# violates nonnull on memcpy with empty ngx_str_t
+nonnull-attribute:ngx_pstrdup
+nonnull-attribute:ngx_sprintf_str
+
 # src/http/ngx_http_script.c:800:16: runtime error: applying non-zero offset 112 to null pointer
 pointer-overflow:ngx_http_script_add_code
 pointer-overflow:ngx_stream_script_add_code

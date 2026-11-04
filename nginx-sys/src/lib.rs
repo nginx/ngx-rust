@@ -4,6 +4,7 @@
 
 pub mod detail;
 mod event;
+mod os;
 mod queue;
 mod rbtree;
 mod string;
@@ -24,10 +25,11 @@ mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
-pub use bindings::*;
-pub use event::*;
-pub use queue::*;
-pub use rbtree::*;
+pub use self::bindings::*;
+pub use self::event::*;
+pub use self::os::*;
+pub use self::queue::*;
+pub use self::rbtree::*;
 
 /// Sentinel returned by `ngx_resolve_start()` when no resolver is configured.
 ///
@@ -148,68 +150,6 @@ impl ngx_variable_value_t {
 impl AsRef<[u8]> for ngx_variable_value_t {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
-    }
-}
-
-/// Returns the error code of the last failed operation (`errno`).
-#[inline]
-pub fn ngx_errno() -> ngx_err_t {
-    errno::errno().0 as _
-}
-
-/// Sets the error code (`errno`).
-#[inline]
-pub fn ngx_set_errno(err: ngx_err_t) {
-    errno::set_errno(errno::Errno(err as _))
-}
-
-/// Returns the error code of the last failed sockets operation.
-#[inline]
-pub fn ngx_socket_errno() -> ngx_err_t {
-    // This will use GetLastError() instead of WSAGetLastError() on Windows.
-    // However, the functions are equivalent on any supported Windows version.
-    errno::errno().0 as _
-}
-
-/// Sets the error code of the sockets operation.
-#[inline]
-pub fn ngx_set_socket_errno(err: ngx_err_t) {
-    // This will use SetLastError() instead of WSASetLastError() on Windows.
-    // However, the functions are equivalent on any supported Windows version.
-    errno::set_errno(errno::Errno(err as _))
-}
-
-/// Returns a non cryptograhpically-secure pseudo-random integer.
-#[inline]
-pub fn ngx_random() -> core::ffi::c_long {
-    #[cfg(windows)]
-    unsafe {
-        // Emulate random() as Microsoft CRT does not provide it.
-        // rand() should be thread-safe in the multi-threaded CRT we link to, but will not be seeded
-        // outside of the main thread.
-        let x: u32 = ((rand() as u32) << 16) ^ ((rand() as u32) << 8) ^ (rand() as u32);
-        (0x7fffffff & x) as _
-    }
-    #[cfg(not(windows))]
-    unsafe {
-        random()
-    }
-}
-
-/// Causes the calling thread to relinquish the CPU.
-#[inline]
-pub fn ngx_sched_yield() {
-    #[cfg(windows)]
-    unsafe {
-        SwitchToThread()
-    };
-    #[cfg(all(not(windows), ngx_feature = "have_sched_yield"))]
-    unsafe {
-        sched_yield()
-    };
-    #[cfg(not(any(windows, ngx_feature = "have_sched_yield")))]
-    unsafe {
-        usleep(1)
     }
 }
 

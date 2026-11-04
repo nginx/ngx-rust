@@ -1,5 +1,6 @@
 mod buffer;
 mod conf;
+pub mod file;
 mod pool;
 pub mod slab;
 mod status;
