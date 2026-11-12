@@ -101,7 +101,7 @@ const INT_MACRO_RULES: &[(&str, IntKind)] = const {
         ("nginx_version", NGX_UINT_T),
         ("NGX_OK", NGX_INT_T),
         ("NGX_AT_FDCWD", NGX_FD_T),
-        ("NGX_FILE_ERROR", IntKind::Int),
+        ("NGX_FILE_ERROR", NGX_INT_T),
         ("NGX_INVALID_FILE", NGX_FD_T),
         ("NGX_INVALID_PID", NGX_PID_T),
         ("NGX_MODULE_UNSET_INDEX", NGX_UINT_T),

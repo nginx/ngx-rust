@@ -19,7 +19,13 @@ default-target = "x86_64-unknown-linux-gnu"
 targets = []
 
 [dependencies]
-errno = { version = "0.3.10", default-features = false }
+cfg-if = "1.0.5"
+errno.workspace = true
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies.windows-sys]
+features = ["Win32", "Win32_Storage_FileSystem", "Win32_System_Console"]
+version = ">=0.59,<0.62"
 
 [build-dependencies]
 bindgen = "0.73.2"
