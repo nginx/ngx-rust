@@ -43,6 +43,14 @@ if [ $HTTP = YES ]; then
     fi
 
     if :; then
+        ngx_module_name=ngx_http_rustyindex_module
+        ngx_module_libs=
+        ngx_rust_target_name=rustyindex
+
+        ngx_rust_module
+    fi
+
+    if :; then
         ngx_module_name=ngx_http_shared_dict_module
         ngx_module_libs=
         ngx_rust_target_name=shared_dict

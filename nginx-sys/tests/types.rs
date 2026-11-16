@@ -5,7 +5,6 @@
 //! cannot affect the projects using this crate.
 //!
 //! Verified with: 1.18.0..1.31
-use core::ffi::c_int;
 use core::mem;
 
 use nginx_sys::*;
@@ -102,7 +101,8 @@ fn core_constants() {
 
     #[cfg(not(windows))]
     let _: ngx_fd_t = NGX_INVALID_FILE;
-    let _: c_int = NGX_FILE_ERROR;
+    let _: ngx_int_t = NGX_FILE_ERROR;
+    let _: &[ngx_fd_t] = &[ngx_stdout(), ngx_stderr()];
     let _: ngx_pid_t = NGX_INVALID_PID;
 
     let _: ngx_int_t = NGX_MAX_INT_T_VALUE;

@@ -2,6 +2,7 @@
 MODULE_NAMES	= \
 	ngx_http_async_module \
 	ngx_http_curl_module \
+	ngx_http_rustyindex_module \
 	ngx_http_shared_dict_module \
 	ngx_http_upstream_custom_module
 
@@ -9,6 +10,7 @@ MODULE_NAMES	= \
 TARGET_NAMES	= \
 	async \
 	curl \
+	rustyindex \
 	shared_dict \
 	upstream
 

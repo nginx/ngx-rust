@@ -16,6 +16,7 @@ This crate provides a couple of example using [ngx](https://crates.io/crates/ngx
 - [awssig.rs](./awssig.rs) - An example of NGINX dynamic module that can sign GET request using AWS Signature v4.
 - [curl](./curl.rs) - An example of the Access Phase NGINX dynamic module that blocks HTTP requests if `user-agent` header starts with `curl`.
 - [httporigdst](./httporigdst.rs) - A dynamic module recovers the original IP address and port number of the destination packet.
+- [rustyindex](./rustyindex.rs) - A Content Phase module that lists directory contents as a markdown table, using the file and directory wrappers from `ngx::core::file`.
 - [upstream](./upstream.rs) - A dynamic module demonstrating the setup code to write an upstream filter or load balancer.
 
 To build all these examples simply run:
