@@ -9,7 +9,7 @@
 # root (`.cargo/audit.toml`).
 
 [advisories]
-ignore = ["RUSTSEC-2020-0071"]
+ignore = []
 
 # # Advisory Database Configuration
 # [database]
